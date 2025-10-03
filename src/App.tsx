@@ -1,7 +1,6 @@
-import React from 'react';
-import { POSProvider } from './context/POSContext';
 import { Router } from './components/Router';
-
+import { POSProvider } from './context/POSContext';
+import './lib/i18n';
 function App() {
   return (
     <POSProvider>
