@@ -1,20 +1,34 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePOS } from '../context/POSContext';
-import { Layout } from '../components/Layout';
+import { Layout } from '../components/layout/Layout';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { FAB } from '../components/ui/FAB';
-import { Search, Grid2x2 as Grid, List, Plus, Package, CreditCard as Edit, Trash2, Camera } from 'lucide-react';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { 
+  MagnifyingGlassIcon, 
+  Squares2X2Icon, 
+  ListBulletIcon, 
+  PlusIcon, 
+  CubeIcon, 
+  PencilIcon, 
+  TrashIcon, 
+  CameraIcon 
+} from '@heroicons/react/24/outline';
 
 export function CatalogScreen() {
+  const { t } = useTranslation();
   const { state, dispatch } = usePOS();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
-
-  const t = (en: string, hi: string) => state.store?.language === 'hi' ? hi : en;
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; itemId: string | null }>({
+    isOpen: false,
+    itemId: null
+  });
 
   const filteredItems = state.items.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -36,45 +50,52 @@ export function CatalogScreen() {
   };
 
   const handleDeleteItem = (itemId: string) => {
-    dispatch({ type: 'DELETE_ITEM', payload: itemId });
+    setDeleteConfirm({ isOpen: true, itemId });
+  };
+
+  const confirmDelete = () => {
+    if (deleteConfirm.itemId) {
+      dispatch({ type: 'DELETE_ITEM', payload: deleteConfirm.itemId });
+    }
+    setDeleteConfirm({ isOpen: false, itemId: null });
   };
 
   const EmptyState = () => (
     <div className="text-center py-12">
       <div className="mx-auto w-24 h-24 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-        <Package className="w-12 h-12 text-gray-400" />
+        <CubeIcon className="w-12 h-12 text-gray-400" />
       </div>
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {t('No items yet', 'अभी तक कोई आइटम नहीं')}
+        {t('catalog.noItemsYet')}
       </h3>
       <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-        {t('Start building your catalog by adding items or importing from photos', 'आइटम जोड़कर या फोटो से आयात करके अपनी कैटलॉग बनाना शुरू करें')}
+        {t('catalog.startBuilding')}
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          {t('Add Item', 'आइटम जोड़ें')}
+          <PlusIcon className="w-4 h-4 mr-2" />
+          {t('catalog.addItem')}
         </Button>
         <Button
           variant="secondary"
           onClick={() => dispatch({ type: 'SET_CURRENT_SCREEN', payload: 'ocr' })}
         >
-          <Camera className="w-4 h-4 mr-2" />
-          {t('Import from Photo', 'फोटो से आयात करें')}
+          <CameraIcon className="w-4 h-4 mr-2" />
+          {t('catalog.importFromPhoto')}
         </Button>
       </div>
     </div>
   );
 
   return (
-    <Layout title={t('Item Catalog', 'आइटम कैटलॉग')}>
+    <Layout title={t('catalog.title')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Search and Filter Bar */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
-              placeholder={t('Search items...', 'आइटम खोजें...')}
+              placeholder={t('catalog.searchItems')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -87,7 +108,7 @@ export function CatalogScreen() {
               onClick={() => setViewMode('grid')}
               className="px-3"
             >
-              <Grid className="h-4 w-4" />
+              <Squares2X2Icon className="h-4 w-4" />
             </Button>
             <Button
               variant={viewMode === 'list' ? 'primary' : 'secondary'}
@@ -95,7 +116,7 @@ export function CatalogScreen() {
               onClick={() => setViewMode('list')}
               className="px-3"
             >
-              <List className="h-4 w-4" />
+              <ListBulletIcon className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -107,7 +128,7 @@ export function CatalogScreen() {
           <>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {filteredItems.length} {t('items', 'आइटम')}
+                {filteredItems.length} {t('dashboard.items')}
               </h2>
             </div>
 
@@ -123,22 +144,22 @@ export function CatalogScreen() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <Package className="h-12 w-12 text-gray-400" />
+                        <CubeIcon className="h-12 w-12 text-gray-400" />
                       )}
                       {/* Stock indicators */}
                       {item.stock !== undefined && (
                         <div className="absolute top-2 right-2">
                           {item.stock === 0 ? (
                             <span className="bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">
-                              Out of Stock
+                              {t('catalog.stockStatus.outOfStock')}
                             </span>
                           ) : item.stock <= 5 ? (
                             <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">
-                              Low Stock
+                              {t('catalog.stockStatus.lowStock')}
                             </span>
                           ) : (
                             <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
-                              In Stock
+                              {t('catalog.stockStatus.inStock')}
                             </span>
                           )}
                         </div>
@@ -153,7 +174,7 @@ export function CatalogScreen() {
                       </p>
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-bold text-orange-500 dark:text-orange-400">
-                          ₹{item.price}
+                          {t('common.currency')}{item.price}
                         </span>
                         <div className="flex gap-1">
                           <Button
@@ -162,7 +183,7 @@ export function CatalogScreen() {
                             onClick={() => setEditingItem(item)}
                             className="p-2"
                           >
-                            <Edit className="h-4 w-4" />
+                            <PencilIcon className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -170,7 +191,7 @@ export function CatalogScreen() {
                             onClick={() => handleDeleteItem(item.id)}
                             className="p-2 text-red-600 hover:text-red-700"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <TrashIcon className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
@@ -191,7 +212,7 @@ export function CatalogScreen() {
                             className="w-full h-full object-cover rounded-lg"
                           />
                         ) : (
-                          <Package className="h-8 w-8 text-gray-400" />
+                          <CubeIcon className="h-8 w-8 text-gray-400" />
                         )}
                       </div>
                       <div className="ml-4 flex-1">
@@ -202,7 +223,7 @@ export function CatalogScreen() {
                           {item.category}
                         </p>
                         <p className="text-lg font-bold text-orange-500 dark:text-orange-400">
-                          ₹{item.price}
+                          {t('common.currency')}{item.price}
                         </p>
                       </div>
                       <div className="flex gap-2">
@@ -211,7 +232,7 @@ export function CatalogScreen() {
                           size="sm"
                           onClick={() => setEditingItem(item)}
                         >
-                          <Edit className="h-4 w-4" />
+                          <PencilIcon className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -219,7 +240,7 @@ export function CatalogScreen() {
                           onClick={() => handleDeleteItem(item.id)}
                           className="text-red-600 hover:text-red-700"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <TrashIcon className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -231,7 +252,7 @@ export function CatalogScreen() {
         )}
 
         {/* Floating Action Button */}
-        <FAB onClick={() => setShowAddModal(true)} />
+        <FAB onClick={() => setShowAddModal(true)} icon={<PlusIcon className="h-6 w-6" />} />
 
         {/* Add/Edit Item Modal would go here - simplified for this demo */}
         {(showAddModal || editingItem) && (
@@ -239,14 +260,14 @@ export function CatalogScreen() {
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 {editingItem 
-                  ? t('Edit Item', 'आइटम संपादित करें')
-                  : t('Add Item', 'आइटम जोड़ें')
+                  ? t('catalog.editItem')
+                  : t('catalog.addItem')
                 }
               </h2>
               <div className="space-y-4">
-                <Input label={t('Item Name', 'आइटम का नाम')} placeholder={t('Enter item name', 'आइटम का नाम दर्ज करें')} />
-                <Input label={t('Price', 'कीमत')} type="number" placeholder="0" />
-                <Input label={t('Category', 'श्रेणी')} placeholder={t('Enter category', 'श्रेणी दर्ज करें')} />
+                <Input label={t('catalog.itemName')} placeholder={t('catalog.enterItemName')} />
+                <Input label={t('catalog.price')} type="number" placeholder="0" />
+                <Input label={t('catalog.category')} placeholder={t('catalog.enterCategory')} />
               </div>
               <div className="flex gap-3 mt-6">
                 <Button 
@@ -257,7 +278,7 @@ export function CatalogScreen() {
                   }}
                   className="flex-1"
                 >
-                  {t('Cancel', 'रद्द करें')}
+                  {t('common.cancel')}
                 </Button>
                 <Button 
                   onClick={() => {
@@ -267,12 +288,21 @@ export function CatalogScreen() {
                   }}
                   className="flex-1"
                 >
-                  {t('Save', 'सेव करें')}
+                  {t('catalog.save')}
                 </Button>
               </div>
             </div>
           </div>
         )}
+
+        <ConfirmDialog
+          isOpen={deleteConfirm.isOpen}
+          onClose={() => setDeleteConfirm({ isOpen: false, itemId: null })}
+          onConfirm={confirmDelete}
+          title={t('catalog.confirmDelete')}
+          message={t('catalog.deleteConfirmation')}
+          confirmText={t('catalog.delete')}
+        />
       </div>
     </Layout>
   );
