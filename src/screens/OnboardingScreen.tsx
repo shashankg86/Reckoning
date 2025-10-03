@@ -1,40 +1,44 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePOS } from '../context/POSContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Store, ChevronRight } from 'lucide-react';
 
-const storeTypes = [
-  { value: 'restaurant', label: 'Restaurant / रेस्टोरेंट' },
-  { value: 'cafe', label: 'Cafe / कैफे' },
-  { value: 'retail', label: 'Retail Shop / खुदरा दुकान' },
-  { value: 'salon', label: 'Salon / सैलून' },
-  { value: 'pharmacy', label: 'Pharmacy / दवाखाना' },
-  { value: 'other', label: 'Other / अन्य' },
-];
-
-const languages = [
-  { value: 'en', label: 'English' },
-  { value: 'hi', label: 'हिंदी' },
-];
-
-const themes = [
-  { value: 'light', label: 'Light / हल्का' },
-  { value: 'dark', label: 'Dark / गहरा' },
-];
-
 export function OnboardingScreen() {
+  const { t } = useTranslation();
   const { dispatch } = usePOS();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     storeType: '',
     storeName: '',
-    language: 'en',
+    language: 'en', // Default to English
     theme: 'light',
   });
 
-  const t = (en: string, hi: string) => formData.language === 'hi' ? hi : en;
+  // Store type options using translations
+  const storeTypes = [
+    { value: '', label: t('onboarding.selectStoreType') },
+    { value: 'restaurant', label: t('onboarding.storeTypes.restaurant') },
+    { value: 'cafe', label: t('onboarding.storeTypes.cafe') },
+    { value: 'retail', label: t('onboarding.storeTypes.retail') },
+    { value: 'salon', label: t('onboarding.storeTypes.salon') },
+    { value: 'pharmacy', label: t('onboarding.storeTypes.pharmacy') },
+    { value: 'other', label: t('onboarding.storeTypes.other') },
+  ];
+
+  const languages = [
+    { value: 'en', label: 'English' },
+    { value: 'hi', label: 'हिंदी' },
+    { value: 'ar', label: 'العربية' },
+    { value: 'mr', label: 'मराठी' },
+  ];
+
+  const themes = [
+    { value: 'light', label: t('onboarding.themes.light') },
+    { value: 'dark', label: t('onboarding.themes.dark') },
+  ];
 
   const handleComplete = () => {
     dispatch({
@@ -82,10 +86,10 @@ export function OnboardingScreen() {
             <Store className="w-8 h-8 text-orange-500 dark:text-orange-400" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {t('Welcome to Universal POS', 'यूनिवर्सल पीओएस में आपका स्वागत है')}
+            {t('onboarding.welcome')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-2">
-            {t('Let\'s set up your store', 'आइए अपनी दुकान सेट करें')}
+            {t('onboarding.letsSetup')}
           </p>
         </div>
 
@@ -109,17 +113,14 @@ export function OnboardingScreen() {
           {step === 1 && (
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('What type of business do you have?', 'आपका व्यवसाय किस प्रकार का है?')}
+                {t('onboarding.businessType')}
               </h2>
               <Select
                 value={formData.storeType}
                 onChange={(e) =>
                   setFormData({ ...formData, storeType: e.target.value })
                 }
-                options={[
-                  { value: '', label: t('Select store type', 'दुकान का प्रकार चुनें') },
-                  ...storeTypes,
-                ]}
+                options={storeTypes}
               />
             </div>
           )}
@@ -127,14 +128,14 @@ export function OnboardingScreen() {
           {step === 2 && (
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('What\'s your store name?', 'आपकी दुकान का नाम क्या है?')}
+                {t('onboarding.storeName')}
               </h2>
               <Input
                 value={formData.storeName}
                 onChange={(e) =>
                   setFormData({ ...formData, storeName: e.target.value })
                 }
-                placeholder={t('Enter store name', 'दुकान का नाम दर्ज करें')}
+                placeholder={t('onboarding.enterStoreName')}
                 autoFocus
               />
             </div>
@@ -143,13 +144,15 @@ export function OnboardingScreen() {
           {step === 3 && (
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('Choose your language', 'अपनी भाषा चुनें')}
+                {t('onboarding.chooseLanguage')}
               </h2>
               <Select
                 value={formData.language}
-                onChange={(e) =>
+                onChange={(e) => {
                   setFormData({ ...formData, language: e.target.value })
-                }
+                  // Change i18n language immediately when selected
+                  i18n.changeLanguage(e.target.value);
+                }}
                 options={languages}
               />
             </div>
@@ -158,7 +161,7 @@ export function OnboardingScreen() {
           {step === 4 && (
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('Choose your theme', 'अपनी थीम चुनें')}
+                {t('onboarding.chooseTheme')}
               </h2>
               <Select
                 value={formData.theme}
@@ -173,7 +176,7 @@ export function OnboardingScreen() {
           <div className="flex justify-between pt-4">
             {step > 1 && (
               <Button variant="secondary" onClick={prevStep}>
-                {t('Back', 'वापस')}
+                {t('onboarding.back')}
               </Button>
             )}
             <Button
@@ -182,8 +185,8 @@ export function OnboardingScreen() {
               className={step === 1 ? 'w-full' : 'ml-auto'}
             >
               {step === 4
-                ? t('Get Started', 'शुरू करें')
-                : t('Next', 'अगला')
+                ? t('onboarding.getStarted')
+                : t('onboarding.next')
               }
               <ChevronRight className="w-4 h-4 ml-2" />
             </Button>

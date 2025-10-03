@@ -73,7 +73,7 @@ const initialState: POSState = {
   store: {
     name: 'My Store',
     type: 'retail',
-    language: 'en',
+    language: 'en', // Default to English
     theme: 'light'
   },
   items: [

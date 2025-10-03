@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePOS } from '../context/POSContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Store, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { BuildingStorefrontIcon, EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 export function LoginScreen() {
+  const { t } = useTranslation();
   const { dispatch } = usePOS();
   const [formData, setFormData] = useState({
     email: '',
@@ -33,47 +35,47 @@ export function LoginScreen() {
       <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mb-4">
-            <Store className="w-8 h-8 text-orange-500 dark:text-orange-400" />
+            <BuildingStorefrontIcon className="w-8 h-8 text-orange-500 dark:text-orange-400" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Log In
+            {t('auth.login')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Welcome back to Universal POS
+            {t('auth.welcomeBack')}
           </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="relative">
             <Input
-              label="Mobile Number or Email"
+              label={t('auth.mobileOrEmail')}
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="Enter your mobile number or email"
+              placeholder={t('auth.enterMobile')}
               required
               className="pl-10"
             />
-            <Mail className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            <EnvelopeIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
           </div>
 
           <div className="relative">
             <Input
-              label="Password"
+              label={t('auth.password')}
               type={showPassword ? 'text' : 'password'}
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              placeholder="Enter your password"
+              placeholder={t('auth.enterPassword')}
               required
               className="pl-10 pr-10"
             />
-            <Lock className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            <LockClosedIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-9 h-5 w-5 text-gray-400 hover:text-gray-600"
             >
-              {showPassword ? <EyeOff /> : <Eye />}
+              {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
             </button>
           </div>
 
@@ -86,7 +88,7 @@ export function LoginScreen() {
                 className="w-4 h-4 text-orange-500 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2"
               />
               <span className="ml-2 text-sm text-gray-600 dark:text-gray-400">
-                Remember Me
+                {t('auth.rememberMe')}
               </span>
             </label>
             <button
@@ -94,7 +96,7 @@ export function LoginScreen() {
               onClick={() => dispatch({ type: 'SET_CURRENT_SCREEN', payload: 'forgot-password' })}
               className="text-sm text-orange-500 hover:text-orange-600"
             >
-              Forgot Password?
+              {t('auth.forgotPassword')}
             </button>
           </div>
 
@@ -103,19 +105,19 @@ export function LoginScreen() {
             disabled={isLoading}
             className="w-full"
           >
-            {isLoading ? 'Logging in...' : 'Log In'}
+            {isLoading ? t('auth.loggingIn') : t('auth.login')}
           </Button>
 
           <div className="text-center">
             <span className="text-gray-600 dark:text-gray-400">
-              Don't have an account?{' '}
+              {t('auth.dontHaveAccount')}{' '}
             </span>
             <button
               type="button"
               onClick={() => dispatch({ type: 'SET_CURRENT_SCREEN', payload: 'signup' })}
               className="text-orange-500 hover:text-orange-600 font-medium"
             >
-              Sign up
+              {t('auth.signup')}
             </button>
           </div>
         </form>

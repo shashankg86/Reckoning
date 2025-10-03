@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { usePOS } from '../context/POSContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Store, Mail, Lock, Phone, Eye, EyeOff } from 'lucide-react';
+import { BuildingStorefrontIcon, EnvelopeIcon, LockClosedIcon, PhoneIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 export function SignupScreen() {
+  const { t } = useTranslation();
   const { dispatch } = usePOS();
   const [formData, setFormData] = useState({
     phone: '',
@@ -44,28 +46,28 @@ export function SignupScreen() {
       <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mb-4">
-            <Store className="w-8 h-8 text-orange-500 dark:text-orange-400" />
+            <BuildingStorefrontIcon className="w-8 h-8 text-orange-500 dark:text-orange-400" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Create Your Account
+            {t('auth.createAccount')}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Join Universal POS for seamless business management.
+            {t('auth.joinUs')}
           </p>
         </div>
 
         <form onSubmit={handleSignup} className="space-y-6">
           <div className="relative">
             <Input
-              label="Mobile Number"
+              label={t('auth.mobileOrEmail')}
               type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="e.g., +1 (555) 123-4567"
+              placeholder={t('auth.enterMobile')}
               required
               className="pl-10"
             />
-            <Phone className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            <PhoneIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
           </div>
 
           <div className="relative">
@@ -78,46 +80,46 @@ export function SignupScreen() {
               required
               className="pl-10"
             />
-            <Mail className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            <EnvelopeIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
           </div>
 
           <div className="relative">
             <Input
-              label="Password"
+              label={t('auth.password')}
               type={showPassword ? 'text' : 'password'}
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              placeholder="Create a strong password"
+              placeholder={t('auth.createPassword')}
               required
               className="pl-10 pr-10"
             />
-            <Lock className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            <LockClosedIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-9 h-5 w-5 text-gray-400 hover:text-gray-600"
             >
-              {showPassword ? <EyeOff /> : <Eye />}
+              {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
             </button>
           </div>
 
           <div className="relative">
             <Input
-              label="Confirm Password"
+              label={t('auth.confirmPassword')}
               type={showConfirmPassword ? 'text' : 'password'}
               value={formData.confirmPassword}
               onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-              placeholder="Confirm your password"
+              placeholder={t('auth.confirmNewPassword')}
               required
               className="pl-10 pr-10"
             />
-            <Lock className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            <LockClosedIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
               className="absolute right-3 top-9 h-5 w-5 text-gray-400 hover:text-gray-600"
             >
-              {showConfirmPassword ? <EyeOff /> : <Eye />}
+              {showConfirmPassword ? <EyeSlashIcon /> : <EyeIcon />}
             </button>
           </div>
 
@@ -126,19 +128,19 @@ export function SignupScreen() {
             disabled={isLoading}
             className="w-full"
           >
-            {isLoading ? 'Creating Account...' : 'Sign Up'}
+            {isLoading ? t('auth.creatingAccount') : t('auth.signup')}
           </Button>
 
           <div className="text-center">
             <span className="text-gray-600 dark:text-gray-400">
-              Already have an account?{' '}
+              {t('auth.alreadyHaveAccount')}{' '}
             </span>
             <button
               type="button"
               onClick={() => dispatch({ type: 'SET_CURRENT_SCREEN', payload: 'login' })}
               className="text-orange-500 hover:text-orange-600 font-medium"
             >
-              Log in
+              {t('auth.login')}
             </button>
           </div>
         </form>
