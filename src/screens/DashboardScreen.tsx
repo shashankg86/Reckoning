@@ -1,23 +1,23 @@
-import React from 'react';
-import { usePOS } from '../context/POSContext';
+import {
+  ArrowTrendingUpIcon,
+  ChartBarIcon,
+  ClockIcon,
+  CubeIcon,
+  CurrencyRupeeIcon,
+  DocumentTextIcon,
+  QrCodeIcon,
+  ShoppingCartIcon
+} from '@heroicons/react/24/outline';
 import { Layout } from '../components/Layout';
-import { Card, MetricCard } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { 
-  FileText, 
-  Package, 
-  Scan, 
-  BarChart3, 
-  TrendingUp,
-  IndianRupee,
-  ShoppingCart,
-  Clock
-} from 'lucide-react';
+import { Card, MetricCard } from '../components/ui/Card';
+import { usePOS } from '../context/POSContext';
 
 export function DashboardScreen() {
   const { state, dispatch } = usePOS();
-  
-  const t = (en: string, hi: string) => state.store?.language === 'hi' ? hi : en;
+
+  const t = (en: string, hi: string) =>
+    state.store?.language === 'hi' ? hi : en;
 
   const navigateToScreen = (screen: string) => {
     dispatch({ type: 'SET_CURRENT_SCREEN', payload: screen });
@@ -36,28 +36,28 @@ export function DashboardScreen() {
   const quickActions = [
     {
       id: 'invoice',
-      icon: FileText,
+      icon: DocumentTextIcon,
       labelEn: 'Create Invoice',
       labelHi: 'बिल बनाएं',
       color: 'bg-blue-100 text-blue-600',
     },
     {
       id: 'catalog',
-      icon: Package,
+      icon: CubeIcon,
       labelEn: 'Add Item',
       labelHi: 'आइटम जोड़ें',
       color: 'bg-green-100 text-green-600',
     },
     {
       id: 'ocr',
-      icon: Scan,
+      icon: QrCodeIcon,
       labelEn: 'OCR Import',
       labelHi: 'OCR आयात',
       color: 'bg-purple-100 text-purple-600',
     },
     {
       id: 'reports',
-      icon: BarChart3,
+      icon: ChartBarIcon,
       labelEn: 'View Reports',
       labelHi: 'रिपोर्ट देखें',
       color: 'bg-orange-100 text-orange-600',
@@ -73,37 +73,40 @@ export function DashboardScreen() {
             {t('Good morning,', 'सुप्रभात,')} {state.store?.name}
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            {t('Here\'s what\'s happening with your store today', 'आज आपकी दुकान में क्या हो रहा है')}
+            {t(
+              "Here's what's happening with your store today",
+              'आज आपकी दुकान में क्या हो रहा है'
+            )}
           </p>
         </div>
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <MetricCard
-            title={t('Today\'s Sales', 'आज की बिक्री')}
+            title={t("Today's Sales", 'आज की बिक्री')}
             value={`₹${todaysSales.toLocaleString('en-IN')}`}
-            icon={<IndianRupee />}
+            icon={<CurrencyRupeeIcon className="h-5 w-5" />}
             trend="up"
             trendValue={t('+12.5% from yesterday', 'कल से +12.5%')}
           />
           <MetricCard
             title={t('Orders', 'ऑर्डर')}
             value={todaysOrders.toString()}
-            icon={<ShoppingCart />}
+            icon={<ShoppingCartIcon className="h-5 w-5" />}
             trend="up"
             trendValue={t('+3 from yesterday', 'कल से +3')}
           />
           <MetricCard
             title={t('Weekly Growth', 'साप्ताहिक वृद्धि')}
             value={`+${weeklyGrowth}%`}
-            icon={<TrendingUp />}
+            icon={<ArrowTrendingUpIcon className="h-5 w-5" />}
             trend="up"
             trendValue={t('Great progress!', 'शानदार प्रगति!')}
           />
           <MetricCard
             title={t('Active Items', 'सक्रिय आइटम')}
             value={state.items.length.toString()}
-            icon={<Package />}
+            icon={<CubeIcon className="h-5 w-5" />}
             subtitle={t('in catalog', 'कैटलॉग में')}
           />
         </div>
@@ -123,11 +126,15 @@ export function DashboardScreen() {
                   onClick={() => navigateToScreen(action.id)}
                   className="h-20 flex-col space-y-2 text-center"
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${action.color}`}>
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center ${action.color}`}
+                  >
                     <Icon className="h-4 w-4" />
                   </div>
                   <span className="text-sm">
-                    {state.store?.language === 'hi' ? action.labelHi : action.labelEn}
+                    {state.store?.language === 'hi'
+                      ? action.labelHi
+                      : action.labelEn}
                   </span>
                 </Button>
               );
@@ -158,7 +165,7 @@ export function DashboardScreen() {
                 >
                   <div className="flex items-center">
                     <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
-                      <IndianRupee className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                      <CurrencyRupeeIcon className="h-4 w-4 text-orange-500 dark:text-orange-400" />
                     </div>
                     <div className="ml-3">
                       <p className="font-medium text-gray-900 dark:text-white">
@@ -170,7 +177,7 @@ export function DashboardScreen() {
                     </div>
                   </div>
                   <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                    <Clock className="h-4 w-4 mr-1" />
+                    <ClockIcon className="h-4 w-4 mr-1" />
                     {transaction.time}
                   </div>
                 </div>

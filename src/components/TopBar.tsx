@@ -1,6 +1,12 @@
-import React, { useState } from 'react';
+import {
+  BuildingStorefrontIcon,
+  GlobeAltIcon,
+  MoonIcon,
+  SunIcon,
+  UserIcon
+} from '@heroicons/react/24/outline';
+import { useState } from 'react';
 import { usePOS } from '../context/POSContext';
-import { Store, User, Sun, Moon, Globe } from 'lucide-react';
 import { Button } from './ui/Button';
 
 interface TopBarProps {
@@ -21,7 +27,8 @@ export function TopBar({ title }: TopBarProps) {
     dispatch({ type: 'SET_LANGUAGE', payload: newLanguage });
   };
 
-  const t = (en: string, hi: string) => state.store?.language === 'hi' ? hi : en;
+  const t = (en: string, hi: string) =>
+    state.store?.language === 'hi' ? hi : en;
 
   return (
     <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
@@ -29,7 +36,7 @@ export function TopBar({ title }: TopBarProps) {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <div className="flex-shrink-0 lg:hidden">
-              <Store className="h-8 w-8 text-orange-500" />
+              <BuildingStorefrontIcon className="h-8 w-8 text-orange-500" />
             </div>
             <div className="ml-4 lg:ml-0">
               <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -46,19 +53,19 @@ export function TopBar({ title }: TopBarProps) {
               className="p-2"
             >
               {state.store?.theme === 'dark' ? (
-                <Sun className="h-5 w-5" />
+                <SunIcon className="h-5 w-5" />
               ) : (
-                <Moon className="h-5 w-5" />
+                <MoonIcon className="h-5 w-5" />
               )}
             </Button>
-            
+
             <Button
               variant="ghost"
               size="sm"
               onClick={toggleLanguage}
               className="p-2"
             >
-              <Globe className="h-5 w-5" />
+              <GlobeAltIcon className="h-5 w-5" />
               <span className="ml-1 text-sm">
                 {state.store?.language === 'hi' ? 'EN' : 'हि'}
               </span>
@@ -71,7 +78,7 @@ export function TopBar({ title }: TopBarProps) {
                 onClick={() => setShowProfile(!showProfile)}
                 className="p-2"
               >
-                <User className="h-5 w-5" />
+                <UserIcon className="h-5 w-5" />
               </Button>
 
               {showProfile && (

@@ -1,27 +1,26 @@
-import React from 'react';
+import {
+  BuildingStorefrontIcon,
+  ChartBarIcon,
+  CubeIcon,
+  DocumentTextIcon,
+  HomeIcon,
+  QrCodeIcon
+} from '@heroicons/react/24/outline';
 import { usePOS } from '../context/POSContext';
-import { 
-  LayoutDashboard, 
-  Package, 
-  FileText, 
-  Scan, 
-  BarChart3,
-  Store
-} from 'lucide-react';
 
 const navItems = [
-  { id: 'dashboard', icon: LayoutDashboard, labelEn: 'Dashboard', labelHi: 'डैशबोर्ड' },
-  { id: 'catalog', icon: Package, labelEn: 'Catalog', labelHi: 'सूची' },
-  { id: 'invoice', icon: FileText, labelEn: 'Invoice', labelHi: 'बिल' },
-  { id: 'ocr', icon: Scan, labelEn: 'OCR Import', labelHi: 'OCR आयात' },
-  { id: 'reports', icon: BarChart3, labelEn: 'Reports', labelHi: 'रिपोर्ट' },
+  { id: 'dashboard', icon: HomeIcon, labelEn: 'Dashboard', labelHi: 'डैशबोर्ड' },
+  { id: 'catalog', icon: CubeIcon, labelEn: 'Catalog', labelHi: 'सूची' },
+  { id: 'invoice', icon: DocumentTextIcon, labelEn: 'Invoice', labelHi: 'बिल' },
+  { id: 'ocr', icon: QrCodeIcon, labelEn: 'OCR Import', labelHi: 'OCR आयात' },
+  { id: 'reports', icon: ChartBarIcon, labelEn: 'Reports', labelHi: 'रिपोर्ट' },
 ];
 
 export function Navigation() {
   const { state, dispatch } = usePOS();
   const currentScreen = state.currentScreen;
 
-  const t = (en: string, hi: string) => state.store?.language === 'hi' ? hi : en;
+  const t = (en: string, hi: string) => (state.store?.language === 'hi' ? hi : en);
 
   const handleNavigate = (screenId: string) => {
     dispatch({ type: 'SET_CURRENT_SCREEN', payload: screenId });
@@ -32,7 +31,7 @@ export function Navigation() {
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 lg:bg-white lg:dark:bg-gray-800 lg:border-r lg:border-gray-200 lg:dark:border-gray-700">
         <div className="flex items-center h-16 px-4 border-b border-gray-200 dark:border-gray-700">
-          <Store className="h-8 w-8 text-orange-500" />
+          <BuildingStorefrontIcon className="h-8 w-8 text-orange-500" />
           <span className="ml-2 text-lg font-semibold text-gray-900 dark:text-white">
             {t('Universal POS', 'यूनिवर्सल पीओएस')}
           </span>
@@ -45,11 +44,10 @@ export function Navigation() {
               <button
                 key={item.id}
                 onClick={() => handleNavigate(item.id)}
-                className={`w-full flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
-                  isActive
+                className={`w-full flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${isActive
                     ? 'bg-orange-100 text-orange-900 dark:bg-orange-900 dark:text-orange-100'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
-                }`}
+                  }`}
               >
                 <Icon className="mr-3 h-5 w-5 flex-shrink-0" />
                 {state.store?.language === 'hi' ? item.labelHi : item.labelEn}
@@ -69,11 +67,10 @@ export function Navigation() {
               <button
                 key={item.id}
                 onClick={() => handleNavigate(item.id)}
-                className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
-                  isActive
+                className={`flex flex-col items-center justify-center space-y-1 transition-colors ${isActive
                     ? 'text-orange-500 dark:text-orange-400'
                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
-                }`}
+                  }`}
               >
                 <Icon className="h-5 w-5" />
                 <span className="text-xs">

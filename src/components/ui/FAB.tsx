@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react';
-import { Plus } from 'lucide-react';
+import { PlusIcon } from '@heroicons/react/24/outline';
+import { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 
 interface FABProps {
@@ -8,7 +8,7 @@ interface FABProps {
   className?: string;
 }
 
-export function FAB({ onClick, icon = <Plus className="h-6 w-6" />, className }: FABProps) {
+export function FAB({ onClick, icon = <PlusIcon className="h-6 w-6" />, className }: FABProps) {
   return (
     <button
       onClick={onClick}

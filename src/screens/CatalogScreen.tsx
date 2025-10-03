@@ -1,22 +1,22 @@
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { usePOS } from '../context/POSContext';
-import { Layout } from '../components/layout/Layout';
-import { Card } from '../components/ui/Card';
-import { Input } from '../components/ui/Input';
-import { Button } from '../components/ui/Button';
-import { FAB } from '../components/ui/FAB';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { 
-  MagnifyingGlassIcon, 
-  Squares2X2Icon, 
-  ListBulletIcon, 
-  PlusIcon, 
-  CubeIcon, 
-  PencilIcon, 
-  TrashIcon, 
-  CameraIcon 
+import {
+  CameraIcon,
+  CubeIcon,
+  ListBulletIcon,
+  MagnifyingGlassIcon,
+  PencilIcon,
+  PlusIcon,
+  Squares2X2Icon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Layout } from '../components/layout/Layout';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { FAB } from '../components/ui/FAB';
+import { Input } from '../components/ui/Input';
+import { usePOS } from '../context/POSContext';
 
 export function CatalogScreen() {
   const { t } = useTranslation();
@@ -35,19 +35,6 @@ export function CatalogScreen() {
     item.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddItem = (itemData: any) => {
-    const newItem = {
-      id: Date.now().toString(),
-      ...itemData,
-    };
-    dispatch({ type: 'ADD_ITEM', payload: newItem });
-    setShowAddModal(false);
-  };
-
-  const handleEditItem = (itemData: any) => {
-    dispatch({ type: 'UPDATE_ITEM', payload: { ...editingItem, ...itemData } });
-    setEditingItem(null);
-  };
 
   const handleDeleteItem = (itemId: string) => {
     setDeleteConfirm({ isOpen: true, itemId });
@@ -138,8 +125,8 @@ export function CatalogScreen() {
                   <Card key={item.id} hover className="overflow-hidden">
                     <div className="aspect-square bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                       {item.image ? (
-                        <img 
-                          src={item.image} 
+                        <img
+                          src={item.image}
                           alt={item.name}
                           className="w-full h-full object-cover"
                         />
@@ -206,8 +193,8 @@ export function CatalogScreen() {
                     <div className="flex items-center">
                       <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
                         {item.image ? (
-                          <img 
-                            src={item.image} 
+                          <img
+                            src={item.image}
                             alt={item.name}
                             className="w-full h-full object-cover rounded-lg"
                           />
@@ -259,7 +246,7 @@ export function CatalogScreen() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {editingItem 
+                {editingItem
                   ? t('catalog.editItem')
                   : t('catalog.addItem')
                 }
@@ -270,8 +257,8 @@ export function CatalogScreen() {
                 <Input label={t('catalog.category')} placeholder={t('catalog.enterCategory')} />
               </div>
               <div className="flex gap-3 mt-6">
-                <Button 
-                  variant="secondary" 
+                <Button
+                  variant="secondary"
                   onClick={() => {
                     setShowAddModal(false);
                     setEditingItem(null);
@@ -280,7 +267,7 @@ export function CatalogScreen() {
                 >
                   {t('common.cancel')}
                 </Button>
-                <Button 
+                <Button
                   onClick={() => {
                     // Handle save logic here
                     setShowAddModal(false);

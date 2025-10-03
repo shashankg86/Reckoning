@@ -1,23 +1,35 @@
-import React, { useState } from 'react';
-import { usePOS } from '../context/POSContext';
+import {
+  MagnifyingGlassIcon,
+  MinusIcon,
+  PlusIcon,
+  PrinterIcon,
+  QrCodeIcon,
+  ShareIcon,
+  TrashIcon
+} from '@heroicons/react/24/outline';
+import { useState } from 'react';
 import { Layout } from '../components/Layout';
+import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
-import { Button } from '../components/ui/Button';
-import { Search, Plus, Minus, Trash2, Share, Printer, QrCode } from 'lucide-react';
+import { Invoice, usePOS } from '../context/POSContext';
 
 export function InvoiceScreen() {
   const { state, dispatch } = usePOS();
   const [searchTerm, setSearchTerm] = useState('');
   const [discount, setDiscount] = useState(0);
 
-  const t = (en: string, hi: string) => state.store?.language === 'hi' ? hi : en;
+  const t = (en: string, hi: string) =>
+    state.store?.language === 'hi' ? hi : en;
 
-  const filteredItems = state.items.filter(item =>
+  const filteredItems = state.items.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = state.cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
   const tax = subtotal * 0.18; // 18% GST
   const total = subtotal + tax - discount;
 
@@ -29,12 +41,15 @@ export function InvoiceScreen() {
     if (quantity <= 0) {
       dispatch({ type: 'REMOVE_FROM_CART', payload: itemId });
     } else {
-      dispatch({ type: 'UPDATE_CART_QUANTITY', payload: { id: itemId, quantity } });
+      dispatch({
+        type: 'UPDATE_CART_QUANTITY',
+        payload: { id: itemId, quantity },
+      });
     }
   };
 
   const generateInvoice = (paymentMethod: 'cash' | 'upi' | 'razorpay') => {
-    const invoice = {
+    const invoice: Invoice = {
       id: Date.now().toString(),
       items: state.cart,
       subtotal,
@@ -43,6 +58,7 @@ export function InvoiceScreen() {
       total,
       paymentMethod,
       date: new Date(),
+      status: 'paid'
     };
     dispatch({ type: 'ADD_INVOICE', payload: invoice });
     dispatch({ type: 'CLEAR_CART' });
@@ -59,9 +75,9 @@ export function InvoiceScreen() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 {t('Add Items', 'आइटम जोड़ें')}
               </h2>
-              
+
               <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
                   placeholder={t('Search items...', 'आइटम खोजें...')}
                   value={searchTerm}
@@ -90,7 +106,7 @@ export function InvoiceScreen() {
                         ₹{item.price}
                       </p>
                       <Button size="sm" className="mt-1">
-                        <Plus className="h-3 w-3" />
+                        <PlusIcon className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
@@ -119,7 +135,10 @@ export function InvoiceScreen() {
                 <>
                   <div className="space-y-3 mb-6 max-h-64 overflow-y-auto">
                     {state.cart.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                      >
                         <div className="flex-1">
                           <h3 className="font-medium text-gray-900 dark:text-white">
                             {item.name}
@@ -132,10 +151,12 @@ export function InvoiceScreen() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            onClick={() =>
+                              updateQuantity(item.id, item.quantity - 1)
+                            }
                             className="p-1"
                           >
-                            <Minus className="h-3 w-3" />
+                            <MinusIcon className="h-3 w-3" />
                           </Button>
                           <span className="w-8 text-center text-sm font-medium">
                             {item.quantity}
@@ -143,10 +164,12 @@ export function InvoiceScreen() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                            onClick={() =>
+                              updateQuantity(item.id, item.quantity + 1)
+                            }
                             className="p-1"
                           >
-                            <Plus className="h-3 w-3" />
+                            <PlusIcon className="h-3 w-3" />
                           </Button>
                           <Button
                             size="sm"
@@ -154,7 +177,7 @@ export function InvoiceScreen() {
                             onClick={() => updateQuantity(item.id, 0)}
                             className="p-1 text-red-600"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <TrashIcon className="h-3 w-3" />
                           </Button>
                         </div>
                         <div className="ml-4 text-right">
@@ -172,7 +195,9 @@ export function InvoiceScreen() {
                       label={t('Discount (₹)', 'छूट (₹)')}
                       type="number"
                       value={discount}
-                      onChange={(e) => setDiscount(Number(e.target.value) || 0)}
+                      onChange={(e) =>
+                        setDiscount(Number(e.target.value) || 0)
+                      }
                       placeholder="0"
                     />
                   </div>
@@ -232,7 +257,7 @@ export function InvoiceScreen() {
                         variant="secondary"
                         className="justify-start"
                       >
-                        <QrCode className="w-4 h-4 mr-2" />
+                        <QrCodeIcon className="w-4 h-4 mr-2" />
                         {t('UPI QR Code', 'UPI QR कोड')}
                       </Button>
                       <Button
@@ -248,11 +273,11 @@ export function InvoiceScreen() {
                   {/* Share Options */}
                   <div className="flex gap-2 pt-4">
                     <Button variant="ghost" size="sm" className="flex-1">
-                      <Share className="w-4 h-4 mr-2" />
+                      <ShareIcon className="w-4 h-4 mr-2" />
                       WhatsApp
                     </Button>
                     <Button variant="ghost" size="sm" className="flex-1">
-                      <Printer className="w-4 h-4 mr-2" />
+                      <PrinterIcon className="w-4 h-4 mr-2" />
                       {t('Print', 'प्रिंट')}
                     </Button>
                   </div>

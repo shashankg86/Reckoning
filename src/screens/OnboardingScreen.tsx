@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import {
+  BuildingStorefrontIcon,
+  ChevronRightIcon
+} from '@heroicons/react/24/outline';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePOS } from '../context/POSContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
-import { Store, ChevronRight } from 'lucide-react';
+import { usePOS } from '../context/POSContext';
 
 export function OnboardingScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { dispatch } = usePOS();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -78,12 +81,11 @@ export function OnboardingScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mb-4">
-            <Store className="w-8 h-8 text-orange-500 dark:text-orange-400" />
+            <BuildingStorefrontIcon className="w-8 h-8 text-orange-500 dark:text-orange-400" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             {t('onboarding.welcome')}
@@ -99,11 +101,8 @@ export function OnboardingScreen() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className={`w-2 h-2 rounded-full ${
-                  i <= step
-                    ? 'bg-orange-500'
-                    : 'bg-gray-300 dark:bg-gray-600'
-                }`}
+                className={`w-2 h-2 rounded-full ${i <= step ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
               />
             ))}
           </div>
@@ -149,8 +148,7 @@ export function OnboardingScreen() {
               <Select
                 value={formData.language}
                 onChange={(e) => {
-                  setFormData({ ...formData, language: e.target.value })
-                  // Change i18n language immediately when selected
+                  setFormData({ ...formData, language: e.target.value });
                   i18n.changeLanguage(e.target.value);
                 }}
                 options={languages}
@@ -186,14 +184,12 @@ export function OnboardingScreen() {
             >
               {step === 4
                 ? t('onboarding.getStarted')
-                : t('onboarding.next')
-              }
-              <ChevronRight className="w-4 h-4 ml-2" />
+                : t('onboarding.next')}
+              <ChevronRightIcon className="w-4 h-4 ml-2" />
             </Button>
           </div>
         </div>
       </div>
-    </div>
     </div>
   );
 }

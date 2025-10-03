@@ -21,7 +21,7 @@ interface CartItem extends Item {
   quantity: number;
 }
 
-interface Invoice {
+export interface Invoice {
   id: string;
   items: CartItem[];
   subtotal: number;

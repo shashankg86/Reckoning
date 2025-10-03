@@ -1,20 +1,17 @@
-import React, { useState } from 'react';
-import { usePOS } from '../context/POSContext';
+import {
+  ArrowDownTrayIcon,
+  ArrowTrendingUpIcon,
+  CubeIcon,
+  CurrencyRupeeIcon,
+  ShoppingCartIcon
+} from '@heroicons/react/24/outline';
+import { useState } from 'react';
 import { Layout } from '../components/Layout';
-import { Card, MetricCard } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { Card, MetricCard } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
-import { 
-  Calendar, 
-  Download, 
-  TrendingUp, 
-  TrendingDown,
-  IndianRupee,
-  ShoppingCart,
-  Package,
-  Users
-} from 'lucide-react';
+import { usePOS } from '../context/POSContext';
 
 export function ReportsScreen() {
   const { state } = usePOS();
@@ -81,7 +78,7 @@ export function ReportsScreen() {
                 options={dateRangeOptions}
               />
             </div>
-            
+
             {dateRange === 'custom' && (
               <>
                 <Input
@@ -98,14 +95,14 @@ export function ReportsScreen() {
                 />
               </>
             )}
-            
+
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => exportReport('csv')}>
-                <Download className="w-4 h-4 mr-2" />
+                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
                 CSV
               </Button>
               <Button variant="secondary" onClick={() => exportReport('excel')}>
-                <Download className="w-4 h-4 mr-2" />
+                <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
                 Excel
               </Button>
             </div>
@@ -117,28 +114,28 @@ export function ReportsScreen() {
           <MetricCard
             title={t('Total Sales', 'कुल बिक्री')}
             value={`₹${reportData.totalSales.toLocaleString('en-IN')}`}
-            icon={<IndianRupee />}
+            icon={<CurrencyRupeeIcon className="w-5 h-5" />}
             trend="up"
             trendValue={`+${reportData.growth.sales}%`}
           />
           <MetricCard
             title={t('Total Orders', 'कुल ऑर्डर')}
             value={reportData.totalOrders.toString()}
-            icon={<ShoppingCart />}
+            icon={<ShoppingCartIcon className="w-5 h-5" />}
             trend="up"
             trendValue={`+${reportData.growth.orders}%`}
           />
           <MetricCard
             title={t('Average Order', 'औसत ऑर्डर')}
             value={`₹${reportData.averageOrder}`}
-            icon={<TrendingUp />}
+            icon={<ArrowTrendingUpIcon className="w-5 h-5" />}
             trend="up"
             trendValue="+5.2%"
           />
           <MetricCard
             title={t('Items Sold', 'बेचे गए आइटम')}
             value="542"
-            icon={<Package />}
+            icon={<CubeIcon className="w-5 h-5" />}
             trend="up"
             trendValue="+18.1%"
           />
@@ -155,10 +152,10 @@ export function ReportsScreen() {
                 {t('This Week', 'इस सप्ताह')}
               </div>
             </div>
-            
+
             {/* Simple Bar Chart */}
             <div className="space-y-3">
-              {reportData.salesByDay.map((day, index) => (
+              {reportData.salesByDay.map((day) => (
                 <div key={day.day} className="flex items-center">
                   <div className="w-12 text-sm text-gray-600 dark:text-gray-400">
                     {day.day}
@@ -167,7 +164,6 @@ export function ReportsScreen() {
                     <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                       <div
                         className="bg-teal-600 h-2 rounded-full transition-all duration-500"
-                        className="bg-orange-500 h-2 rounded-full transition-all duration-500"
                         style={{
                           width: `${(day.sales / Math.max(...reportData.salesByDay.map(d => d.sales))) * 100}%`
                         }}
@@ -191,12 +187,11 @@ export function ReportsScreen() {
               {reportData.topSellingItems.map((item, index) => (
                 <div key={item.name} className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${
-                      index === 0 ? 'bg-yellow-500' :
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${index === 0 ? 'bg-yellow-500' :
                       index === 1 ? 'bg-gray-400' :
-                      index === 2 ? 'bg-orange-600' :
-                      'bg-gray-300'
-                    }`}>
+                        index === 2 ? 'bg-orange-600' :
+                          'bg-gray-300'
+                      }`}>
                       {index + 1}
                     </div>
                     <div className="ml-3">
