@@ -15,15 +15,9 @@ import { CatalogScreen } from '../screens/CatalogScreen';
 import { InvoiceScreen } from '../screens/InvoiceScreen';
 import { OCRImportScreen } from '../screens/OCRImportScreen';
 import { ReportsScreen } from '../screens/ReportsScreen';
+import { LoadingScreen } from './ui/Loader';
 
-// Loading component
-function LoadingScreen() {
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
-    </div>
-  );
-}
+
 
 // Protected route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
