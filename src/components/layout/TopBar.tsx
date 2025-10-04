@@ -4,6 +4,10 @@ import { usePOS } from '../../context/POSContext';
 import { BuildingStorefrontIcon, UserIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { LanguageSelector } from './LanguageSelector';
+import { CurrencySelector } from './CurrencySelector';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../lib/firebaseClient';
+import { useNavigate } from 'react-router-dom';
 
 interface TopBarProps {
   title?: string;
@@ -13,10 +17,21 @@ export function TopBar({ title }: TopBarProps) {
   const { t } = useTranslation();
   const { state, dispatch } = usePOS();
   const [showProfile, setShowProfile] = useState(false);
+  const navigate = useNavigate();
 
   const toggleTheme = () => {
     const newTheme = state.store?.theme === 'dark' ? 'light' : 'dark';
     dispatch({ type: 'SET_THEME', payload: newTheme });
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      dispatch({ type: 'LOGOUT' });
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -48,6 +63,7 @@ export function TopBar({ title }: TopBarProps) {
               )}
             </Button>
             
+            <CurrencySelector />
             <LanguageSelector />
 
             <div className="relative">
@@ -57,21 +73,35 @@ export function TopBar({ title }: TopBarProps) {
                 onClick={() => setShowProfile(!showProfile)}
                 className="p-2"
               >
-                <UserIcon className="h-5 w-5" />
+                {state.user?.photoURL ? (
+                  <img
+                    src={state.user.photoURL}
+                    alt={state.user.name || 'User'}
+                    className="h-5 w-5 rounded-full"
+                  />
+                ) : (
+                  <UserIcon className="h-5 w-5" />
+                )}
               </Button>
 
               {showProfile && (
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50">
                   <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                    <div className="font-medium">{state.store?.name}</div>
+                    <div className="font-medium">{state.user?.name || state.user?.email}</div>
                     <div className="text-gray-500 dark:text-gray-400 capitalize">
                       {state.store?.type}
                     </div>
                   </div>
-                  <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <button 
+                    onClick={() => navigate('/settings')}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
                     {t('navigation.settings')}
                   </button>
-                  <button className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <button 
+                    onClick={handleLogout}
+                    className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  >
                     {t('auth.logout')}
                   </button>
                 </div>

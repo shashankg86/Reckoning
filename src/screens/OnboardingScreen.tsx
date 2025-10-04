@@ -1,26 +1,28 @@
-import {
-  BuildingStorefrontIcon,
-  ChevronRightIcon
-} from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '../lib/firebaseClient';
+import { usePOS } from '../context/POSContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
-import { usePOS } from '../context/POSContext';
+import { BuildingStorefrontIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import type { Language, Currency, Theme } from '../context/POSContext';
 
 export function OnboardingScreen() {
   const { t, i18n } = useTranslation();
-  const { dispatch } = usePOS();
+  const { state, dispatch } = usePOS();
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     storeType: '',
     storeName: '',
-    language: 'en', // Default to English
-    theme: 'light',
+    language: 'en' as Language,
+    currency: 'INR' as Currency,
+    theme: 'light' as Theme,
   });
 
-  // Store type options using translations
   const storeTypes = [
     { value: '', label: t('onboarding.selectStoreType') },
     { value: 'restaurant', label: t('onboarding.storeTypes.restaurant') },
@@ -38,23 +40,40 @@ export function OnboardingScreen() {
     { value: 'mr', label: 'मराठी' },
   ];
 
+  const currencies = [
+    { value: 'INR', label: '₹ Indian Rupee' },
+    { value: 'AED', label: 'د.إ UAE Dirham' },
+  ];
+
   const themes = [
     { value: 'light', label: t('onboarding.themes.light') },
     { value: 'dark', label: t('onboarding.themes.dark') },
   ];
 
-  const handleComplete = () => {
-    dispatch({
-      type: 'SET_STORE',
-      payload: {
-        type: formData.storeType,
-        name: formData.storeName,
-        language: formData.language as 'en' | 'hi',
-        theme: formData.theme as 'light' | 'dark',
-      },
-    });
-    dispatch({ type: 'SET_ONBOARDED', payload: true });
-    dispatch({ type: 'SET_CURRENT_SCREEN', payload: 'dashboard' });
+  const handleComplete = async () => {
+    const storeData = {
+      type: formData.storeType,
+      name: formData.storeName,
+      language: formData.language,
+      currency: formData.currency,
+      theme: formData.theme,
+    };
+
+    try {
+      // Update user document in Firestore
+      if (state.user?.uid) {
+        await updateDoc(doc(db, 'users', state.user.uid), {
+          store: storeData,
+          isOnboarded: true
+        });
+      }
+
+      dispatch({ type: 'SET_STORE', payload: storeData });
+      dispatch({ type: 'SET_ONBOARDED', payload: true });
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error saving onboarding data:', error);
+    }
   };
 
   const nextStep = () => {
@@ -78,6 +97,15 @@ export function OnboardingScreen() {
       default:
         return false;
     }
+  };
+
+  const handleLanguageChange = (language: Language) => {
+    setFormData({ ...formData, language });
+    i18n.changeLanguage(language);
+    
+    // Auto-set currency based on language
+    const defaultCurrency = language === 'ar' ? 'AED' : 'INR';
+    setFormData(prev => ({ ...prev, language, currency: defaultCurrency }));
   };
 
   return (
@@ -147,12 +175,21 @@ export function OnboardingScreen() {
               </h2>
               <Select
                 value={formData.language}
-                onChange={(e) => {
-                  setFormData({ ...formData, language: e.target.value });
-                  i18n.changeLanguage(e.target.value);
-                }}
+                onChange={(e) => handleLanguageChange(e.target.value as Language)}
                 options={languages}
               />
+              <div className="mt-4">
+                <h3 className="text-md font-medium text-gray-900 dark:text-white mb-2">
+                  {t('onboarding.chooseCurrency')}
+                </h3>
+                <Select
+                  value={formData.currency}
+                  onChange={(e) =>
+                    setFormData({ ...formData, currency: e.target.value as Currency })
+                  }
+                  options={currencies}
+                />
+              </div>
             </div>
           )}
 
@@ -164,7 +201,7 @@ export function OnboardingScreen() {
               <Select
                 value={formData.theme}
                 onChange={(e) =>
-                  setFormData({ ...formData, theme: e.target.value })
+                  setFormData({ ...formData, theme: e.target.value as Theme })
                 }
                 options={themes}
               />

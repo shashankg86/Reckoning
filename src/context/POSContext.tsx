@@ -1,10 +1,16 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import { User } from 'firebase/auth';
+
+export type Language = 'en' | 'hi' | 'ar' | 'mr';
+export type Currency = 'INR' | 'AED';
+export type Theme = 'light' | 'dark';
 
 interface Store {
   name: string;
   type: string;
-  language: 'en' | 'hi';
-  theme: 'light' | 'dark';
+  language: Language;
+  currency: Currency;
+  theme: Theme;
 }
 
 interface Item {
@@ -41,21 +47,25 @@ interface POSState {
   items: Item[];
   cart: CartItem[];
   invoices: Invoice[];
-  currentScreen: string;
   user: {
+    uid: string;
     email?: string;
     phone?: string;
     name?: string;
+    photoURL?: string;
   } | null;
+  loading: boolean;
 }
 
 type POSAction = 
+  | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_AUTHENTICATED'; payload: boolean }
   | { type: 'SET_USER'; payload: any }
   | { type: 'SET_ONBOARDED'; payload: boolean }
   | { type: 'SET_STORE'; payload: Store }
-  | { type: 'SET_THEME'; payload: 'light' | 'dark' }
-  | { type: 'SET_LANGUAGE'; payload: 'en' | 'hi' }
+  | { type: 'SET_THEME'; payload: Theme }
+  | { type: 'SET_LANGUAGE'; payload: Language }
+  | { type: 'SET_CURRENCY'; payload: Currency }
   | { type: 'ADD_ITEM'; payload: Item }
   | { type: 'UPDATE_ITEM'; payload: Item }
   | { type: 'DELETE_ITEM'; payload: string }
@@ -64,18 +74,16 @@ type POSAction =
   | { type: 'REMOVE_FROM_CART'; payload: string }
   | { type: 'CLEAR_CART' }
   | { type: 'ADD_INVOICE'; payload: Invoice }
-  | { type: 'SET_CURRENT_SCREEN'; payload: string }
   | { type: 'LOGOUT' };
+
+const getDefaultCurrency = (language: Language): Currency => {
+  return language === 'ar' ? 'AED' : 'INR';
+};
 
 const initialState: POSState = {
   isAuthenticated: false,
   isOnboarded: false,
-  store: {
-    name: 'My Store',
-    type: 'retail',
-    language: 'en', // Default to English
-    theme: 'light'
-  },
+  store: null,
   items: [
     {
       id: '1',
@@ -130,28 +138,16 @@ const initialState: POSState = {
       date: new Date('2024-11-07'),
       customer: 'Priya Sharma',
       status: 'paid'
-    },
-    {
-      id: 'INV002',
-      items: [
-        { id: '3', name: 'Dabur Honey', price: 320, category: 'Pantry', quantity: 1 }
-      ],
-      subtotal: 320,
-      discount: 0,
-      tax: 57.6,
-      total: 377.6,
-      paymentMethod: 'cash',
-      date: new Date('2024-11-07'),
-      customer: 'Rajesh Kumar',
-      status: 'pending'
     }
   ],
-  currentScreen: 'login',
-  user: null
+  user: null,
+  loading: true
 };
 
 function posReducer(state: POSState, action: POSAction): POSState {
   switch (action.type) {
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
     case 'SET_AUTHENTICATED':
       return { ...state, isAuthenticated: action.payload };
     case 'SET_USER':
@@ -166,9 +162,19 @@ function posReducer(state: POSState, action: POSAction): POSState {
         store: state.store ? { ...state.store, theme: action.payload } : null 
       };
     case 'SET_LANGUAGE':
+      const newCurrency = getDefaultCurrency(action.payload);
       return { 
         ...state, 
-        store: state.store ? { ...state.store, language: action.payload } : null 
+        store: state.store ? { 
+          ...state.store, 
+          language: action.payload,
+          currency: newCurrency
+        } : null 
+      };
+    case 'SET_CURRENCY':
+      return { 
+        ...state, 
+        store: state.store ? { ...state.store, currency: action.payload } : null 
       };
     case 'ADD_ITEM':
       return { ...state, items: [...state.items, action.payload] };
@@ -218,15 +224,10 @@ function posReducer(state: POSState, action: POSAction): POSState {
       return { ...state, cart: [] };
     case 'ADD_INVOICE':
       return { ...state, invoices: [...state.invoices, action.payload] };
-    case 'SET_CURRENT_SCREEN':
-      return { ...state, currentScreen: action.payload };
     case 'LOGOUT':
       return { 
-        ...state, 
-        isAuthenticated: false, 
-        user: null, 
-        currentScreen: 'login',
-        cart: []
+        ...initialState,
+        loading: false
       };
     default:
       return state;
@@ -242,7 +243,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(posReducer, initialState);
 
   // Apply theme to document root
-  React.useEffect(() => {
+  useEffect(() => {
     const root = document.documentElement;
     if (state.store?.theme === 'dark') {
       root.classList.add('dark');
@@ -250,6 +251,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       root.classList.remove('dark');
     }
   }, [state.store?.theme]);
+
+  // Apply RTL for Arabic
+  useEffect(() => {
+    const root = document.documentElement;
+    if (state.store?.language === 'ar') {
+      root.dir = 'rtl';
+      root.lang = 'ar';
+    } else {
+      root.dir = 'ltr';
+      root.lang = state.store?.language || 'en';
+    }
+  }, [state.store?.language]);
 
   return (
     <POSContext.Provider value={{ state, dispatch }}>

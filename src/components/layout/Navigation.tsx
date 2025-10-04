@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePOS } from '../../context/POSContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   HomeIcon, 
   RectangleStackIcon, 
@@ -19,31 +19,31 @@ import {
 
 const navItems = [
   { 
-    id: 'dashboard', 
+    path: '/dashboard', 
     icon: HomeIcon, 
     iconSolid: HomeIconSolid,
     labelKey: 'navigation.dashboard' 
   },
   { 
-    id: 'catalog', 
+    path: '/catalog', 
     icon: RectangleStackIcon, 
     iconSolid: RectangleStackIconSolid,
     labelKey: 'navigation.catalog' 
   },
   { 
-    id: 'invoice', 
+    path: '/invoice', 
     icon: DocumentTextIcon, 
     iconSolid: DocumentTextIconSolid,
     labelKey: 'navigation.invoice' 
   },
   { 
-    id: 'ocr', 
+    path: '/ocr', 
     icon: CameraIcon, 
     iconSolid: CameraIconSolid,
     labelKey: 'navigation.ocr' 
   },
   { 
-    id: 'reports', 
+    path: '/reports', 
     icon: ChartBarIcon, 
     iconSolid: ChartBarIconSolid,
     labelKey: 'navigation.reports' 
@@ -52,11 +52,11 @@ const navItems = [
 
 export function Navigation() {
   const { t } = useTranslation();
-  const { state, dispatch } = usePOS();
-  const currentScreen = state.currentScreen;
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleNavigate = (screenId: string) => {
-    dispatch({ type: 'SET_CURRENT_SCREEN', payload: screenId });
+  const handleNavigate = (path: string) => {
+    navigate(path);
   };
 
   return (
@@ -71,12 +71,12 @@ export function Navigation() {
         </div>
         <nav className="flex-1 px-2 py-4 space-y-1">
           {navItems.map((item) => {
-            const Icon = currentScreen === item.id ? item.iconSolid : item.icon;
-            const isActive = currentScreen === item.id;
+            const Icon = location.pathname === item.path ? item.iconSolid : item.icon;
+            const isActive = location.pathname === item.path;
             return (
               <button
-                key={item.id}
-                onClick={() => handleNavigate(item.id)}
+                key={item.path}
+                onClick={() => handleNavigate(item.path)}
                 className={`w-full flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
                   isActive
                     ? 'bg-orange-100 text-orange-900 dark:bg-orange-900 dark:text-orange-100'
@@ -95,12 +95,12 @@ export function Navigation() {
       <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 z-50">
         <div className="grid grid-cols-5 h-16">
           {navItems.map((item) => {
-            const Icon = currentScreen === item.id ? item.iconSolid : item.icon;
-            const isActive = currentScreen === item.id;
+            const Icon = location.pathname === item.path ? item.iconSolid : item.icon;
+            const isActive = location.pathname === item.path;
             return (
               <button
-                key={item.id}
-                onClick={() => handleNavigate(item.id)}
+                key={item.path}
+                onClick={() => handleNavigate(item.path)}
                 className={`flex flex-col items-center justify-center space-y-1 transition-colors ${
                   isActive
                     ? 'text-orange-500 dark:text-orange-400'
