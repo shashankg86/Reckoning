@@ -1,14 +1,13 @@
-import React from 'react';
 import { usePOS } from '../context/POSContext';
-import { LoginScreen } from '../screens/LoginScreen';
-import { SignupScreen } from '../screens/SignupScreen';
-import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
-import { OnboardingScreen } from '../screens/OnboardingScreen';
-import { DashboardScreen } from '../screens/DashboardScreen';
 import { CatalogScreen } from '../screens/CatalogScreen';
+import { DashboardScreen } from '../screens/DashboardScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { InvoiceScreen } from '../screens/InvoiceScreen';
+import { LoginScreen } from '../screens/LoginScreen';
 import { OCRImportScreen } from '../screens/OCRImportScreen';
+import { OnboardingScreen } from '../screens/OnboardingScreen';
 import { ReportsScreen } from '../screens/ReportsScreen';
+import { SignupScreen } from '../screens/SignupScreen';
 
 export function Router() {
   const { state } = usePOS();
