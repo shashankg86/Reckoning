@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebaseClient';
-import { usePOS } from '../context/POSContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -12,8 +9,7 @@ import type { Language, Currency, Theme } from '../context/POSContext';
 
 export function OnboardingScreen() {
   const { t, i18n } = useTranslation();
-  const { state, dispatch } = usePOS();
-  const navigate = useNavigate();
+  const { completeOnboarding, state } = useAuth();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     storeType: '',
@@ -52,28 +48,14 @@ export function OnboardingScreen() {
 
   const handleComplete = async () => {
     const storeData = {
-      type: formData.storeType,
       name: formData.storeName,
+      type: formData.storeType,
       language: formData.language,
       currency: formData.currency,
       theme: formData.theme,
     };
 
-    try {
-      // Update user document in Firestore
-      if (state.user?.uid) {
-        await updateDoc(doc(db, 'users', state.user.uid), {
-          store: storeData,
-          isOnboarded: true
-        });
-      }
-
-      dispatch({ type: 'SET_STORE', payload: storeData });
-      dispatch({ type: 'SET_ONBOARDED', payload: true });
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Error saving onboarding data:', error);
-    }
+    await completeOnboarding(storeData);
   };
 
   const nextStep = () => {

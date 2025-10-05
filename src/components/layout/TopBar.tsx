@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { usePOS } from '../../context/POSContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { BuildingStorefrontIcon, UserIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { LanguageSelector } from './LanguageSelector';
 import { CurrencySelector } from './CurrencySelector';
-import { signOut } from 'firebase/auth';
-import { auth } from '../../lib/firebaseClient';
-import { useNavigate } from 'react-router-dom';
 
 interface TopBarProps {
   title?: string;
@@ -15,23 +12,15 @@ interface TopBarProps {
 
 export function TopBar({ title }: TopBarProps) {
   const { t } = useTranslation();
-  const { state, dispatch } = usePOS();
+  const { state, logout } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
-  const navigate = useNavigate();
 
   const toggleTheme = () => {
-    const newTheme = state.store?.theme === 'dark' ? 'light' : 'dark';
-    dispatch({ type: 'SET_THEME', payload: newTheme });
+    // TODO: Implement theme toggle
   };
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      dispatch({ type: 'LOGOUT' });
-      navigate('/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+    await logout();
   };
 
   return (
@@ -44,7 +33,7 @@ export function TopBar({ title }: TopBarProps) {
             </div>
             <div className="ml-4 lg:ml-0">
               <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {title || state.store?.name || t('app.name')}
+                {title || state.user?.store?.name || t('app.name')}
               </h1>
             </div>
           </div>
@@ -56,7 +45,7 @@ export function TopBar({ title }: TopBarProps) {
               onClick={toggleTheme}
               className="p-2"
             >
-              {state.store?.theme === 'dark' ? (
+              {state.user?.store?.theme === 'dark' ? (
                 <SunIcon className="h-5 w-5" />
               ) : (
                 <MoonIcon className="h-5 w-5" />
@@ -89,11 +78,11 @@ export function TopBar({ title }: TopBarProps) {
                   <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                     <div className="font-medium">{state.user?.name || state.user?.email}</div>
                     <div className="text-gray-500 dark:text-gray-400 capitalize">
-                      {state.store?.type}
+                      {state.user?.store?.type}
                     </div>
                   </div>
                   <button 
-                    onClick={() => navigate('/settings')}
+                    onClick={() => {/* TODO: Navigate to settings */}}
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
                     {t('navigation.settings')}

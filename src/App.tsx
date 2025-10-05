@@ -1,11 +1,15 @@
 import { Router } from './components/Router';
+import { AuthProvider } from './contexts/AuthContext';
 import { POSProvider } from './context/POSContext';
 import './lib/i18n';
+
 function App() {
   return (
-    <POSProvider>
-      <Router />
-    </POSProvider>
+    <AuthProvider>
+      <POSProvider>
+        <Router />
+      </POSProvider>
+    </AuthProvider>
   );
 }
 

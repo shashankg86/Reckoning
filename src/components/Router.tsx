@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { usePOS } from '../context/POSContext';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
+import { WelcomeScreen } from './WelcomeScreen';
 
 // Auth screens
 import { LoginScreen } from '../screens/LoginScreen';
@@ -16,14 +16,13 @@ import { InvoiceScreen } from '../screens/InvoiceScreen';
 import { OCRImportScreen } from '../screens/OCRImportScreen';
 import { ReportsScreen } from '../screens/ReportsScreen';
 import { LoadingScreen } from './ui/Loader';
-
-
+import { useState } from 'react';
 
 // Protected route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { state } = usePOS();
+  const { state } = useAuth();
   
-  if (state.loading) {
+  if (state.isLoading) {
     return <LoadingScreen />;
   }
   
@@ -35,14 +34,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/onboarding" replace />;
   }
   
+  // Show welcome screen for first-time users after onboarding
+  const [showWelcome, setShowWelcome] = useState(true);
+  if (showWelcome && state.user?.isOnboarded) {
+    return <WelcomeScreen onContinue={() => setShowWelcome(false)} />;
+  }
+  
   return <>{children}</>;
 }
 
 // Auth route wrapper
 function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { state } = usePOS();
+  const { state } = useAuth();
   
-  if (state.loading) {
+  if (state.isLoading) {
     return <LoadingScreen />;
   }
   
@@ -58,9 +63,9 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
 
 // Onboarding route wrapper
 function OnboardingRoute({ children }: { children: React.ReactNode }) {
-  const { state } = usePOS();
+  const { state } = useAuth();
   
-  if (state.loading) {
+  if (state.isLoading) {
     return <LoadingScreen />;
   }
   
@@ -76,9 +81,6 @@ function OnboardingRoute({ children }: { children: React.ReactNode }) {
 }
 
 export function Router() {
-  // Initialize auth state
-  useAuth();
-  
   return (
     <BrowserRouter>
       <Routes>

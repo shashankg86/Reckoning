@@ -1,51 +1,24 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { BuildingStorefrontIcon, EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 export function LoginScreen() {
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  const { login, state } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     rememberMe: false
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    
-    try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      // Navigation will be handled by useAuth hook
-    } catch (error: any) {
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    setError('');
-    
-    try {
-      await signInWithPopup(auth, googleProvider);
-      // Navigation will be handled by useAuth hook
-    } catch (error: any) {
-      setError(error.message);
-    } finally {
-      setIsLoading(false);
-    }
+    await login(formData.email, formData.password);
   };
 
   return (
@@ -63,9 +36,9 @@ export function LoginScreen() {
           </p>
         </div>
 
-        {error && (
+        {state.error && (
           <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error}
+            {state.error}
           </div>
         )}
 
@@ -125,10 +98,10 @@ export function LoginScreen() {
 
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={state.isLoading}
             className="w-full"
           >
-            {isLoading ? t('auth.loggingIn') : t('auth.login')}
+            {state.isLoading ? t('auth.loggingIn') : t('auth.login')}
           </Button>
 
           <div className="relative">
@@ -145,8 +118,8 @@ export function LoginScreen() {
           <Button
             type="button"
             variant="secondary"
-            onClick={handleGoogleLogin}
-            disabled={isLoading}
+            onClick={() => {/* TODO: Implement Google login */}}
+            disabled={state.isLoading}
             className="w-full"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
