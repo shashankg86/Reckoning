@@ -206,6 +206,33 @@
     "remove": "हटाएं",
     "update": "अपडेट करें",
     "create": "बनाएं",
-    "currency": "₹"
+    "currency": "₹",
+    "hello": "नमस्ते",
+    "units": "इकाइयां",
+    "image": "छवि",
+    "actions": "कार्य",
+    "itemName": "वस्तु का नाम",
+    "apply": "लागू करें",
+    "justNow": "अभी",
+    "hoursAgo": "{count} घंटे पहले"
+  },
+  "welcome": {
+    "title": "वापस स्वागत है!",
+    "subtitle": "अपना व्यापार प्रबंधित करने के लिए तैयार हैं?",
+    "lastLogin": "अंतिम लॉगिन",
+    "storeInfo": "दुकान की जानकारी",
+    "storeName": "दुकान का नाम",
+    "storeType": "दुकान का प्रकार",
+    "language": "भाषा",
+    "currency": "मुद्रा",
+    "totalItems": "कुल वस्तुएं",
+    "totalInvoices": "कुल बिल",
+    "itemsInCart": "कार्ट में वस्तुएं",
+    "continueToDashboard": "डैशबोर्ड पर जाएं"
+  },
+  "onboarding": {
+    "storeLogo": "दुकान का लोगो",
+    "uploadLogo": "लोगो अपलोड करें",
+    "logoHint": "अपनी दुकान का लोगो अपलोड करें या हम आपकी प्रोफाइल तस्वीर को डिफ़ॉल्ट के रूप में उपयोग करेंगे"
   }
 }

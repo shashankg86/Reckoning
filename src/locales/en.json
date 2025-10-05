@@ -206,6 +206,33 @@
     "remove": "Remove",
     "update": "Update",
     "create": "Create",
-    "currency": "₹"
+    "currency": "₹",
+    "hello": "Hello",
+    "units": "units",
+    "image": "Image",
+    "actions": "Actions",
+    "itemName": "Item Name",
+    "apply": "Apply",
+    "justNow": "Just now",
+    "hoursAgo": "{count} hours ago"
+  },
+  "welcome": {
+    "title": "Welcome back!",
+    "subtitle": "Ready to manage your business?",
+    "lastLogin": "Last login",
+    "storeInfo": "Store Information",
+    "storeName": "Store Name",
+    "storeType": "Store Type",
+    "language": "Language",
+    "currency": "Currency",
+    "totalItems": "Total Items",
+    "totalInvoices": "Total Invoices",
+    "itemsInCart": "Items in Cart",
+    "continueToDashboard": "Continue to Dashboard"
+  },
+  "onboarding": {
+    "storeLogo": "Store Logo",
+    "uploadLogo": "Upload Logo",
+    "logoHint": "Upload your store logo or we'll use your profile picture as default"
   }
 }
