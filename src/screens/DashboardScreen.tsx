@@ -11,16 +11,18 @@ import {
 import { Layout } from '../components/Layout';
 import { Button } from '../components/ui/Button';
 import { Card, MetricCard } from '../components/ui/Card';
+import { useNavigate } from 'react-router-dom';
 import { usePOS } from '../context/POSContext';
 
 export function DashboardScreen() {
   const { state, dispatch } = usePOS();
+  const navigate = useNavigate();
 
   const t = (en: string, hi: string) =>
     state.store?.language === 'hi' ? hi : en;
 
-  const navigateToScreen = (screen: string) => {
-    dispatch({ type: 'SET_CURRENT_SCREEN', payload: screen });
+  const navigateToScreen = (path: string) => {
+    navigate(path);
   };
 
   // Sample data - in real app this would come from state/API
@@ -123,7 +125,7 @@ export function DashboardScreen() {
                 <Button
                   key={action.id}
                   variant="secondary"
-                  onClick={() => navigateToScreen(action.id)}
+                  onClick={() => navigateToScreen(`/${action.id}`)}
                   className="h-20 flex-col space-y-2 text-center"
                 >
                   <div
@@ -152,7 +154,7 @@ export function DashboardScreen() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => navigateToScreen('reports')}
+                onClick={() => navigateToScreen('/reports')}
               >
                 {t('View All', 'सभी देखें')}
               </Button>

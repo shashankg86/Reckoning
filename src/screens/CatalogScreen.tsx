@@ -14,15 +14,17 @@ import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { DataTable, Column } from '../components/ui/DataTable';
 import { FAB } from '../components/ui/FAB';
 import { Input } from '../components/ui/Input';
 import { usePOS } from '../context/POSContext';
+import type { Item } from '../types';
 
 export function CatalogScreen() {
   const { t } = useTranslation();
   const { state, dispatch } = usePOS();
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; itemId: string | null }>({
@@ -46,6 +48,75 @@ export function CatalogScreen() {
     }
     setDeleteConfirm({ isOpen: false, itemId: null });
   };
+
+  const itemColumns: Column<Item>[] = [
+    {
+      key: 'image',
+      title: t('common.image'),
+      render: (_, item) => (
+        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden">
+          {item.image ? (
+            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+          ) : (
+            <CubeIcon className="w-6 h-6 text-gray-400" />
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'name',
+      title: t('catalog.itemName'),
+      sortable: true,
+    },
+    {
+      key: 'category',
+      title: t('catalog.category'),
+      sortable: true,
+    },
+    {
+      key: 'price',
+      title: t('catalog.price'),
+      sortable: true,
+      render: (value) => `${t('common.currency')}${value}`,
+    },
+    {
+      key: 'stock',
+      title: t('catalog.stock'),
+      sortable: true,
+      render: (value, item) => (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+          (value || 0) === 0 ? 'bg-red-100 text-red-800' :
+          (value || 0) <= 5 ? 'bg-yellow-100 text-yellow-800' :
+          'bg-green-100 text-green-800'
+        }`}>
+          {value || 0} {t('common.units')}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      title: t('common.actions'),
+      render: (_, item) => (
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setEditingItem(item)}
+          >
+            <PencilIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDeleteItem(item.id)}
+            className="text-red-600 hover:text-red-700"
+          >
+            <TrashIcon className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   const EmptyState = () => (
     <div className="text-center py-12">
@@ -90,20 +161,27 @@ export function CatalogScreen() {
           </div>
           <div className="flex gap-2">
             <Button
-              variant={viewMode === 'grid' ? 'primary' : 'secondary'}
+              variant={viewMode === 'grid' ? 'primary' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('grid')}
-              className="px-3"
             >
               <Squares2X2Icon className="h-4 w-4" />
             </Button>
             <Button
-              variant={viewMode === 'list' ? 'primary' : 'secondary'}
+              variant={viewMode === 'list' ? 'primary' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('list')}
-              className="px-3"
             >
               <ListBulletIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0V4a1 1 0 011-1h16a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V10z" />
+              </svg>
             </Button>
           </div>
         </div>
@@ -119,7 +197,16 @@ export function CatalogScreen() {
               </h2>
             </div>
 
-            {viewMode === 'grid' ? (
+            {viewMode === 'table' ? (
+              <DataTable
+                data={filteredItems}
+                columns={itemColumns}
+                searchable={false}
+                emptyMessage={t('catalog.noItemsFound')}
+                emptyIcon={<CubeIcon className="w-16 h-16" />}
+                pageSize={10}
+              />
+            ) : viewMode === 'grid' ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredItems.map((item) => (
                   <Card key={item.id} hover className="overflow-hidden">
