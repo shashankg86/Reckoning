@@ -1,57 +1,54 @@
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ArrowDownTrayIcon,
   ArrowTrendingUpIcon,
   CubeIcon,
   CurrencyRupeeIcon,
-  ShoppingCartIcon
+  ShoppingCartIcon,
+  ChartBarIcon,
+  TableCellsIcon,
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
-import { Layout } from '../components/Layout';
+import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
 import { Card, MetricCard } from '../components/ui/Card';
-import { Input } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
-import { usePOS } from '../context/POSContext';
+import { DateRangePicker, DateRange } from '../components/ui/DateRangePicker';
+import { ChartContainer } from '../components/ui/ChartContainer';
+import { DataTable, Column } from '../components/ui/DataTable';
+import type { ReportView, ChartType, TopSellingItem, SalesData } from '../types';
 
 export function ReportsScreen() {
-  const { state } = usePOS();
-  const [dateRange, setDateRange] = useState('today');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const { t } = useTranslation();
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    preset: 'today'
+  });
+  const [reportView, setReportView] = useState<ReportView>('chart');
+  const [chartType, setChartType] = useState<ChartType>('bar');
 
-  const t = (en: string, hi: string) => state.store?.language === 'hi' ? hi : en;
-
-  const dateRangeOptions = [
-    { value: 'today', label: t('Today', 'आज') },
-    { value: 'yesterday', label: t('Yesterday', 'कल') },
-    { value: 'thisWeek', label: t('This Week', 'इस सप्ताह') },
-    { value: 'lastWeek', label: t('Last Week', 'पिछला सप्ताह') },
-    { value: 'thisMonth', label: t('This Month', 'इस महीने') },
-    { value: 'lastMonth', label: t('Last Month', 'पिछला महीना') },
-    { value: 'custom', label: t('Custom Range', 'कस्टम रेंज') },
-  ];
-
-  // Mock data - in real app this would be calculated from actual invoices
+  // Mock data - in real app this would come from API
   const reportData = {
     totalSales: 145620,
     totalOrders: 234,
     averageOrder: 622,
+    itemsSold: 542,
     topSellingItems: [
       { name: 'Chicken Biryani', sales: 45, revenue: 11250 },
       { name: 'Paneer Tikka', sales: 32, revenue: 5760 },
       { name: 'Dal Makhani', sales: 28, revenue: 3360 },
       { name: 'Butter Naan', sales: 56, revenue: 2520 },
       { name: 'Lassi', sales: 41, revenue: 2460 },
-    ],
+    ] as TopSellingItem[],
     salesByDay: [
-      { day: 'Mon', sales: 18500 },
-      { day: 'Tue', sales: 22300 },
-      { day: 'Wed', sales: 19800 },
-      { day: 'Thu', sales: 25100 },
-      { day: 'Fri', sales: 28400 },
-      { day: 'Sat', sales: 31200 },
-      { day: 'Sun', sales: 20320 },
-    ],
+      { date: 'Mon', sales: 18500, orders: 32 },
+      { date: 'Tue', sales: 22300, orders: 38 },
+      { date: 'Wed', sales: 19800, orders: 35 },
+      { date: 'Thu', sales: 25100, orders: 42 },
+      { date: 'Fri', sales: 28400, orders: 48 },
+      { date: 'Sat', sales: 31200, orders: 52 },
+      { date: 'Sun', sales: 20320, orders: 36 },
+    ] as SalesData[],
     growth: {
       sales: 12.5,
       orders: 8.3,
@@ -59,165 +56,249 @@ export function ReportsScreen() {
     }
   };
 
+  const chartData = {
+    labels: reportData.salesByDay.map(d => d.date),
+    datasets: [
+      {
+        label: t('reports.dailySales'),
+        data: reportData.salesByDay.map(d => d.sales),
+        backgroundColor: 'rgba(251, 146, 60, 0.5)',
+        borderColor: 'rgba(251, 146, 60, 1)',
+        borderWidth: 2,
+        fill: chartType === 'line',
+      },
+      {
+        label: t('reports.dailyOrders'),
+        data: reportData.salesByDay.map(d => d.orders),
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        borderColor: 'rgba(59, 130, 246, 1)',
+        borderWidth: 2,
+        fill: chartType === 'line',
+      },
+    ],
+  };
+
+  const pieChartData = {
+    labels: reportData.topSellingItems.map(item => item.name),
+    datasets: [
+      {
+        data: reportData.topSellingItems.map(item => item.revenue),
+        backgroundColor: [
+          'rgba(251, 146, 60, 0.8)',
+          'rgba(59, 130, 246, 0.8)',
+          'rgba(16, 185, 129, 0.8)',
+          'rgba(239, 68, 68, 0.8)',
+          'rgba(139, 92, 246, 0.8)',
+        ],
+        borderWidth: 2,
+      },
+    ],
+  };
+
+  const topItemsColumns: Column<TopSellingItem>[] = [
+    {
+      key: 'name',
+      title: t('common.itemName'),
+      sortable: true,
+    },
+    {
+      key: 'sales',
+      title: t('reports.unitsSold'),
+      sortable: true,
+      render: (value) => `${value} ${t('common.units')}`,
+    },
+    {
+      key: 'revenue',
+      title: t('reports.revenue'),
+      sortable: true,
+      render: (value) => `₹${value.toLocaleString('en-IN')}`,
+    },
+  ];
+
+  const salesColumns: Column<SalesData>[] = [
+    {
+      key: 'date',
+      title: t('common.date'),
+      sortable: true,
+    },
+    {
+      key: 'sales',
+      title: t('reports.sales'),
+      sortable: true,
+      render: (value) => `₹${value.toLocaleString('en-IN')}`,
+    },
+    {
+      key: 'orders',
+      title: t('reports.orders'),
+      sortable: true,
+    },
+  ];
+
   const exportReport = (format: 'csv' | 'excel') => {
-    // Mock export functionality
     console.log(`Exporting report as ${format}`);
+    // TODO: Implement actual export functionality
   };
 
   return (
-    <Layout title={t('Reports', 'रिपोर्ट')}>
+    <Layout title={t('reports.title')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Date Range Selector */}
-        <Card className="p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
-            <div className="flex-1">
-              <Select
-                label={t('Date Range', 'दिनांक सीमा')}
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
-                options={dateRangeOptions}
-              />
-            </div>
-
-            {dateRange === 'custom' && (
-              <>
-                <Input
-                  label={t('Start Date', 'प्रारंभ दिनांक')}
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-                <Input
-                  label={t('End Date', 'समाप्ति दिनांक')}
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </>
-            )}
-
+        {/* Header with Controls */}
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              {t('reports.title')}
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              {t('reports.subtitle')}
+            </p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+            <DateRangePicker
+              value={dateRange}
+              onChange={setDateRange}
+              className="flex-1 lg:flex-none"
+            />
+            
             <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => exportReport('csv')}>
+              <Button
+                variant={reportView === 'chart' ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => setReportView('chart')}
+              >
+                <ChartBarIcon className="w-4 h-4 mr-2" />
+                {t('reports.charts')}
+              </Button>
+              <Button
+                variant={reportView === 'statistics' ? 'primary' : 'secondary'}
+                size="sm"
+                onClick={() => setReportView('statistics')}
+              >
+                <TableCellsIcon className="w-4 h-4 mr-2" />
+                {t('reports.statistics')}
+              </Button>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" onClick={() => exportReport('csv')}>
                 <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
                 CSV
               </Button>
-              <Button variant="secondary" onClick={() => exportReport('excel')}>
+              <Button variant="secondary" size="sm" onClick={() => exportReport('excel')}>
                 <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
                 Excel
               </Button>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* Key Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <MetricCard
-            title={t('Total Sales', 'कुल बिक्री')}
+            title={t('reports.totalSales')}
             value={`₹${reportData.totalSales.toLocaleString('en-IN')}`}
             icon={<CurrencyRupeeIcon className="w-5 h-5" />}
             trend="up"
             trendValue={`+${reportData.growth.sales}%`}
           />
           <MetricCard
-            title={t('Total Orders', 'कुल ऑर्डर')}
+            title={t('reports.totalOrders')}
             value={reportData.totalOrders.toString()}
             icon={<ShoppingCartIcon className="w-5 h-5" />}
             trend="up"
             trendValue={`+${reportData.growth.orders}%`}
           />
           <MetricCard
-            title={t('Average Order', 'औसत ऑर्डर')}
+            title={t('reports.averageOrder')}
             value={`₹${reportData.averageOrder}`}
             icon={<ArrowTrendingUpIcon className="w-5 h-5" />}
             trend="up"
             trendValue="+5.2%"
           />
           <MetricCard
-            title={t('Items Sold', 'बेचे गए आइटम')}
-            value="542"
+            title={t('reports.itemsSold')}
+            value={reportData.itemsSold.toString()}
             icon={<CubeIcon className="w-5 h-5" />}
             trend="up"
             trendValue="+18.1%"
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Sales Chart */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('Daily Sales', 'दैनिक बिक्री')}
-              </h3>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                {t('This Week', 'इस सप्ताह')}
+        {/* Chart/Statistics View */}
+        {reportView === 'chart' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Sales Chart */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {t('reports.salesTrend')}
+                </h3>
+                <div className="flex gap-2">
+                  {(['line', 'bar'] as ChartType[]).map((type) => (
+                    <Button
+                      key={type}
+                      variant={chartType === type ? 'primary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setChartType(type)}
+                      className="capitalize"
+                    >
+                      {type}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </div>
+              <ChartContainer type={chartType} data={chartData} />
+            </Card>
 
-            {/* Simple Bar Chart */}
-            <div className="space-y-3">
-              {reportData.salesByDay.map((day) => (
-                <div key={day.day} className="flex items-center">
-                  <div className="w-12 text-sm text-gray-600 dark:text-gray-400">
-                    {day.day}
-                  </div>
-                  <div className="flex-1 mx-3">
-                    <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-teal-600 h-2 rounded-full transition-all duration-500"
-                        style={{
-                          width: `${(day.sales / Math.max(...reportData.salesByDay.map(d => d.sales))) * 100}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="w-20 text-sm font-medium text-gray-900 dark:text-white text-right">
-                    ₹{day.sales.toLocaleString('en-IN')}
-                  </div>
+            {/* Revenue Distribution */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {t('reports.revenueDistribution')}
+                </h3>
+                <div className="flex gap-2">
+                  {(['pie', 'doughnut'] as ChartType[]).map((type) => (
+                    <Button
+                      key={type}
+                      variant={chartType === type ? 'primary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setChartType(type)}
+                      className="capitalize"
+                    >
+                      {type}
+                    </Button>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </Card>
+              </div>
+              <ChartContainer type="doughnut" data={pieChartData} />
+            </Card>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            {/* Top Selling Items Table */}
+            <DataTable
+              data={reportData.topSellingItems}
+              columns={topItemsColumns}
+              searchPlaceholder={t('reports.searchItems')}
+              emptyMessage={t('reports.noItemsFound')}
+              pageSize={5}
+            />
 
-          {/* Top Selling Items */}
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-              {t('Top Selling Items', 'सबसे ज्यादा बिकने वाले आइटम')}
-            </h3>
-            <div className="space-y-4">
-              {reportData.topSellingItems.map((item, index) => (
-                <div key={item.name} className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${index === 0 ? 'bg-yellow-500' :
-                      index === 1 ? 'bg-gray-400' :
-                        index === 2 ? 'bg-orange-600' :
-                          'bg-gray-300'
-                      }`}>
-                      {index + 1}
-                    </div>
-                    <div className="ml-3">
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {item.name}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {item.sales} {t('sold', 'बेचा गया')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-teal-600 dark:text-teal-400">
-                      ₹{item.revenue.toLocaleString('en-IN')}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
+            {/* Daily Sales Table */}
+            <DataTable
+              data={reportData.salesByDay}
+              columns={salesColumns}
+              searchPlaceholder={t('reports.searchDates')}
+              emptyMessage={t('reports.noSalesData')}
+              pageSize={7}
+            />
+          </div>
+        )}
 
         {/* GST Summary */}
-        <Card className="p-6 mt-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            {t('GST Summary', 'जीएसटी सारांश')}
+        <Card className="p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            {t('reports.gstSummary')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -225,23 +306,23 @@ export function ReportsScreen() {
                 ₹26,212
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t('Total GST Collected', 'कुल जीएसटी संग्रहीत')}
+                {t('reports.totalGstCollected')}
               </p>
             </div>
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ₹18,420
+                ₹13,106
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t('CGST (9%)', 'CGST (9%)')}
+                CGST (9%)
               </p>
             </div>
             <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                ₹7,792
+                ₹13,106
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t('SGST (9%)', 'SGST (9%)')}
+                SGST (9%)
               </p>
             </div>
           </div>
