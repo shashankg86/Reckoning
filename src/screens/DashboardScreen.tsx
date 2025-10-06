@@ -123,7 +123,7 @@ export function DashboardScreen() {
               const Icon = action.icon;
               return (
                 <Button
-                  key={action.id}
+                  key={action.path}
                   variant="secondary"
                   onClick={() => navigateToScreen(action.path)}
                   className="h-20 flex-col space-y-2 text-center"

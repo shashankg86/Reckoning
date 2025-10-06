@@ -56,6 +56,7 @@ export function Navigation() {
   const location = useLocation();
 
   const handleNavigate = (path: string) => {
+    console.log('Navigating to:', path); // Debug log
     navigate(path);
   };
 
