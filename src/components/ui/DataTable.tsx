@@ -125,11 +125,11 @@ export function DataTable<T extends Record<string, any>>({
         </div>
       )}
       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-        {emptyMessage || t('common.noDataFound', 'No data found')}
+        {emptyMessage || t('common.noDataFound')}
       </h3>
       {searchTerm && (
         <p className="text-gray-500 dark:text-gray-400">
-          {t('common.tryDifferentSearch', 'Try adjusting your search terms')}
+          {t('common.tryDifferentSearch')}
         </p>
       )}
     </div>
@@ -139,7 +139,7 @@ export function DataTable<T extends Record<string, any>>({
     <div className="text-center py-12">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
       <p className="text-gray-500 dark:text-gray-400">
-        {t('common.loading', 'Loading...')}
+        {t('common.loading')}
       </p>
     </div>
   );
@@ -153,7 +153,7 @@ export function DataTable<T extends Record<string, any>>({
             <div className="relative flex-1 max-w-md">
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <Input
-                placeholder={searchPlaceholder || t('common.search', 'Search...')}
+                placeholder={searchPlaceholder || t('common.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -161,7 +161,7 @@ export function DataTable<T extends Record<string, any>>({
             </div>
             <div className="flex items-center space-x-2">
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                {t('common.show', 'Show')}:
+                {t('common.show')}:
               </span>
               <Select
                 value={selectedPageSize.toString()}
@@ -238,9 +238,9 @@ export function DataTable<T extends Record<string, any>>({
         <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              {t('common.showing', 'Showing')} {(currentPage - 1) * selectedPageSize + 1} {t('common.to', 'to')}{' '}
-              {Math.min(currentPage * selectedPageSize, sortedData.length)} {t('common.of', 'of')}{' '}
-              {sortedData.length} {t('common.results', 'results')}
+              {t('common.showing')} {(currentPage - 1) * selectedPageSize + 1} {t('common.to')}{' '}
+              {Math.min(currentPage * selectedPageSize, sortedData.length)} {t('common.of')}{' '}
+              {sortedData.length} {t('common.results')}
             </div>
             <div className="flex items-center space-x-2">
               <Button
@@ -252,7 +252,7 @@ export function DataTable<T extends Record<string, any>>({
                 <ChevronLeftIcon className="h-4 w-4" />
               </Button>
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                {t('common.page', 'Page')} {currentPage} {t('common.of', 'of')} {totalPages}
+                {t('common.page')} {currentPage} {t('common.of')} {totalPages}
               </span>
               <Button
                 variant="ghost"

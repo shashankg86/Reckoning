@@ -37,28 +37,28 @@ export function DashboardScreen() {
 
   const quickActions = [
     {
-      id: 'invoice',
+      path: '/invoice',
       icon: DocumentTextIcon,
       labelEn: 'Create Invoice',
       labelHi: 'बिल बनाएं',
       color: 'bg-blue-100 text-blue-600',
     },
     {
-      id: 'catalog',
+      path: '/catalog',
       icon: CubeIcon,
       labelEn: 'Add Item',
       labelHi: 'आइटम जोड़ें',
       color: 'bg-green-100 text-green-600',
     },
     {
-      id: 'ocr',
+      path: '/ocr',
       icon: QrCodeIcon,
       labelEn: 'OCR Import',
       labelHi: 'OCR आयात',
       color: 'bg-purple-100 text-purple-600',
     },
     {
-      id: 'reports',
+      path: '/reports',
       icon: ChartBarIcon,
       labelEn: 'View Reports',
       labelHi: 'रिपोर्ट देखें',
@@ -125,7 +125,7 @@ export function DashboardScreen() {
                 <Button
                   key={action.id}
                   variant="secondary"
-                  onClick={() => navigateToScreen(`/${action.id}`)}
+                  onClick={() => navigateToScreen(action.path)}
                   className="h-20 flex-col space-y-2 text-center"
                 >
                   <div

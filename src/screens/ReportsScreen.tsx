@@ -149,7 +149,7 @@ export function ReportsScreen() {
               {t('reports.title')}
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              {t('reports.subtitle')}
+              {t('reports.subtitle', 'Analyze your business performance')}
             </p>
           </div>
           
@@ -167,7 +167,7 @@ export function ReportsScreen() {
                 onClick={() => setReportView('chart')}
               >
                 <ChartBarIcon className="w-4 h-4 mr-2" />
-                {t('reports.charts')}
+                {t('reports.charts', 'Charts')}
               </Button>
               <Button
                 variant={reportView === 'statistics' ? 'primary' : 'secondary'}
@@ -175,7 +175,7 @@ export function ReportsScreen() {
                 onClick={() => setReportView('statistics')}
               >
                 <TableCellsIcon className="w-4 h-4 mr-2" />
-                {t('reports.statistics')}
+                {t('reports.statistics', 'Statistics')}
               </Button>
             </div>
             
@@ -231,7 +231,7 @@ export function ReportsScreen() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('reports.salesTrend')}
+                  {t('reports.salesTrend', 'Sales Trend')}
                 </h3>
                 <div className="flex gap-2">
                   {(['line', 'bar'] as ChartType[]).map((type) => (
@@ -254,7 +254,7 @@ export function ReportsScreen() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('reports.revenueDistribution')}
+                  {t('reports.revenueDistribution', 'Revenue Distribution')}
                 </h3>
                 <div className="flex gap-2">
                   {(['pie', 'doughnut'] as ChartType[]).map((type) => (
@@ -279,8 +279,8 @@ export function ReportsScreen() {
             <DataTable
               data={reportData.topSellingItems}
               columns={topItemsColumns}
-              searchPlaceholder={t('reports.searchItems')}
-              emptyMessage={t('reports.noItemsFound')}
+              searchPlaceholder={t('reports.searchItems', 'Search items...')}
+              emptyMessage={t('reports.noItemsFound', 'No items found')}
               pageSize={5}
             />
 
@@ -288,8 +288,8 @@ export function ReportsScreen() {
             <DataTable
               data={reportData.salesByDay}
               columns={salesColumns}
-              searchPlaceholder={t('reports.searchDates')}
-              emptyMessage={t('reports.noSalesData')}
+              searchPlaceholder={t('reports.searchDates', 'Search dates...')}
+              emptyMessage={t('reports.noSalesData', 'No sales data found')}
               pageSize={7}
             />
           </div>
