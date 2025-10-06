@@ -17,10 +17,16 @@ export function TopBar({ title }: TopBarProps) {
 
   const toggleTheme = () => {
     // TODO: Implement theme toggle
+    console.log('Theme toggle clicked');
   };
 
   const handleLogout = async () => {
-    await logout();
+    try {
+      await logout();
+      setShowProfile(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (
@@ -74,26 +80,35 @@ export function TopBar({ title }: TopBarProps) {
               </Button>
 
               {showProfile && (
-                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50">
-                  <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                    <div className="font-medium">{state.user?.name || state.user?.email}</div>
-                    <div className="text-gray-500 dark:text-gray-400 capitalize">
-                      {state.user?.store?.type}
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowProfile(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-20 border border-gray-200 dark:border-gray-700">
+                    <div className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                      <div className="font-medium">{state.user?.name || state.user?.email}</div>
+                      <div className="text-gray-500 dark:text-gray-400 capitalize">
+                        {state.user?.store?.type || 'User'}
+                      </div>
                     </div>
+                    <button 
+                      onClick={() => {
+                        setShowProfile(false);
+                        // TODO: Navigate to settings
+                      }}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {t('navigation.settings')}
+                    </button>
+                    <button 
+                      onClick={handleLogout}
+                      className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    >
+                      {t('auth.logout')}
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => {/* TODO: Navigate to settings */}}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    {t('navigation.settings')}
-                  </button>
-                  <button 
-                    onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    {t('auth.logout')}
-                  </button>
-                </div>
+                </>
               )}
             </div>
           </div>

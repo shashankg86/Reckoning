@@ -1,8 +1,19 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import AuthService, { UserProfile } from '../services/AuthService';
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  updateProfile,
+  User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebaseClient';
+import type { User, Store } from '../types';
 
 interface AuthState {
-  user: UserProfile | null;
+  user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   isOnboarded: boolean;
@@ -11,7 +22,7 @@ interface AuthState {
 
 type AuthAction =
   | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_USER'; payload: UserProfile | null }
+  | { type: 'SET_USER'; payload: User | null }
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'CLEAR_ERROR' }
   | { type: 'LOGOUT' };
@@ -54,7 +65,7 @@ interface AuthContextType {
   register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  completeOnboarding: (storeData: UserProfile['store']) => Promise<void>;
+  completeOnboarding: (storeData: Store) => Promise<void>;
   clearError: () => void;
 }
 
@@ -62,21 +73,72 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
-  const authService = AuthService.getInstance();
 
   useEffect(() => {
-    const unsubscribe = authService.onAuthStateChange((user) => {
-      dispatch({ type: 'SET_USER', payload: user });
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      
+      if (firebaseUser) {
+        try {
+          // User is signed in, fetch user data from Firestore
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            
+            // Update last login
+            await updateDoc(doc(db, 'users', firebaseUser.uid), {
+              lastLoginAt: new Date()
+            });
+
+            const user: User = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: userData.name || firebaseUser.displayName,
+              phone: userData.phone,
+              photoURL: firebaseUser.photoURL,
+              isOnboarded: userData.isOnboarded || false,
+              store: userData.store,
+              createdAt: userData.createdAt?.toDate() || new Date(),
+              lastLoginAt: new Date()
+            };
+
+            dispatch({ type: 'SET_USER', payload: user });
+          } else {
+            // New user, create document
+            const newUser: Partial<User> = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName,
+              photoURL: firebaseUser.photoURL,
+              isOnboarded: false,
+              createdAt: new Date(),
+              lastLoginAt: new Date()
+            };
+
+            await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
+            
+            dispatch({ type: 'SET_USER', payload: newUser as User });
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          dispatch({ type: 'SET_ERROR', payload: 'Failed to load user data' });
+        }
+      } else {
+        // User is signed out
+        dispatch({ type: 'SET_USER', payload: null });
+      }
     });
 
     return unsubscribe;
-  }, [authService]);
+  }, []);
 
   const login = async (email: string, password: string) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
-      await authService.login(email, password);
+      await signInWithEmailAndPassword(auth, email, password);
+      // User state will be updated by onAuthStateChanged
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
     }
@@ -86,7 +148,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
-      await authService.register(email, password, name, phone);
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      
+      // Update profile with name
+      await updateProfile(userCredential.user, { displayName: name });
+
+      // Create user document in Firestore
+      const userData: Partial<User> = {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        name: name,
+        phone: phone,
+        isOnboarded: false,
+        createdAt: new Date(),
+        lastLoginAt: new Date()
+      };
+
+      await setDoc(doc(db, 'users', userCredential.user.uid), userData);
+      // User state will be updated by onAuthStateChanged
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
     }
@@ -94,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await authService.logout();
+      await signOut(auth);
       dispatch({ type: 'LOGOUT' });
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
@@ -105,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
-      await authService.resetPassword(email);
+      await sendPasswordResetEmail(auth, email);
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
     } finally {
@@ -113,10 +193,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const completeOnboarding = async (storeData: UserProfile['store']) => {
+  const completeOnboarding = async (storeData: Store) => {
     try {
+      if (!state.user) throw new Error('No authenticated user');
+      
       dispatch({ type: 'SET_LOADING', payload: true });
-      await authService.completeOnboarding(storeData);
+      
+      const updates = {
+        store: storeData,
+        isOnboarded: true
+      };
+
+      await updateDoc(doc(db, 'users', state.user.uid), updates);
+      
+      // Update local state
+      const updatedUser: User = {
+        ...state.user,
+        ...updates
+      };
+      
+      dispatch({ type: 'SET_USER', payload: updatedUser });
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
     }

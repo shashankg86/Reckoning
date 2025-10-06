@@ -49,12 +49,6 @@ export function Router() {
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
   
-  console.log('ProtectedRoute - Auth state:', {
-    isLoading: state.isLoading,
-    isAuthenticated: state.isAuthenticated,
-    isOnboarded: state.isOnboarded
-  });
-  
   if (state.isLoading) {
     return <LoadingScreen />;
   }
