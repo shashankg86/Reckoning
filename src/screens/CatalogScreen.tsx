@@ -17,8 +17,8 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { DataTable, Column } from '../components/ui/DataTable';
 import { FAB } from '../components/ui/FAB';
 import { Input } from '../components/ui/Input';
-import { usePOS } from '../context/POSContext';
-import type { Item } from '../types';
+import { usePOS } from '../contexts/POSContext';
+import type { Item } from '../contexts/POSContext';
 
 export function CatalogScreen() {
   const { t } = useTranslation();

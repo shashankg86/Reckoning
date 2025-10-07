@@ -13,7 +13,8 @@ import {
   Filler,
 } from 'chart.js';
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
-import type { ChartType } from '../../types';
+
+type ChartType = 'line' | 'bar' | 'pie' | 'doughnut';
 
 ChartJS.register(
   CategoryScale,

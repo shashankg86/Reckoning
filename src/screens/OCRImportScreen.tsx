@@ -9,7 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Layout } from '../components/Layout';
+import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';

@@ -14,7 +14,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { usePOS } from '../contexts/POSContext';
-import type { Invoice } from '../contexts/POSContext';
+import type { Invoice, PaymentMethod } from '../contexts/POSContext';
 
 export function InvoiceScreen() {
   const { t } = useTranslation();
@@ -48,7 +48,7 @@ export function InvoiceScreen() {
     }
   };
 
-  const generateInvoice = (paymentMethod: 'cash' | 'upi' | 'razorpay') => {
+  const generateInvoice = (paymentMethod: PaymentMethod) => {
     const invoice: Invoice = {
       id: Date.now().toString(),
       items: state.cart,

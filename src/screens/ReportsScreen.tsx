@@ -15,7 +15,22 @@ import { Card, MetricCard } from '../components/ui/Card';
 import { DateRangePicker, DateRange } from '../components/ui/DateRangePicker';
 import { ChartContainer } from '../components/ui/ChartContainer';
 import { DataTable, Column } from '../components/ui/DataTable';
-import type { ReportView, ChartType, TopSellingItem, SalesData } from '../types';
+
+// Define types locally since they're specific to reports
+type ReportView = 'chart' | 'statistics';
+type ChartType = 'line' | 'bar' | 'pie' | 'doughnut';
+
+interface TopSellingItem {
+  name: string;
+  sales: number;
+  revenue: number;
+}
+
+interface SalesData {
+  date: string;
+  sales: number;
+  orders: number;
+}
 
 export function ReportsScreen() {
   const { t } = useTranslation();
