@@ -8,11 +8,12 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Layout } from '../components/Layout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
-import { usePOS } from '../context/POSContext';
+import { usePOS } from '../contexts/POSContext';
 
 //  Import parsers
 import Papa from 'papaparse';
@@ -54,6 +55,7 @@ const CURRENCY_PATTERNS = {
 };
 
 export function OCRImportScreen() {
+  const { t } = useTranslation();
   const { state, dispatch } = usePOS();
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -68,9 +70,6 @@ export function OCRImportScreen() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const pdfInputRef = useRef<HTMLInputElement | null>(null);
   const csvExcelInputRef = useRef<HTMLInputElement | null>(null);
-
-  const t = (en: string, hi: string) =>
-    state.store?.language === 'hi' ? hi : en;
 
   // --- IMAGE DETECTION AND EXTRACTION ---
   const detectAndExtractImages = async (file: File): Promise<ImageRegion[]> => {
@@ -757,7 +756,7 @@ export function OCRImportScreen() {
     setDebugText('');
     setExtractedImages([]);
     setOriginalImageData('');
-    dispatch({ type: 'SET_CURRENT_SCREEN', payload: 'catalog' });
+    // TODO: Navigate to catalog
   };
 
   // --- UI Components ---
@@ -768,29 +767,28 @@ export function OCRImportScreen() {
         <ArrowUpTrayIcon className="w-8 h-8 text-orange-500 dark:text-orange-400" />
       </div>
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {t('Import Items with Images from Menus', 'इमेज के साथ आइटम आयात करें')}
+        {t('ocr.importItems')}
       </h3>
       <p className="text-gray-500 dark:text-gray-400 mb-6">
-        {t('Upload menu photos with food images',
-          'खाने की तस्वीरों के साथ मेनू फोटो अपलोड करें')}
+        {t('ocr.uploadDescription')}
       </p>
 
       <div className="flex flex-col sm:flex-row gap-4 justify-center">
         <Button variant="primary" onClick={() => imageInputRef.current?.click()}>
           <CameraIcon className="w-4 h-4 mr-2" />
-          {t('Upload Photo', 'फोटो अपलोड करें')}
+          {t('ocr.uploadPhoto')}
         </Button>
         <input ref={imageInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
 
         <Button variant="secondary" onClick={() => pdfInputRef.current?.click()}>
           <DocumentTextIcon className="w-4 h-4 mr-2" />
-          {t('Upload PDF', 'पीडीएफ अपलोड करें')}
+          {t('ocr.uploadPdf')}
         </Button>
         <input ref={pdfInputRef} type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" />
 
         <Button variant="secondary" onClick={() => csvExcelInputRef.current?.click()}>
           <DocumentTextIcon className="w-4 h-4 mr-2" />
-          {t('Upload Excel/CSV', 'एक्सेल/CSV अपलोड करें')}
+          Excel/CSV
         </Button>
         <input
           ref={csvExcelInputRef}
@@ -810,13 +808,13 @@ export function OCRImportScreen() {
         <DocumentTextIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
       </div>
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {t('Processing with AI...', 'AI से प्रोसेसिंग...')}
+        {t('ocr.processing')}
       </h3>
       <p className="text-gray-500 dark:text-gray-400">
-        {t('Extracting items and images from your menu', 'आपके मेनू से आइटम और इमेज निकाली जा रही हैं')}
+        {t('ocr.extractingItems')}
       </p>
       <p className="text-xs text-gray-400 mt-2">
-        {t('This may take 10-30 seconds', 'इसमें 10-30 सेकंड लग सकते हैं')}
+        This may take 10-30 seconds
       </p>
     </Card>
   );
@@ -827,7 +825,7 @@ export function OCRImportScreen() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('Extracted Items', 'निकाले गए आइटम')} ({parsedItems.length})
+              {t('ocr.extractedItems')} ({parsedItems.length})
             </h2>
             {ocrConfidence > 0 && (
               <p className="text-xs text-gray-500 mt-1">
@@ -842,17 +840,17 @@ export function OCRImportScreen() {
             setExtractedImages([]);
             setOriginalImageData('');
           }}>
-            {t('Upload New', 'नया अपलोड करें')}
+            {t('ocr.uploadNew')}
           </Button>
         </div>
 
         {parsedItems.length === 0 ? (
           <div className="text-center">
-            <p className="text-gray-500 mb-4">{t('No items found. Check extracted text below.', 'कोई आइटम नहीं मिला')}</p>
+            <p className="text-gray-500 mb-4">No items found. Check extracted text below.</p>
             {debugText && (
               <details className="text-left">
                 <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 mb-2">
-                  {t('🔍 View Raw Extracted Text (Debug)', 'निकाला गया टेक्स्ट देखें')}
+                  🔍 View Raw Extracted Text (Debug)
                 </summary>
                 <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
                   {debugText}
@@ -898,28 +896,28 @@ export function OCRImportScreen() {
                           <Input
                             value={item.name}
                             onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                            placeholder={t('Item name', 'आइटम का नाम')}
+                            placeholder={t('catalog.itemName')}
                           />
                           <Input
                             type="number"
                             step="0.01"
                             value={item.price}
                             onChange={(e) => updateItem(item.id, { price: Number(e.target.value) })}
-                            placeholder={t('Price', 'कीमत')}
+                            placeholder={t('catalog.price')}
                           />
                         </div>
                       </div>
                       <Input
                         value={item.category}
                         onChange={(e) => updateItem(item.id, { category: e.target.value })}
-                        placeholder={t('Category', 'श्रेणी')}
+                        placeholder={t('catalog.category')}
                       />
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => setEditingItem(null)}>
-                          <CheckIcon className="w-3 h-3 mr-1" /> {t('Save', 'सेव')}
+                          <CheckIcon className="w-3 h-3 mr-1" /> {t('catalog.save')}
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => setEditingItem(null)}>
-                          {t('Cancel', 'रद्द')}
+                          {t('common.cancel')}
                         </Button>
                       </div>
                     </div>
@@ -943,7 +941,7 @@ export function OCRImportScreen() {
                           {item.name}
                           {item.image && (
                             <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                              {t('With Image', 'इमेज के साथ')}
+                              With Image
                             </span>
                           )}
                         </h3>
@@ -972,7 +970,7 @@ export function OCRImportScreen() {
             {debugText && (
               <details className="mb-4">
                 <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-700">
-                  {t('🔍 View Raw Text & Extracted Images', 'मूल टेक्स्ट और निकाली गई इमेज देखें')}
+                  🔍 View Raw Text & Extracted Images
                 </summary>
                 <div className="mt-2 space-y-3">
                   {extractedImages.length > 0 && (
@@ -1003,7 +1001,7 @@ export function OCRImportScreen() {
           <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
             <Button onClick={saveItemsToCatalog} className="flex-1">
               <CheckIcon className="w-4 h-4 mr-2" />
-              {t('Add All to Catalog', 'सभी को कैटलॉग में जोड़ें')} ({parsedItems.length})
+              {t('ocr.addAllToCatalog')} ({parsedItems.length})
             </Button>
           </div>
         )}
@@ -1012,7 +1010,7 @@ export function OCRImportScreen() {
   );
 
   return (
-    <Layout title={t('Smart OCR Import', 'स्मार्ट OCR आयात')}>
+    <Layout title={t('ocr.title')}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {!uploadedFile && !isProcessing && parsedItems.length === 0 && <UploadArea />}
         {isProcessing && <ProcessingState />}
