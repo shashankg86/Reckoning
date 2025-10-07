@@ -2,8 +2,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { GlobeAltIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
-import { usePOS } from '../../context/POSContext';
-import type { Language } from '../../context/POSContext';
+import { useAuth } from '../../contexts/AuthContext';
+import type { Language } from '../../contexts/POSContext';
 
 const languages = [
   { code: 'en' as Language, name: 'English', nativeName: 'English' },
@@ -14,14 +14,15 @@ const languages = [
 
 export function LanguageSelector() {
   const { i18n } = useTranslation();
-  const { state, dispatch } = usePOS();
+  const { state } = useAuth();
   const [isOpen, setIsOpen] = React.useState(false);
 
-  const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
+  const currentLanguage = languages.find(lang => lang.code === state.user?.store?.language) || languages[0];
 
   const handleLanguageChange = (languageCode: Language) => {
     i18n.changeLanguage(languageCode);
-    dispatch({ type: 'SET_LANGUAGE', payload: languageCode });
+    // TODO: Update user store language
+    console.log('Language change:', languageCode);
     setIsOpen(false);
   };
 
@@ -50,7 +51,7 @@ export function LanguageSelector() {
                 key={language.code}
                 onClick={() => handleLanguageChange(language.code)}
                 className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${
-                  i18n.language === language.code
+                  state.user?.store?.language === language.code
                     ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
                     : 'text-gray-700 dark:text-gray-300'
                 }`}
@@ -59,7 +60,7 @@ export function LanguageSelector() {
                   <div className="font-medium">{language.nativeName}</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">{language.name}</div>
                 </div>
-                {i18n.language === language.code && (
+                {state.user?.store?.language === language.code && (
                   <div className="w-2 h-2 bg-orange-500 rounded-full" />
                 )}
               </button>

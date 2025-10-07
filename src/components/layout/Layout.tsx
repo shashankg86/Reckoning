@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { usePOS } from '../../context/POSContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Navigation } from './Navigation';
 import { TopBar } from './TopBar';
 
@@ -9,7 +9,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children, title }: LayoutProps) {
-  const { state } = usePOS();
+  const { state } = useAuth();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">

@@ -2,23 +2,27 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { CurrencyRupeeIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
-import { usePOS } from '../../context/POSContext';
-import type { Currency } from '../../context/POSContext';
+import { useAuth } from '../../contexts/AuthContext';
+import type { Currency } from '../../contexts/POSContext';
 
 const currencies = [
   { code: 'INR' as Currency, symbol: '₹', name: 'Indian Rupee' },
   { code: 'AED' as Currency, symbol: 'د.إ', name: 'UAE Dirham' },
+  { code: 'USD' as Currency, symbol: '$', name: 'US Dollar' },
+  { code: 'EUR' as Currency, symbol: '€', name: 'Euro' },
+  { code: 'GBP' as Currency, symbol: '£', name: 'British Pound' },
 ];
 
 export function CurrencySelector() {
   const { t } = useTranslation();
-  const { state, dispatch } = usePOS();
+  const { state } = useAuth();
   const [isOpen, setIsOpen] = React.useState(false);
 
-  const currentCurrency = currencies.find(curr => curr.code === state.store?.currency) || currencies[0];
+  const currentCurrency = currencies.find(curr => curr.code === state.user?.store?.currency) || currencies[0];
 
   const handleCurrencyChange = (currencyCode: Currency) => {
-    dispatch({ type: 'SET_CURRENCY', payload: currencyCode });
+    // TODO: Implement currency change
+    console.log('Currency change:', currencyCode);
     setIsOpen(false);
   };
 
@@ -47,7 +51,7 @@ export function CurrencySelector() {
                 key={currency.code}
                 onClick={() => handleCurrencyChange(currency.code)}
                 className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${
-                  state.store?.currency === currency.code
+                  state.user?.store?.currency === currency.code
                     ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
                     : 'text-gray-700 dark:text-gray-300'
                 }`}
@@ -59,7 +63,7 @@ export function CurrencySelector() {
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">{currency.code}</div>
                 </div>
-                {state.store?.currency === currency.code && (
+                {state.user?.store?.currency === currency.code && (
                   <div className="w-2 h-2 bg-orange-500 rounded-full" />
                 )}
               </button>

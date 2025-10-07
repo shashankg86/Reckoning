@@ -8,19 +8,19 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
-import { Layout } from '../components/Layout';
+import { useTranslation } from 'react-i18next';
+import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
-import { Invoice, usePOS } from '../context/POSContext';
+import { usePOS } from '../contexts/POSContext';
+import type { Invoice } from '../contexts/POSContext';
 
 export function InvoiceScreen() {
+  const { t } = useTranslation();
   const { state, dispatch } = usePOS();
   const [searchTerm, setSearchTerm] = useState('');
   const [discount, setDiscount] = useState(0);
-
-  const t = (en: string, hi: string) =>
-    state.store?.language === 'hi' ? hi : en;
 
   const filteredItems = state.items.filter((item) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -66,20 +66,20 @@ export function InvoiceScreen() {
   };
 
   return (
-    <Layout title={t('Create Invoice', 'बिल बनाएं')}>
+    <Layout title={t('invoice.title')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Item Selection */}
           <div className="space-y-6">
             <Card className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('Add Items', 'आइटम जोड़ें')}
+                {t('invoice.addItems')}
               </h2>
 
               <div className="relative mb-4">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
-                  placeholder={t('Search items...', 'आइटम खोजें...')}
+                  placeholder={t('catalog.searchItems')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -113,7 +113,7 @@ export function InvoiceScreen() {
                 ))}
                 {filteredItems.length === 0 && (
                   <p className="text-center text-gray-500 dark:text-gray-400 py-4">
-                    {t('No items found', 'कोई आइटम नहीं मिला')}
+                    {t('catalog.noItemsFound')}
                   </p>
                 )}
               </div>
@@ -124,12 +124,12 @@ export function InvoiceScreen() {
           <div className="space-y-6">
             <Card className="p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('Invoice Summary', 'बिल सारांश')}
+                {t('invoice.invoiceSummary')}
               </h2>
 
               {state.cart.length === 0 ? (
                 <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                  {t('Cart is empty', 'कार्ट खाली है')}
+                  {t('invoice.cartEmpty')}
                 </p>
               ) : (
                 <>
@@ -192,7 +192,7 @@ export function InvoiceScreen() {
                   {/* Discount Input */}
                   <div className="mb-4">
                     <Input
-                      label={t('Discount (₹)', 'छूट (₹)')}
+                      label={t('invoice.discountAmount')}
                       type="number"
                       value={discount}
                       onChange={(e) =>
@@ -206,7 +206,7 @@ export function InvoiceScreen() {
                   <div className="space-y-2 pt-4 border-t border-gray-200 dark:border-gray-600">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600 dark:text-gray-400">
-                        {t('Subtotal', 'उप-योग')}:
+                        {t('invoice.subtotal')}:
                       </span>
                       <span className="text-gray-900 dark:text-white">
                         ₹{subtotal.toFixed(2)}
@@ -214,7 +214,7 @@ export function InvoiceScreen() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600 dark:text-gray-400">
-                        {t('Tax (18% GST)', 'कर (18% जीएसटी)')}:
+                        {t('invoice.tax')}:
                       </span>
                       <span className="text-gray-900 dark:text-white">
                         ₹{tax.toFixed(2)}
@@ -223,7 +223,7 @@ export function InvoiceScreen() {
                     {discount > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">
-                          {t('Discount', 'छूट')}:
+                          {t('invoice.discount')}:
                         </span>
                         <span className="text-green-600 dark:text-green-400">
                           -₹{discount.toFixed(2)}
@@ -232,7 +232,7 @@ export function InvoiceScreen() {
                     )}
                     <div className="flex justify-between text-lg font-semibold pt-2 border-t border-gray-200 dark:border-gray-600">
                       <span className="text-gray-900 dark:text-white">
-                        {t('Total', 'कुल')}:
+                        {t('invoice.total')}:
                       </span>
                       <span className="text-orange-500 dark:text-orange-400">
                         ₹{total.toFixed(2)}
@@ -243,14 +243,14 @@ export function InvoiceScreen() {
                   {/* Payment Methods */}
                   <div className="space-y-3 pt-6">
                     <h3 className="font-medium text-gray-900 dark:text-white">
-                      {t('Payment Method', 'भुगतान विधि')}
+                      {t('invoice.paymentMethod')}
                     </h3>
                     <div className="grid grid-cols-1 gap-2">
                       <Button
                         onClick={() => generateInvoice('cash')}
                         className="justify-start"
                       >
-                        💵 {t('Cash', 'नकद')}
+                        💵 {t('invoice.cash')}
                       </Button>
                       <Button
                         onClick={() => generateInvoice('upi')}
@@ -258,14 +258,14 @@ export function InvoiceScreen() {
                         className="justify-start"
                       >
                         <QrCodeIcon className="w-4 h-4 mr-2" />
-                        {t('UPI QR Code', 'UPI QR कोड')}
+                        {t('invoice.upiQr')}
                       </Button>
                       <Button
                         onClick={() => generateInvoice('razorpay')}
                         variant="secondary"
                         className="justify-start"
                       >
-                        💳 {t('Razorpay', 'Razorpay')}
+                        💳 {t('invoice.razorpay')}
                       </Button>
                     </div>
                   </div>
@@ -278,7 +278,7 @@ export function InvoiceScreen() {
                     </Button>
                     <Button variant="ghost" size="sm" className="flex-1">
                       <PrinterIcon className="w-4 h-4 mr-2" />
-                      {t('Print', 'प्रिंट')}
+                      {t('common.print')}
                     </Button>
                   </div>
                 </>
