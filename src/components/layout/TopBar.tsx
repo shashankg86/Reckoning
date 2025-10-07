@@ -12,12 +12,14 @@ interface TopBarProps {
 
 export function TopBar({ title }: TopBarProps) {
   const { t } = useTranslation();
-  const { state, logout } = useAuth();
+  const { state, logout, updateStoreSettings } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
 
-  const toggleTheme = () => {
-    // TODO: Implement theme toggle
-    console.log('Theme toggle clicked');
+  const toggleTheme = async () => {
+    if (!state.user?.store) return;
+    
+    const newTheme = state.user.store.theme === 'dark' ? 'light' : 'dark';
+    await updateStoreSettings({ theme: newTheme });
   };
 
   const handleLogout = async () => {

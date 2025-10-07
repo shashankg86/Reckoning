@@ -213,6 +213,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [authState.user?.store?.language]);
 
+  // Apply theme immediately when component mounts
+  useEffect(() => {
+    const root = document.documentElement;
+    const theme = authState.user?.store?.theme || 'light';
+    
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    
+    // Also set a CSS custom property for additional styling
+    root.style.setProperty('--theme', theme);
+  }, [authState.user?.store?.theme]);
   return (
     <POSContext.Provider value={{ state, dispatch }}>
       {children}

@@ -92,6 +92,13 @@ export function OnboardingScreen() {
       logoURL,
     };
 
+    // Apply theme immediately during onboarding
+    const root = document.documentElement;
+    if (formData.theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
     await completeOnboarding(storeData);
   };
 

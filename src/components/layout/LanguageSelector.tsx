@@ -14,15 +14,16 @@ const languages = [
 
 export function LanguageSelector() {
   const { i18n } = useTranslation();
-  const { state } = useAuth();
+  const { state, updateStoreSettings } = useAuth();
   const [isOpen, setIsOpen] = React.useState(false);
 
   const currentLanguage = languages.find(lang => lang.code === state.user?.store?.language) || languages[0];
 
-  const handleLanguageChange = (languageCode: Language) => {
+  const handleLanguageChange = async (languageCode: Language) => {
+    if (!state.user?.store) return;
+    
     i18n.changeLanguage(languageCode);
-    // TODO: Update user store language
-    console.log('Language change:', languageCode);
+    await updateStoreSettings({ language: languageCode });
     setIsOpen(false);
   };
 

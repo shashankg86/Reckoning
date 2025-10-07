@@ -66,6 +66,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   completeOnboarding: (storeData: Store) => Promise<void>;
+  updateStoreSettings: (updates: Partial<Store>) => Promise<void>;
   clearError: () => void;
 }
 
@@ -218,6 +219,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateStoreSettings = async (updates: Partial<Store>) => {
+    try {
+      if (!state.user || !state.user.store) throw new Error('No authenticated user or store');
+      
+      const updatedStore = { ...state.user.store, ...updates };
+      
+      await updateDoc(doc(db, 'users', state.user.uid), {
+        store: updatedStore
+      });
+      
+      // Update local state
+      const updatedUser: User = {
+        ...state.user,
+        store: updatedStore
+      };
+      
+      dispatch({ type: 'SET_USER', payload: updatedUser });
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+    }
+  };
   const clearError = () => {
     dispatch({ type: 'CLEAR_ERROR' });
   };
@@ -231,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         resetPassword,
         completeOnboarding,
+        updateStoreSettings,
         clearError,
       }}
     >

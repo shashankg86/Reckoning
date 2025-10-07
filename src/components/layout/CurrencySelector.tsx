@@ -15,14 +15,15 @@ const currencies = [
 
 export function CurrencySelector() {
   const { t } = useTranslation();
-  const { state } = useAuth();
+  const { state, updateStoreSettings } = useAuth();
   const [isOpen, setIsOpen] = React.useState(false);
 
   const currentCurrency = currencies.find(curr => curr.code === state.user?.store?.currency) || currencies[0];
 
-  const handleCurrencyChange = (currencyCode: Currency) => {
-    // TODO: Implement currency change
-    console.log('Currency change:', currencyCode);
+  const handleCurrencyChange = async (currencyCode: Currency) => {
+    if (!state.user?.store) return;
+    
+    await updateStoreSettings({ currency: currencyCode });
     setIsOpen(false);
   };
 
