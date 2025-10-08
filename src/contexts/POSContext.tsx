@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from './AuthContext';
 
 export type Language = 'en' | 'hi' | 'ar' | 'mr';
@@ -185,11 +186,42 @@ function posReducer(state: POSState, action: POSAction): POSState {
 const POSContext = createContext<{
   state: POSState;
   dispatch: React.Dispatch<POSAction>;
+  handleDeleteItem: (itemId: string) => void;
+  handleAddItem: (item: Item) => void;
+  handleUpdateItem: (item: Item) => void;
+  handleAddToCart: (item: Item) => void;
+  handleCreateInvoice: (invoice: Invoice) => void;
 } | null>(null);
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(posReducer, initialState);
   const { state: authState } = useAuth();
+
+  const handleDeleteItem = (itemId: string) => {
+    dispatch({ type: 'DELETE_ITEM', payload: itemId });
+    toast.success('Item deleted successfully');
+  };
+
+  const handleAddItem = (item: Item) => {
+    dispatch({ type: 'ADD_ITEM', payload: item });
+    toast.success('Item added to catalog');
+  };
+
+  const handleUpdateItem = (item: Item) => {
+    dispatch({ type: 'UPDATE_ITEM', payload: item });
+    toast.success('Item updated successfully');
+  };
+
+  const handleAddToCart = (item: Item) => {
+    dispatch({ type: 'ADD_TO_CART', payload: item });
+    toast.success(`${item.name} added to cart`);
+  };
+
+  const handleCreateInvoice = (invoice: Invoice) => {
+    dispatch({ type: 'ADD_INVOICE', payload: invoice });
+    dispatch({ type: 'CLEAR_CART' });
+    toast.success('Invoice created successfully');
+  };
 
   // Apply theme to document root based on user's store settings
   useEffect(() => {
@@ -228,7 +260,15 @@ export function POSProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--theme', theme);
   }, [authState.user?.store?.theme]);
   return (
-    <POSContext.Provider value={{ state, dispatch }}>
+    <POSContext.Provider value={{ 
+      state, 
+      dispatch,
+      handleDeleteItem,
+      handleAddItem,
+      handleUpdateItem,
+      handleAddToCart,
+      handleCreateInvoice
+    }}>
       {children}
     </POSContext.Provider>
   );

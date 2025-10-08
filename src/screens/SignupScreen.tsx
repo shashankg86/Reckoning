@@ -188,6 +188,8 @@ export function SignupScreen() {
           </div>
         </form>
       </div>
+    )
+    }
     </div>
   );
 }
