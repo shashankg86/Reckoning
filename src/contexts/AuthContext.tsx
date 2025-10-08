@@ -3,13 +3,15 @@ import {
   onAuthStateChanged, 
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   sendPasswordResetEmail,
   updateProfile,
   User as FirebaseUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebaseClient';
+import { auth, db, googleProvider } from '../lib/firebaseClient';
+import toast from 'react-hot-toast';
 import type { User, Store } from '../types';
 
 interface AuthState {
@@ -62,6 +64,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 interface AuthContextType {
   state: AuthState;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -139,9 +142,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
       await signInWithEmailAndPassword(auth, email, password);
+      toast.success('Login successful!');
       // User state will be updated by onAuthStateChanged
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message });
+      let errorMessage = 'Login failed. Please try again.';
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No account found with this email address.';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'Incorrect password. Please try again.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Please enter a valid email address.';
+          break;
+        case 'auth/user-disabled':
+          errorMessage = 'This account has been disabled.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many failed attempts. Please try again later.';
+          break;
+        case 'auth/invalid-credential':
+          errorMessage = 'Invalid email or password. Please check your credentials.';
+          break;
+      }
+      
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
+    }
+  };
+
+  const loginWithGoogle = async () => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'CLEAR_ERROR' });
+      
+      const result = await signInWithPopup(auth, googleProvider);
+      
+      // Check if user document exists
+      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
+      
+      if (!userDoc.exists()) {
+        // Create user document for new Google users
+        const userData: Partial<User> = {
+          uid: result.user.uid,
+          email: result.user.email,
+          name: result.user.displayName,
+          photoURL: result.user.photoURL,
+          isOnboarded: false,
+          createdAt: new Date(),
+          lastLoginAt: new Date()
+        };
+
+        await setDoc(doc(db, 'users', result.user.uid), userData);
+      } else {
+        // Update last login for existing users
+        await updateDoc(doc(db, 'users', result.user.uid), {
+          lastLoginAt: new Date()
+        });
+      }
+      
+      toast.success('Google login successful!');
+      // User state will be updated by onAuthStateChanged
+    } catch (error: any) {
+      let errorMessage = 'Google login failed. Please try again.';
+      
+      switch (error.code) {
+        case 'auth/popup-closed-by-user':
+          errorMessage = 'Login cancelled. Please try again.';
+          break;
+        case 'auth/popup-blocked':
+          errorMessage = 'Popup blocked. Please allow popups and try again.';
+          break;
+        case 'auth/cancelled-popup-request':
+          errorMessage = 'Login cancelled. Please try again.';
+          break;
+      }
+      
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
     }
   };
 
@@ -167,9 +247,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
 
       await setDoc(doc(db, 'users', userCredential.user.uid), userData);
+      toast.success('Account created successfully!');
       // User state will be updated by onAuthStateChanged
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message });
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'An account with this email already exists.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Please enter a valid email address.';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password should be at least 6 characters long.';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'Email registration is not enabled.';
+          break;
+      }
+      
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
     }
   };
 
@@ -177,8 +276,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await signOut(auth);
       dispatch({ type: 'LOGOUT' });
+      toast.success('Logged out successfully');
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message });
+      const errorMessage = 'Logout failed. Please try again.';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
     }
   };
 
@@ -187,8 +289,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
       await sendPasswordResetEmail(auth, email);
+      toast.success('Password reset email sent!');
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message });
+      let errorMessage = 'Failed to send reset email. Please try again.';
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No account found with this email address.';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Please enter a valid email address.';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many requests. Please try again later.';
+          break;
+      }
+      
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -214,8 +332,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
       
       dispatch({ type: 'SET_USER', payload: updatedUser });
+      toast.success('Store setup completed!');
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message });
+      const errorMessage = 'Failed to complete setup. Please try again.';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
     }
   };
 
@@ -237,7 +358,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       dispatch({ type: 'SET_USER', payload: updatedUser });
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message });
+      const errorMessage = 'Failed to update settings. Please try again.';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
     }
   };
   const clearError = () => {
@@ -249,6 +372,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         state,
         login,
+        loginWithGoogle,
         register,
         logout,
         resetPassword,
