@@ -241,6 +241,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
     
     if (language === 'ar') {
       root.dir = 'rtl';
+    }
+  }
+  )
   return (
     <POSContext.Provider value={{ 
       state, 

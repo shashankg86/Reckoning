@@ -63,7 +63,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 interface AuthContextType {
   state: AuthState;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<void>;
   register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -137,13 +137,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<boolean> => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
       await signInWithEmailAndPassword(auth, email, password);
       toast.success('Login successful!');
       // User state will be updated by onAuthStateChanged
+      return true;
     } catch (error: any) {
       let errorMessage = 'Login failed. Please try again.';
       
@@ -170,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       toast.error(errorMessage);
+      return false;
     }
   };
 
