@@ -186,7 +186,7 @@ function posReducer(state: POSState, action: POSAction): POSState {
 const POSContext = createContext<{
   state: POSState;
   dispatch: React.Dispatch<POSAction>;
-  handleDeleteItem: (itemId: string) => void;
+  handleDeleteItem?: (itemId: string) => void;
   handleAddItem: (item: Item) => void;
   handleUpdateItem: (item: Item) => void;
   handleAddToCart: (item: Item) => void;
@@ -196,7 +196,6 @@ const POSContext = createContext<{
 export function POSProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(posReducer, initialState);
   const { state: authState } = useAuth();
-
   const handleDeleteItem = (itemId: string) => {
     dispatch({ type: 'DELETE_ITEM', payload: itemId });
     toast.success('Item deleted successfully');
@@ -223,42 +222,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
     toast.success('Invoice created successfully');
   };
 
-  // Apply theme to document root based on user's store settings
+  // Apply theme to document root - optimized to prevent infinite loops
   useEffect(() => {
     const root = document.documentElement;
-    if (authState.user?.store?.theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [authState.user?.store?.theme]);
-
-  // Apply RTL for Arabic
-  useEffect(() => {
-    const root = document.documentElement;
-    if (authState.user?.store?.language === 'ar') {
-      root.dir = 'rtl';
-      root.lang = 'ar';
-    } else {
-      root.dir = 'ltr';
-      root.lang = authState.user?.store?.language || 'en';
-    }
-  }, [authState.user?.store?.language]);
-
-  // Apply theme immediately when component mounts
-  useEffect(() => {
-    const root = document.documentElement;
-    const theme = authState.user?.store?.theme || 'light';
+    const theme = authState.user?.store?.theme;
     
     if (theme === 'dark') {
       root.classList.add('dark');
-    } else {
+    } else if (theme === 'light') {
       root.classList.remove('dark');
     }
-    
-    // Also set a CSS custom property for additional styling
-    root.style.setProperty('--theme', theme);
   }, [authState.user?.store?.theme]);
+
+  // Apply language and direction - optimized
+  useEffect(() => {
+    const root = document.documentElement;
+    const language = authState.user?.store?.language;
+    
+    if (language === 'ar') {
+      root.dir = 'rtl';
   return (
     <POSContext.Provider value={{ 
       state, 
@@ -270,6 +252,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
       handleCreateInvoice
     }}>
       {children}
+    } else {
+      root.dir = 'ltr';
+    }
+    
+    root.lang = language || 'en';
+  }, [authState.user?.store?.language]);
+
     </POSContext.Provider>
   );
 }
