@@ -52,7 +52,7 @@ interface POSState {
   loading: boolean;
 }
 
-type POSAction = 
+type POSAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'ADD_ITEM'; payload: Item }
   | { type: 'UPDATE_ITEM'; payload: Item }
@@ -131,16 +131,16 @@ function posReducer(state: POSState, action: POSAction): POSState {
     case 'ADD_ITEM':
       return { ...state, items: [...state.items, action.payload] };
     case 'UPDATE_ITEM':
-      return { 
-        ...state, 
-        items: state.items.map(item => 
+      return {
+        ...state,
+        items: state.items.map(item =>
           item.id === action.payload.id ? action.payload : item
-        ) 
+        )
       };
     case 'DELETE_ITEM':
-      return { 
-        ...state, 
-        items: state.items.filter(item => item.id !== action.payload) 
+      return {
+        ...state,
+        items: state.items.filter(item => item.id !== action.payload)
       };
     case 'ADD_TO_CART':
       const existingItem = state.cart.find(item => item.id === action.payload.id);
@@ -148,29 +148,29 @@ function posReducer(state: POSState, action: POSAction): POSState {
         return {
           ...state,
           cart: state.cart.map(item =>
-            item.id === action.payload.id 
+            item.id === action.payload.id
               ? { ...item, quantity: item.quantity + 1 }
               : item
           )
         };
       }
-      return { 
-        ...state, 
-        cart: [...state.cart, { ...action.payload, quantity: 1 }] 
+      return {
+        ...state,
+        cart: [...state.cart, { ...action.payload, quantity: 1 }]
       };
     case 'UPDATE_CART_QUANTITY':
       return {
         ...state,
         cart: state.cart.map(item =>
-          item.id === action.payload.id 
+          item.id === action.payload.id
             ? { ...item, quantity: action.payload.quantity }
             : item
         )
       };
     case 'REMOVE_FROM_CART':
-      return { 
-        ...state, 
-        cart: state.cart.filter(item => item.id !== action.payload) 
+      return {
+        ...state,
+        cart: state.cart.filter(item => item.id !== action.payload)
       };
     case 'CLEAR_CART':
       return { ...state, cart: [] };
@@ -186,7 +186,7 @@ function posReducer(state: POSState, action: POSAction): POSState {
 const POSContext = createContext<{
   state: POSState;
   dispatch: React.Dispatch<POSAction>;
-  handleDeleteItem?: (itemId: string) => void;
+  handleDeleteItem: (itemId: string) => void;
   handleAddItem: (item: Item) => void;
   handleUpdateItem: (item: Item) => void;
   handleAddToCart: (item: Item) => void;
@@ -196,6 +196,7 @@ const POSContext = createContext<{
 export function POSProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(posReducer, initialState);
   const { state: authState } = useAuth();
+
   const handleDeleteItem = (itemId: string) => {
     dispatch({ type: 'DELETE_ITEM', payload: itemId });
     toast.success('Item deleted successfully');
@@ -222,46 +223,45 @@ export function POSProvider({ children }: { children: ReactNode }) {
     toast.success('Invoice created successfully');
   };
 
-  // Apply theme to document root - optimized to prevent infinite loops
+  // Apply theme
   useEffect(() => {
     const root = document.documentElement;
     const theme = authState.user?.store?.theme;
-    
+
     if (theme === 'dark') {
       root.classList.add('dark');
-    } else if (theme === 'light') {
+    } else {
       root.classList.remove('dark');
     }
   }, [authState.user?.store?.theme]);
 
-  // Apply language and direction - optimized
+  // Apply language and direction
   useEffect(() => {
     const root = document.documentElement;
     const language = authState.user?.store?.language;
-    
+
     if (language === 'ar') {
       root.dir = 'rtl';
-    }
-  }
-  )
-  return (
-    <POSContext.Provider value={{ 
-      state, 
-      dispatch,
-      handleDeleteItem,
-      handleAddItem,
-      handleUpdateItem,
-      handleAddToCart,
-      handleCreateInvoice
-    }}>
-      {children}
     } else {
       root.dir = 'ltr';
     }
-    
+
     root.lang = language || 'en';
   }, [authState.user?.store?.language]);
 
+  return (
+    <POSContext.Provider
+      value={{
+        state,
+        dispatch,
+        handleDeleteItem,
+        handleAddItem,
+        handleUpdateItem,
+        handleAddToCart,
+        handleCreateInvoice
+      }}
+    >
+      {children}
     </POSContext.Provider>
   );
 }
@@ -272,4 +272,5 @@ export function usePOS() {
     throw new Error('usePOS must be used within a POSProvider');
   }
   return context;
+
 }
