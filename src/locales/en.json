@@ -1,7 +1,26 @@
 {
+  "_meta": {
+    "code": "en",
+    "name": "English",
+    "nativeName": "English",
+    "direction": "ltr"
+  },
   "app": {
     "name": "Universal POS",
     "tagline": "Business Management Made Simple"
+  },
+  "languages": {
+    "en": "English",
+    "hi": "Hindi",
+    "ar": "Arabic",
+    "mr": "Marathi"
+  },
+  "currencies": {
+    "INR": "Indian Rupee",
+    "AED": "UAE Dirham",
+    "USD": "US Dollar",
+    "EUR": "Euro",
+    "GBP": "British Pound"
   },
   "auth": {
     "login": "Log In",
@@ -52,6 +71,9 @@
     "next": "Next",
     "back": "Back",
     "getStarted": "Get Started",
+    "storeLogo": "Store Logo",
+    "uploadLogo": "Upload Logo",
+    "logoHint": "Upload your store logo or we'll use your profile picture as default",
     "storeTypes": {
       "restaurant": "Restaurant",
       "cafe": "Cafe",
@@ -253,10 +275,5 @@
     "totalInvoices": "Total Invoices",
     "itemsInCart": "Items in Cart",
     "continueToDashboard": "Continue to Dashboard"
-  },
-  "onboarding": {
-    "storeLogo": "Store Logo",
-    "uploadLogo": "Upload Logo",
-    "logoHint": "Upload your store logo or we'll use your profile picture as default"
   }
 }

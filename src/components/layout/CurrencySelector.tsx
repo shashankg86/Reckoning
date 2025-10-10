@@ -6,11 +6,11 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { Currency } from '../../contexts/POSContext';
 
 const currencies = [
-  { code: 'INR' as Currency, symbol: '₹', name: 'Indian Rupee' },
-  { code: 'AED' as Currency, symbol: 'د.إ', name: 'UAE Dirham' },
-  { code: 'USD' as Currency, symbol: '$', name: 'US Dollar' },
-  { code: 'EUR' as Currency, symbol: '€', name: 'Euro' },
-  { code: 'GBP' as Currency, symbol: '£', name: 'British Pound' },
+  { code: 'INR' as Currency, symbol: '₹' },
+  { code: 'AED' as Currency, symbol: 'د.إ' },
+  { code: 'USD' as Currency, symbol: '$' },
+  { code: 'EUR' as Currency, symbol: '€' },
+  { code: 'GBP' as Currency, symbol: '£' },
 ];
 
 export function CurrencySelector() {
@@ -34,6 +34,7 @@ export function CurrencySelector() {
         size="sm"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center space-x-2 px-3 py-2"
+        aria-label="Select currency"
       >
         <CurrencyRupeeIcon className="h-4 w-4" />
         <span className="text-sm font-medium">{currentCurrency.symbol}</span>
@@ -45,30 +46,37 @@ export function CurrencySelector() {
           <div
             className="fixed inset-0 z-10"
             onClick={() => setIsOpen(false)}
+            aria-hidden="true"
           />
           <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-20 border border-gray-200 dark:border-gray-700">
-            {currencies.map((currency) => (
-              <button
-                key={currency.code}
-                onClick={() => handleCurrencyChange(currency.code)}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${
-                  state.user?.store?.currency === currency.code
-                    ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
-                    : 'text-gray-700 dark:text-gray-300'
-                }`}
-              >
-                <div>
-                  <div className="font-medium flex items-center">
-                    <span className="mr-2">{currency.symbol}</span>
-                    {currency.name}
+            {currencies.map((currency) => {
+              const isActive = state.user?.store?.currency === currency.code;
+              const currencyName = t(`currencies.${currency.code}`);
+              
+              return (
+                <button
+                  key={currency.code}
+                  onClick={() => handleCurrencyChange(currency.code)}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${
+                    isActive
+                      ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                      : 'text-gray-700 dark:text-gray-300'
+                  }`}
+                  aria-current={isActive ? 'true' : 'false'}
+                >
+                  <div>
+                    <div className="font-medium flex items-center">
+                      <span className="mr-2">{currency.symbol}</span>
+                      {currencyName}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{currency.code}</div>
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">{currency.code}</div>
-                </div>
-                {state.user?.store?.currency === currency.code && (
-                  <div className="w-2 h-2 bg-orange-500 rounded-full" />
-                )}
-              </button>
-            ))}
+                  {isActive && (
+                    <div className="w-2 h-2 bg-orange-500 rounded-full" aria-label="Selected" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </>
       )}

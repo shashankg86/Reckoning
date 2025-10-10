@@ -235,18 +235,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [authState.user?.store?.theme]);
 
-  // Apply language and direction
+  // Apply language and direction (from translation metadata)
   useEffect(() => {
     const root = document.documentElement;
-    const language = authState.user?.store?.language;
+    const language = authState.user?.store?.language || 'en';
 
-    if (language === 'ar') {
-      root.dir = 'rtl';
-    } else {
-      root.dir = 'ltr';
-    }
+    // Get direction from translation file metadata
+    import(`../locales/${language}.json`).then((translations) => {
+      const direction = translations.default?._meta?.direction || 'ltr';
+      root.dir = direction;
+    }).catch(() => {
+      // Fallback for any errors
+      root.dir = language === 'ar' ? 'rtl' : 'ltr';
+    });
 
-    root.lang = language || 'en';
+    root.lang = language;
   }, [authState.user?.store?.language]);
 
   return (
