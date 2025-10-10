@@ -1,16 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  sendPasswordResetEmail,
-  updateProfile,
-  User as FirebaseUser
-} from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '../lib/firebaseClient';
+import { supabase } from '../lib/supabaseClient';
+import { authAPI } from '../api/auth';
+import { storesAPI } from '../api/stores';
 import toast from 'react-hot-toast';
 import type { User, Store } from '../types';
 
@@ -78,97 +69,72 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) throw profileError;
+
+      const stores = await storesAPI.getUserStores();
+      const userStore = stores && stores.length > 0 ? stores[0] : undefined;
+
+      const user: User = {
+        uid: profile.id,
+        email: profile.email,
+        name: profile.name,
+        phone: profile.phone,
+        photoURL: profile.photo_url,
+        isOnboarded: !!userStore,
+        store: userStore,
+        createdAt: new Date(profile.created_at),
+        lastLoginAt: new Date(profile.last_login_at),
+      };
+
+      dispatch({ type: 'SET_USER', payload: user });
+    } catch (error: any) {
+      console.error('Error loading profile:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to load user profile' });
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      
-      if (firebaseUser) {
-        try {
-          // User is signed in, fetch user data from Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            
-            // Update last login
-            await updateDoc(doc(db, 'users', firebaseUser.uid), {
-              lastLoginAt: new Date()
-            });
-
-            const user: User = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: userData.name || firebaseUser.displayName,
-              phone: userData.phone,
-              photoURL: firebaseUser.photoURL,
-              isOnboarded: userData.isOnboarded || false,
-              store: userData.store,
-              createdAt: userData.createdAt?.toDate() || new Date(),
-              lastLoginAt: new Date()
-            };
-
-            dispatch({ type: 'SET_USER', payload: user });
-          } else {
-            // New user, create document
-            const newUser: Partial<User> = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              name: firebaseUser.displayName,
-              photoURL: firebaseUser.photoURL,
-              isOnboarded: false,
-              createdAt: new Date(),
-              lastLoginAt: new Date()
-            };
-
-            await setDoc(doc(db, 'users', firebaseUser.uid), newUser);
-            
-            dispatch({ type: 'SET_USER', payload: newUser as User });
-          }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-          dispatch({ type: 'SET_ERROR', payload: 'Failed to load user data' });
-        }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        loadUserProfile(session.user.id);
       } else {
-        // User is signed out
-        dispatch({ type: 'SET_USER', payload: null });
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     });
 
-    return unsubscribe;
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        await loadUserProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        dispatch({ type: 'LOGOUT' });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
-      await signInWithEmailAndPassword(auth, email, password);
+
+      await authAPI.loginWithEmail(email, password);
       toast.success('Login successful!');
-      // User state will be updated by onAuthStateChanged
       return true;
     } catch (error: any) {
-      let errorMessage = 'Login failed. Please try again.';
-      
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = 'No account found with this email address.';
-          break;
-        case 'auth/wrong-password':
-          errorMessage = 'Incorrect password. Please try again.';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Please enter a valid email address.';
-          break;
-        case 'auth/user-disabled':
-          errorMessage = 'This account has been disabled.';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = 'Too many failed attempts. Please try again later.';
-          break;
-        case 'auth/invalid-credential':
-          errorMessage = 'Invalid email or password. Please check your credentials.';
-          break;
-      }
-      
+      const errorMessage = error.message || 'Login failed. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       toast.error(errorMessage);
       return false;
@@ -179,49 +145,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
-      
-      const result = await signInWithPopup(auth, googleProvider);
-      
-      // Check if user document exists
-      const userDoc = await getDoc(doc(db, 'users', result.user.uid));
-      
-      if (!userDoc.exists()) {
-        // Create user document for new Google users
-        const userData: Partial<User> = {
-          uid: result.user.uid,
-          email: result.user.email,
-          name: result.user.displayName,
-          photoURL: result.user.photoURL,
-          isOnboarded: false,
-          createdAt: new Date(),
-          lastLoginAt: new Date()
-        };
 
-        await setDoc(doc(db, 'users', result.user.uid), userData);
-      } else {
-        // Update last login for existing users
-        await updateDoc(doc(db, 'users', result.user.uid), {
-          lastLoginAt: new Date()
-        });
-      }
-      
-      toast.success('Google login successful!');
-      // User state will be updated by onAuthStateChanged
+      await authAPI.loginWithGoogle();
+      toast.success('Redirecting to Google...');
     } catch (error: any) {
-      let errorMessage = 'Google login failed. Please try again.';
-      
-      switch (error.code) {
-        case 'auth/popup-closed-by-user':
-          errorMessage = 'Login cancelled. Please try again.';
-          break;
-        case 'auth/popup-blocked':
-          errorMessage = 'Popup blocked. Please allow popups and try again.';
-          break;
-        case 'auth/cancelled-popup-request':
-          errorMessage = 'Login cancelled. Please try again.';
-          break;
-      }
-      
+      const errorMessage = error.message || 'Google login failed. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       toast.error(errorMessage);
     }
@@ -231,44 +159,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
-      
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      // Update profile with name
-      await updateProfile(userCredential.user, { displayName: name });
 
-      // Create user document in Firestore
-      const userData: Partial<User> = {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        name: name,
-        phone: phone,
-        isOnboarded: false,
-        createdAt: new Date(),
-        lastLoginAt: new Date()
-      };
-
-      await setDoc(doc(db, 'users', userCredential.user.uid), userData);
-      toast.success('Account created successfully!');
-      // User state will be updated by onAuthStateChanged
-    } catch (error: any) {
-      let errorMessage = 'Registration failed. Please try again.';
-      
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          errorMessage = 'An account with this email already exists.';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Please enter a valid email address.';
-          break;
-        case 'auth/weak-password':
-          errorMessage = 'Password should be at least 6 characters long.';
-          break;
-        case 'auth/operation-not-allowed':
-          errorMessage = 'Email registration is not enabled.';
-          break;
+      if (!phone) {
+        throw new Error('Phone number is required');
       }
-      
+
+      await authAPI.signUpWithEmail(email, password, name, phone);
+      toast.success('Account created successfully!');
+    } catch (error: any) {
+      const errorMessage = error.message || 'Registration failed. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       toast.error(errorMessage);
     }
@@ -276,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      await authAPI.logout();
       dispatch({ type: 'LOGOUT' });
       toast.success('Logged out successfully');
     } catch (error: any) {
@@ -290,23 +189,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
-      await sendPasswordResetEmail(auth, email);
+
+      await authAPI.resetPassword(email);
       toast.success('Password reset email sent!');
     } catch (error: any) {
-      let errorMessage = 'Failed to send reset email. Please try again.';
-      
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = 'No account found with this email address.';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Please enter a valid email address.';
-          break;
-        case 'auth/too-many-requests':
-          errorMessage = 'Too many requests. Please try again later.';
-          break;
-      }
-      
+      const errorMessage = error.message || 'Failed to send reset email. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       toast.error(errorMessage);
     } finally {
@@ -317,23 +204,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const completeOnboarding = async (storeData: Store) => {
     try {
       if (!state.user) throw new Error('No authenticated user');
-      
-      dispatch({ type: 'SET_LOADING', payload: true });
-      
-      const updates = {
-        store: storeData,
-        isOnboarded: true
-      };
 
-      await updateDoc(doc(db, 'users', state.user.uid), updates);
-      
-      // Update local state
-      const updatedUser: User = {
-        ...state.user,
-        ...updates
-      };
-      
-      dispatch({ type: 'SET_USER', payload: updatedUser });
+      dispatch({ type: 'SET_LOADING', payload: true });
+
+      await storesAPI.createStore(storeData);
+
+      await loadUserProfile(state.user.uid);
+
       toast.success('Store setup completed!');
     } catch (error: any) {
       const errorMessage = 'Failed to complete setup. Please try again.';
@@ -344,27 +221,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateStoreSettings = async (updates: Partial<Store>) => {
     try {
-      if (!state.user || !state.user.store) throw new Error('No authenticated user or store');
-      
-      const updatedStore = { ...state.user.store, ...updates };
-      
-      await updateDoc(doc(db, 'users', state.user.uid), {
-        store: updatedStore
-      });
-      
-      // Update local state
-      const updatedUser: User = {
-        ...state.user,
-        store: updatedStore
-      };
-      
-      dispatch({ type: 'SET_USER', payload: updatedUser });
+      if (!state.user || !state.user.store) {
+        throw new Error('No authenticated user or store');
+      }
+
+      await storesAPI.updateStore(state.user.store.id, updates);
+
+      await loadUserProfile(state.user.uid);
+
+      toast.success('Settings updated successfully!');
     } catch (error: any) {
       const errorMessage = 'Failed to update settings. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       toast.error(errorMessage);
     }
   };
+
   const clearError = () => {
     dispatch({ type: 'CLEAR_ERROR' });
   };

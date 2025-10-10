@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from './AuthContext';
+import { itemsAPI } from '../api/items';
+import { invoicesAPI } from '../api/invoices';
 
 export type Language = 'en' | 'hi' | 'ar' | 'mr';
 export type Currency = 'INR' | 'AED' | 'USD' | 'EUR' | 'GBP';
@@ -54,6 +56,7 @@ interface POSState {
 
 type POSAction =
   | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ITEMS'; payload: Item[] }
   | { type: 'ADD_ITEM'; payload: Item }
   | { type: 'UPDATE_ITEM'; payload: Item }
   | { type: 'DELETE_ITEM'; payload: string }
@@ -61,121 +64,67 @@ type POSAction =
   | { type: 'UPDATE_CART_QUANTITY'; payload: { id: string; quantity: number } }
   | { type: 'REMOVE_FROM_CART'; payload: string }
   | { type: 'CLEAR_CART' }
+  | { type: 'SET_INVOICES'; payload: Invoice[] }
   | { type: 'ADD_INVOICE'; payload: Invoice }
   | { type: 'RESET_STATE' };
 
 const initialState: POSState = {
-  items: [
-    {
-      id: '1',
-      name: 'Organic Basmati Rice',
-      price: 650,
-      category: 'Grains & Pulses',
-      stock: 50,
-      sku: 'BR1KG',
-      image: 'https://images.pexels.com/photos/4110256/pexels-photo-4110256.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      id: '2',
-      name: 'Amul Milk 1L Pouch',
-      price: 65,
-      category: 'Dairy',
-      stock: 25,
-      sku: 'AM1L',
-      image: 'https://images.pexels.com/photos/416978/pexels-photo-416978.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      id: '3',
-      name: 'Dabur Honey 500g',
-      price: 320,
-      category: 'Pantry Staples',
-      stock: 15,
-      sku: 'DH500',
-      image: 'https://images.pexels.com/photos/1638280/pexels-photo-1638280.jpeg?auto=compress&cs=tinysrgb&w=400'
-    },
-    {
-      id: '4',
-      name: 'Maggi 2-Minute Noodles',
-      price: 14,
-      category: 'Pantry Staples',
-      stock: 0,
-      sku: 'MG2MIN',
-      image: 'https://images.pexels.com/photos/6287523/pexels-photo-6287523.jpeg?auto=compress&cs=tinysrgb&w=400'
-    }
-  ],
+  items: [],
   cart: [],
-  invoices: [
-    {
-      id: 'INV001',
-      items: [
-        { id: '1', name: 'Organic Basmati Rice', price: 650, category: 'Grains', quantity: 2 },
-        { id: '2', name: 'Amul Milk 1L', price: 65, category: 'Dairy', quantity: 1 }
-      ],
-      subtotal: 1365,
-      discount: 0,
-      tax: 245.7,
-      total: 1610.7,
-      paymentMethod: 'upi',
-      date: new Date('2024-11-07'),
-      customer: 'Priya Sharma',
-      status: 'paid'
-    }
-  ],
-  loading: false
+  invoices: [],
+  loading: false,
 };
 
 function posReducer(state: POSState, action: POSAction): POSState {
   switch (action.type) {
     case 'SET_LOADING':
       return { ...state, loading: action.payload };
+    case 'SET_ITEMS':
+      return { ...state, items: action.payload, loading: false };
     case 'ADD_ITEM':
       return { ...state, items: [...state.items, action.payload] };
     case 'UPDATE_ITEM':
       return {
         ...state,
-        items: state.items.map(item =>
-          item.id === action.payload.id ? action.payload : item
-        )
+        items: state.items.map((item) => (item.id === action.payload.id ? action.payload : item)),
       };
     case 'DELETE_ITEM':
       return {
         ...state,
-        items: state.items.filter(item => item.id !== action.payload)
+        items: state.items.filter((item) => item.id !== action.payload),
       };
     case 'ADD_TO_CART':
-      const existingItem = state.cart.find(item => item.id === action.payload.id);
+      const existingItem = state.cart.find((item) => item.id === action.payload.id);
       if (existingItem) {
         return {
           ...state,
-          cart: state.cart.map(item =>
-            item.id === action.payload.id
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
-          )
+          cart: state.cart.map((item) =>
+            item.id === action.payload.id ? { ...item, quantity: item.quantity + 1 } : item
+          ),
         };
       }
       return {
         ...state,
-        cart: [...state.cart, { ...action.payload, quantity: 1 }]
+        cart: [...state.cart, { ...action.payload, quantity: 1 }],
       };
     case 'UPDATE_CART_QUANTITY':
       return {
         ...state,
-        cart: state.cart.map(item =>
-          item.id === action.payload.id
-            ? { ...item, quantity: action.payload.quantity }
-            : item
-        )
+        cart: state.cart.map((item) =>
+          item.id === action.payload.id ? { ...item, quantity: action.payload.quantity } : item
+        ),
       };
     case 'REMOVE_FROM_CART':
       return {
         ...state,
-        cart: state.cart.filter(item => item.id !== action.payload)
+        cart: state.cart.filter((item) => item.id !== action.payload),
       };
     case 'CLEAR_CART':
       return { ...state, cart: [] };
+    case 'SET_INVOICES':
+      return { ...state, invoices: action.payload, loading: false };
     case 'ADD_INVOICE':
-      return { ...state, invoices: [...state.invoices, action.payload] };
+      return { ...state, invoices: [action.payload, ...state.invoices] };
     case 'RESET_STATE':
       return initialState;
     default:
@@ -186,30 +135,149 @@ function posReducer(state: POSState, action: POSAction): POSState {
 const POSContext = createContext<{
   state: POSState;
   dispatch: React.Dispatch<POSAction>;
-  handleDeleteItem: (itemId: string) => void;
-  handleAddItem: (item: Item) => void;
-  handleUpdateItem: (item: Item) => void;
+  loadItems: () => Promise<void>;
+  loadInvoices: () => Promise<void>;
+  handleDeleteItem: (itemId: string) => Promise<void>;
+  handleAddItem: (item: Omit<Item, 'id'>) => Promise<void>;
+  handleUpdateItem: (item: Item) => Promise<void>;
   handleAddToCart: (item: Item) => void;
-  handleCreateInvoice: (invoice: Invoice) => void;
+  handleCreateInvoice: (invoice: Omit<Invoice, 'id'>) => Promise<void>;
 } | null>(null);
 
 export function POSProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(posReducer, initialState);
   const { state: authState } = useAuth();
 
-  const handleDeleteItem = (itemId: string) => {
-    dispatch({ type: 'DELETE_ITEM', payload: itemId });
-    toast.success('Item deleted successfully');
+  const storeId = authState.user?.store?.id;
+
+  const loadItems = async () => {
+    if (!storeId) return;
+
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const items = await itemsAPI.getItems(storeId);
+
+      const formattedItems: Item[] = items.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        price: parseFloat(item.price),
+        category: item.category,
+        stock: item.stock,
+        sku: item.sku,
+        image: item.image_url,
+      }));
+
+      dispatch({ type: 'SET_ITEMS', payload: formattedItems });
+    } catch (error: any) {
+      console.error('Load items error:', error);
+      toast.error('Failed to load items');
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
   };
 
-  const handleAddItem = (item: Item) => {
-    dispatch({ type: 'ADD_ITEM', payload: item });
-    toast.success('Item added to catalog');
+  const loadInvoices = async () => {
+    if (!storeId) return;
+
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      const invoices = await invoicesAPI.getTodayInvoices(storeId);
+
+      const formattedInvoices: Invoice[] = invoices.map((inv: any) => ({
+        id: inv.invoice_number,
+        items: inv.invoice_items.map((item: any) => ({
+          id: item.item_id,
+          name: item.item_name,
+          price: parseFloat(item.price),
+          category: '',
+          quantity: item.quantity,
+        })),
+        subtotal: parseFloat(inv.subtotal),
+        discount: parseFloat(inv.discount),
+        tax: parseFloat(inv.tax),
+        total: parseFloat(inv.total),
+        paymentMethod: inv.payment_method,
+        date: new Date(inv.created_at),
+        customer: inv.customer_name,
+        status: inv.status,
+      }));
+
+      dispatch({ type: 'SET_INVOICES', payload: formattedInvoices });
+    } catch (error: any) {
+      console.error('Load invoices error:', error);
+      toast.error('Failed to load invoices');
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
   };
 
-  const handleUpdateItem = (item: Item) => {
-    dispatch({ type: 'UPDATE_ITEM', payload: item });
-    toast.success('Item updated successfully');
+  useEffect(() => {
+    if (storeId) {
+      loadItems();
+      loadInvoices();
+    }
+  }, [storeId]);
+
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      await itemsAPI.deleteItem(itemId);
+      dispatch({ type: 'DELETE_ITEM', payload: itemId });
+      toast.success('Item deleted successfully');
+    } catch (error: any) {
+      console.error('Delete item error:', error);
+      toast.error('Failed to delete item');
+    }
+  };
+
+  const handleAddItem = async (item: Omit<Item, 'id'>) => {
+    if (!storeId) {
+      toast.error('No store selected');
+      return;
+    }
+
+    try {
+      const newItem = await itemsAPI.createItem(storeId, {
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        sku: item.sku,
+        stock: item.stock || 0,
+        image_url: item.image,
+      });
+
+      const formattedItem: Item = {
+        id: newItem.id,
+        name: newItem.name,
+        price: parseFloat(newItem.price),
+        category: newItem.category,
+        stock: newItem.stock,
+        sku: newItem.sku,
+        image: newItem.image_url,
+      };
+
+      dispatch({ type: 'ADD_ITEM', payload: formattedItem });
+      toast.success('Item added to catalog');
+    } catch (error: any) {
+      console.error('Add item error:', error);
+      toast.error('Failed to add item');
+    }
+  };
+
+  const handleUpdateItem = async (item: Item) => {
+    try {
+      await itemsAPI.updateItem(item.id, {
+        name: item.name,
+        category: item.category,
+        price: item.price,
+        sku: item.sku,
+        stock: item.stock,
+        image_url: item.image,
+      });
+
+      dispatch({ type: 'UPDATE_ITEM', payload: item });
+      toast.success('Item updated successfully');
+    } catch (error: any) {
+      console.error('Update item error:', error);
+      toast.error('Failed to update item');
+    }
   };
 
   const handleAddToCart = (item: Item) => {
@@ -217,13 +285,56 @@ export function POSProvider({ children }: { children: ReactNode }) {
     toast.success(`${item.name} added to cart`);
   };
 
-  const handleCreateInvoice = (invoice: Invoice) => {
-    dispatch({ type: 'ADD_INVOICE', payload: invoice });
-    dispatch({ type: 'CLEAR_CART' });
-    toast.success('Invoice created successfully');
+  const handleCreateInvoice = async (invoice: Omit<Invoice, 'id'>) => {
+    if (!storeId) {
+      toast.error('No store selected');
+      return;
+    }
+
+    try {
+      const createdInvoice = await invoicesAPI.createInvoice(storeId, {
+        customer_name: invoice.customer,
+        items: invoice.items.map((item) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        discount_type: 'flat',
+        tax: invoice.tax,
+        tax_rate: authState.user?.store?.type === 'restaurant' ? 5 : 18,
+        total: invoice.total,
+        payment_method: invoice.paymentMethod,
+        notes: '',
+      });
+
+      const formattedInvoice: Invoice = {
+        id: createdInvoice.invoice_number,
+        items: invoice.items,
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        tax: invoice.tax,
+        total: invoice.total,
+        paymentMethod: invoice.paymentMethod,
+        date: new Date(createdInvoice.created_at),
+        customer: invoice.customer,
+        status: 'paid',
+      };
+
+      dispatch({ type: 'ADD_INVOICE', payload: formattedInvoice });
+      dispatch({ type: 'CLEAR_CART' });
+
+      await loadItems();
+
+      toast.success('Invoice created successfully');
+    } catch (error: any) {
+      console.error('Create invoice error:', error);
+      toast.error('Failed to create invoice');
+    }
   };
 
-  // Apply theme
   useEffect(() => {
     const root = document.documentElement;
     const theme = authState.user?.store?.theme;
@@ -235,19 +346,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   }, [authState.user?.store?.theme]);
 
-  // Apply language and direction (from translation metadata)
   useEffect(() => {
     const root = document.documentElement;
     const language = authState.user?.store?.language || 'en';
 
-    // Get direction from translation file metadata
-    import(`../locales/${language}.json`).then((translations) => {
-      const direction = translations.default?._meta?.direction || 'ltr';
-      root.dir = direction;
-    }).catch(() => {
-      // Fallback for any errors
-      root.dir = language === 'ar' ? 'rtl' : 'ltr';
-    });
+    import(`../locales/${language}.json`)
+      .then((translations) => {
+        const direction = translations.default?._meta?.direction || 'ltr';
+        root.dir = direction;
+      })
+      .catch(() => {
+        root.dir = language === 'ar' ? 'rtl' : 'ltr';
+      });
 
     root.lang = language;
   }, [authState.user?.store?.language]);
@@ -257,11 +367,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
       value={{
         state,
         dispatch,
+        loadItems,
+        loadInvoices,
         handleDeleteItem,
         handleAddItem,
         handleUpdateItem,
         handleAddToCart,
-        handleCreateInvoice
+        handleCreateInvoice,
       }}
     >
       {children}
@@ -275,5 +387,4 @@ export function usePOS() {
     throw new Error('usePOS must be used within a POSProvider');
   }
   return context;
-
 }
