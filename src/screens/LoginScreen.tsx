@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { BuildingStorefrontIcon, EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { isValidEmail } from '../utils/validation';
 
 export function LoginScreen() {
   const { t } = useTranslation();
@@ -15,9 +16,20 @@ export function LoginScreen() {
     rememberMe: false
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isValidEmail(formData.email)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      return;
+    }
+
     await login(formData.email, formData.password);
   };
 
@@ -56,9 +68,13 @@ export function LoginScreen() {
               label={t('auth.mobileOrEmail')}
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, email: e.target.value });
+                if (emailError) setEmailError('');
+              }}
               placeholder={t('auth.enterMobile')}
               required
+              error={emailError}
               className="pl-10"
             />
             <EnvelopeIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />

@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { BuildingStorefrontIcon, EnvelopeIcon, LockClosedIcon, PhoneIcon, EyeIcon, EyeSlashIcon, UserIcon } from '@heroicons/react/24/outline';
+import { isValidEmail, isValidPhone, isValidName, validatePassword } from '../utils/validation';
 
 export function SignupScreen() {
   const { t } = useTranslation();
@@ -18,17 +19,49 @@ export function SignupScreen() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [passwordMismatch, setPasswordMismatch] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{
+    name?: string;
+    phone?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
+
+  const validateForm = (): boolean => {
+    const errors: typeof validationErrors = {};
+
+    if (!isValidName(formData.name)) {
+      errors.name = 'Please enter a valid name (at least 2 characters, letters only)';
+    }
+
+    if (!isValidPhone(formData.phone)) {
+      errors.phone = 'Please enter a valid phone number (10-15 digits)';
+    }
+
+    if (!isValidEmail(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    const passwordValidation = validatePassword(formData.password);
+    if (!passwordValidation.isValid) {
+      errors.password = passwordValidation.errors[0];
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (formData.password !== formData.confirmPassword) {
-      setPasswordMismatch(true);
+
+    if (!validateForm()) {
       return;
     }
-    
-    setPasswordMismatch(false);
+
     await register(formData.email, formData.password, formData.name, formData.phone);
   };
 
@@ -62,26 +95,21 @@ export function SignupScreen() {
           </div>
         )}
 
-        {passwordMismatch && (
-          <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              {t('auth.passwordMismatch')}
-            </div>
-          </div>
-        )}
-
         <form onSubmit={handleEmailSignup} className="space-y-6">
           <div className="relative">
             <Input
               label={t('auth.fullName')}
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value });
+                if (validationErrors.name) {
+                  setValidationErrors({ ...validationErrors, name: undefined });
+                }
+              }}
               placeholder={t('auth.enterFullName')}
               required
+              error={validationErrors.name}
               className="pl-10"
             />
             <UserIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
@@ -92,9 +120,15 @@ export function SignupScreen() {
               label={t('auth.mobileNumber')}
               type="tel"
               value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, phone: e.target.value });
+                if (validationErrors.phone) {
+                  setValidationErrors({ ...validationErrors, phone: undefined });
+                }
+              }}
               placeholder={t('auth.enterMobile')}
               required
+              error={validationErrors.phone}
               className="pl-10"
             />
             <PhoneIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
@@ -105,9 +139,15 @@ export function SignupScreen() {
               label={t('auth.email')}
               type="email"
               value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, email: e.target.value });
+                if (validationErrors.email) {
+                  setValidationErrors({ ...validationErrors, email: undefined });
+                }
+              }}
               placeholder={t('auth.enterEmail')}
               required
+              error={validationErrors.email}
               className="pl-10"
             />
             <EnvelopeIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
@@ -118,9 +158,16 @@ export function SignupScreen() {
               label={t('auth.password')}
               type={showPassword ? 'text' : 'password'}
               value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, password: e.target.value });
+                if (validationErrors.password) {
+                  setValidationErrors({ ...validationErrors, password: undefined });
+                }
+              }}
               placeholder={t('auth.createPassword')}
               required
+              error={validationErrors.password}
+              helper="At least 8 characters"
               className="pl-10 pr-10"
             />
             <LockClosedIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
@@ -138,9 +185,15 @@ export function SignupScreen() {
               label={t('auth.confirmPassword')}
               type={showConfirmPassword ? 'text' : 'password'}
               value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              onChange={(e) => {
+                setFormData({ ...formData, confirmPassword: e.target.value });
+                if (validationErrors.confirmPassword) {
+                  setValidationErrors({ ...validationErrors, confirmPassword: undefined });
+                }
+              }}
               placeholder={t('auth.confirmNewPassword')}
               required
+              error={validationErrors.confirmPassword}
               className="pl-10 pr-10"
             />
             <LockClosedIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />

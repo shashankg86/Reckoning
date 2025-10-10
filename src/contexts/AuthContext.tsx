@@ -69,15 +69,24 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  const loadUserProfile = async (userId: string) => {
+  const loadUserProfile = async (userId: string, retryCount = 0) => {
     try {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
+
+      if (!profile && retryCount < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        return loadUserProfile(userId, retryCount + 1);
+      }
+
+      if (!profile) {
+        throw new Error('Profile not found after multiple attempts');
+      }
 
       const stores = await storesAPI.getUserStores();
       const userStore = stores && stores.length > 0 ? stores[0] : undefined;
@@ -98,29 +107,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error: any) {
       console.error('Error loading profile:', error);
       dispatch({ type: 'SET_ERROR', payload: 'Failed to load user profile' });
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        loadUserProfile(session.user.id);
-      } else {
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await loadUserProfile(session.user.id);
+        } else {
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
         dispatch({ type: 'SET_LOADING', payload: false });
       }
-    });
+    };
+
+    initAuth();
+
+    const loadingTimeout = setTimeout(() => {
+      if (state.isLoading) {
+        console.warn('Auth loading timeout - forcing loading state to false');
+        dispatch({ type: 'SET_LOADING', payload: false });
+        toast.error('Authentication took too long. Please refresh the page.');
+      }
+    }, 10000);
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event, session?.user?.email);
+
       if (event === 'SIGNED_IN' && session) {
         await loadUserProfile(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         dispatch({ type: 'LOGOUT' });
+      } else if (event === 'USER_UPDATED' && session) {
+        await loadUserProfile(session.user.id);
       }
     });
 
     return () => {
+      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -164,11 +195,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Phone number is required');
       }
 
-      await authAPI.signUpWithEmail(email, password, name, phone);
-      toast.success('Account created successfully!');
+      const { user } = await authAPI.signUpWithEmail(email, password, name, phone);
+
+      if (!user) {
+        throw new Error('Signup succeeded but user data not returned');
+      }
+
+      await loadUserProfile(user.id);
+
+      toast.success('Account created successfully! Welcome!');
     } catch (error: any) {
       const errorMessage = error.message || 'Registration failed. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      dispatch({ type: 'SET_LOADING', payload: false });
       toast.error(errorMessage);
     }
   };
