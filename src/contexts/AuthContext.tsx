@@ -31,8 +31,14 @@ const initialState: AuthState = {
 function authReducer(state: AuthState, action: AuthAction): AuthState {
   switch (action.type) {
     case 'SET_LOADING':
+      console.log('[AuthReducer] SET_LOADING:', action.payload);
       return { ...state, isLoading: action.payload };
     case 'SET_USER':
+      console.log('[AuthReducer] SET_USER:', {
+        user: action.payload?.email,
+        isAuthenticated: action.payload !== null,
+        isOnboarded: action.payload?.isOnboarded || false
+      });
       return {
         ...state,
         user: action.payload,
@@ -42,10 +48,12 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         error: null,
       };
     case 'SET_ERROR':
+      console.log('[AuthReducer] SET_ERROR:', action.payload);
       return { ...state, error: action.payload, isLoading: false };
     case 'CLEAR_ERROR':
       return { ...state, error: null };
     case 'LOGOUT':
+      console.log('[AuthReducer] LOGOUT');
       return { ...initialState, isLoading: false };
     default:
       return state;
@@ -71,25 +79,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadUserProfile = async (userId: string, retryCount = 0) => {
     try {
+      console.log('[loadUserProfile] Loading profile for user:', userId, 'retry:', retryCount);
+
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('[loadUserProfile] Profile query error:', profileError);
+        throw profileError;
+      }
 
       if (!profile && retryCount < 3) {
+        console.log('[loadUserProfile] Profile not found, retrying...');
         await new Promise((resolve) => setTimeout(resolve, 1000));
         return loadUserProfile(userId, retryCount + 1);
       }
 
       if (!profile) {
+        console.error('[loadUserProfile] Profile not found after 3 retries');
         throw new Error('Profile not found after multiple attempts');
       }
 
+      console.log('[loadUserProfile] Profile loaded:', profile.email);
+
       const stores = await storesAPI.getUserStores();
       const userStore = stores && stores.length > 0 ? stores[0] : undefined;
+
+      console.log('[loadUserProfile] Store:', userStore ? userStore.name : 'No store (needs onboarding)');
 
       const user: User = {
         uid: profile.id,
@@ -103,9 +122,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastLoginAt: new Date(profile.last_login_at),
       };
 
+      console.log('[loadUserProfile] Setting user, isOnboarded:', !!userStore);
       dispatch({ type: 'SET_USER', payload: user });
     } catch (error: any) {
-      console.error('Error loading profile:', error);
+      console.error('[loadUserProfile] Error loading profile:', error);
       dispatch({ type: 'SET_ERROR', payload: 'Failed to load user profile' });
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -142,11 +162,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Auth state change:', event, session?.user?.email);
 
       if (event === 'SIGNED_IN' && session) {
+        console.log('User signed in, loading profile...');
         await loadUserProfile(session.user.id);
       } else if (event === 'SIGNED_OUT') {
+        console.log('User signed out');
         dispatch({ type: 'LOGOUT' });
       } else if (event === 'USER_UPDATED' && session) {
+        console.log('User updated, reloading profile...');
         await loadUserProfile(session.user.id);
+      } else if (event === 'TOKEN_REFRESHED' && session) {
+        console.log('Token refreshed');
+        // Token refresh is automatic, no need to reload profile
+      } else if (event === 'PASSWORD_RECOVERY') {
+        console.log('Password recovery initiated');
       }
     });
 
@@ -158,15 +186,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      console.log('[login] Starting login for:', email);
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
 
-      await authAPI.loginWithEmail(email, password);
+      const { user } = await authAPI.loginWithEmail(email, password);
+      console.log('[login] Login API response, user:', user?.email);
+
+      if (!user) {
+        throw new Error('Login succeeded but user data not returned');
+      }
+
+      console.log('[login] Loading user profile...');
+      await loadUserProfile(user.id);
+
+      console.log('[login] Login complete!');
       toast.success('Login successful!');
       return true;
     } catch (error: any) {
+      console.error('[login] Login error:', error);
       const errorMessage = error.message || 'Login failed. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      dispatch({ type: 'SET_LOADING', payload: false });
       toast.error(errorMessage);
       return false;
     }
@@ -178,16 +219,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'CLEAR_ERROR' });
 
       await authAPI.loginWithGoogle();
-      toast.success('Redirecting to Google...');
+      // Note: Google OAuth will redirect, so profile loading happens via onAuthStateChange
     } catch (error: any) {
       const errorMessage = error.message || 'Google login failed. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      dispatch({ type: 'SET_LOADING', payload: false });
       toast.error(errorMessage);
     }
   };
 
   const register = async (email: string, password: string, name: string, phone?: string) => {
     try {
+      console.log('[register] Starting registration for:', email);
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
 
@@ -196,15 +239,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { user } = await authAPI.signUpWithEmail(email, password, name, phone);
+      console.log('[register] Signup API response, user:', user?.email);
 
       if (!user) {
         throw new Error('Signup succeeded but user data not returned');
       }
 
+      console.log('[register] Loading user profile...');
       await loadUserProfile(user.id);
 
+      console.log('[register] Registration complete!');
       toast.success('Account created successfully! Welcome!');
     } catch (error: any) {
+      console.error('[register] Registration error:', error);
       const errorMessage = error.message || 'Registration failed. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       dispatch({ type: 'SET_LOADING', payload: false });

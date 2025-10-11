@@ -66,18 +66,28 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
-  
+
+  console.log('[AuthRoute] state:', {
+    isLoading: state.isLoading,
+    isAuthenticated: state.isAuthenticated,
+    isOnboarded: state.isOnboarded
+  });
+
   if (state.isLoading) {
+    console.log('[AuthRoute] Still loading, showing loader');
     return <LoadingScreen />;
   }
-  
+
   if (state.isAuthenticated) {
     if (!state.isOnboarded) {
+      console.log('[AuthRoute] Authenticated but not onboarded, redirecting to /onboarding');
       return <Navigate to="/onboarding" replace />;
     }
+    console.log('[AuthRoute] Authenticated and onboarded, redirecting to /dashboard');
     return <Navigate to="/dashboard" replace />;
   }
-  
+
+  console.log('[AuthRoute] Not authenticated, showing auth screen');
   return <>{children}</>;
 }
 
