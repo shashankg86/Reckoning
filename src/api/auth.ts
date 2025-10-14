@@ -1,9 +1,40 @@
 import { supabase } from '../lib/supabaseClient';
-import toast from 'react-hot-toast';
 
 export const authAPI = {
+  /**
+   * Check if email already exists in the system
+   */
+  async checkEmailExists(email: string): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email.toLowerCase())
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error checking email:', error);
+        return false;
+      }
+
+      return !!data;
+    } catch (error) {
+      console.error('Error checking email existence:', error);
+      return false;
+    }
+  },
+
   async signUpWithEmail(email: string, password: string, name: string, phone: string) {
     try {
+      // Check if email already exists
+      const emailExists = await this.checkEmailExists(email);
+      
+      if (emailExists) {
+        throw new Error(
+          'This email is already registered. Please log in instead, or use "Sign in with Google" if you previously signed up with Google.'
+        );
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -15,8 +46,17 @@ export const authAPI = {
         },
       });
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        if (error.message.includes('already registered')) {
+          throw new Error('This email is already registered. Please log in instead.');
+        }
+        throw error;
+      }
+      
+      return {
+        user: data.user,
+        session: data.session,
+      };
     } catch (error: any) {
       console.error('Sign up error:', error);
       throw new Error(error.message || 'Failed to sign up');
@@ -30,7 +70,15 @@ export const authAPI = {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. Please try again.');
+        }
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please verify your email before logging in.');
+        }
+        throw error;
+      }
 
       if (data.user) {
         await supabase
@@ -39,7 +87,10 @@ export const authAPI = {
           .eq('id', data.user.id);
       }
 
-      return data;
+      return {
+        user: data.user,
+        session: data.session,
+      };
     } catch (error: any) {
       console.error('Login error:', error);
       throw new Error(error.message || 'Failed to login');
@@ -51,7 +102,11 @@ export const authAPI = {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}/dashboard`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
 

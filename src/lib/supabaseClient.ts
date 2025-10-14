@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { secureStorage } from './secureStorage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -7,13 +8,38 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env file.');
 }
 
+// Create Supabase client with enhanced security
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    persistSession: true,
+    // Use secure encrypted storage instead of plain localStorage
+    storage: secureStorage,
+
+    // Auto refresh tokens before expiry
     autoRefreshToken: true,
+
+    // Persist session securely
+    persistSession: true,
+
+    // Detect session from URL (OAuth redirects)
     detectSessionInUrl: true,
-    storage: localStorage,
+
+    // Use PKCE flow for enhanced OAuth security
+    flowType: 'pkce',
+
+    // Custom storage key
+    storageKey: 'sb-auth-token',
   },
+
+  global: {
+    headers: {
+      'x-client-info': 'universal-pos-app',
+    },
+  },
+
+  db: {
+    schema: 'public',
+  },
+
   realtime: {
     params: {
       eventsPerSecond: 10,
@@ -21,6 +47,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+// Log authentication state changes in development
+if (import.meta.env.DEV) {
+  supabase.auth.onAuthStateChange((event, session) => {
+    console.log('[Supabase Auth]', event, {
+      user: session?.user?.email,
+      expiresAt: session?.expires_at
+        ? new Date(session.expires_at * 1000).toLocaleString()
+        : 'N/A',
+    });
+  });
+}
+
+// Type definitions for your database
 export type Database = {
   public: {
     Tables: {

@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { authAPI } from '../api/auth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { BuildingStorefrontIcon, EnvelopeIcon, LockClosedIcon, PhoneIcon, EyeIcon, EyeSlashIcon, UserIcon } from '@heroicons/react/24/outline';
 import { isValidEmail, isValidPhone, isValidName, validatePassword } from '../utils/validation';
+import toast from 'react-hot-toast';
 
 export function SignupScreen() {
   const { t } = useTranslation();
@@ -26,6 +28,7 @@ export function SignupScreen() {
     password?: string;
     confirmPassword?: string;
   }>({});
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
 
   const validateForm = (): boolean => {
     const errors: typeof validationErrors = {};
@@ -62,11 +65,35 @@ export function SignupScreen() {
       return;
     }
 
+    // Check if email already exists
+    setIsCheckingEmail(true);
+    try {
+      const emailExists = await authAPI.checkEmailExists(formData.email);
+      console.log({emailExists})
+      
+      if (emailExists) {
+        setValidationErrors({
+          ...validationErrors,
+          email: 'This email is already registered. Please log in or use "Sign in with Google" if you signed up with Google.'
+        });
+        toast.error('This email is already registered. Please log in instead.');
+        setIsCheckingEmail(false);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking email:', error);
+      // Continue with signup even if check fails
+    }
+    setIsCheckingEmail(false);
+
     await register(formData.email, formData.password, formData.name, formData.phone);
   };
 
   const handleGoogleSignup = async () => {
-    await loginWithGoogle();
+    // Google OAuth automatically handles both cases:
+    // - If user exists: logs them in and shows "Welcome back!"
+    // - If user is new: creates account and shows "Welcome! Your account has been created."
+    await loginWithGoogle(true);
   };
 
   return (
@@ -208,10 +235,15 @@ export function SignupScreen() {
 
           <Button
             type="submit"
-            disabled={state.isLoading}
+            disabled={state.isLoading || isCheckingEmail}
             className="w-full"
           >
-            {state.isLoading ? t('auth.creatingAccount') : t('auth.signup')}
+            {isCheckingEmail 
+              ? 'Checking email...' 
+              : state.isLoading 
+                ? t('auth.creatingAccount') 
+                : t('auth.signup')
+            }
           </Button>
 
           <div className="relative">
