@@ -7,6 +7,7 @@ import { LoadingScreen } from './ui/Loader';
 import { LoginScreen } from '../screens/LoginScreen';
 import { SignupScreen } from '../screens/SignupScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
+import { PhoneVerificationScreen } from '../screens/PhoneVerificationScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 
 // App screens
@@ -24,6 +25,9 @@ export function Router() {
         <Route path="/login" element={<AuthRoute><LoginScreen /></AuthRoute>} />
         <Route path="/signup" element={<AuthRoute><SignupScreen /></AuthRoute>} />
         <Route path="/forgot-password" element={<AuthRoute><ForgotPasswordScreen /></AuthRoute>} />
+        
+        {/* Phone verification route */}
+        <Route path="/phone-verification" element={<VerificationRoute><PhoneVerificationScreen /></VerificationRoute>} />
         
         {/* Onboarding route */}
         <Route path="/onboarding" element={<OnboardingRoute><OnboardingScreen /></OnboardingRoute>} />
@@ -88,6 +92,30 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   }
 
   console.log('[AuthRoute] Not authenticated, showing auth screen');
+  return <>{children}</>;
+}
+
+function VerificationRoute({ children }: { children: React.ReactNode }) {
+  const { state } = useAuth();
+
+  console.log('[VerificationRoute] state:', {
+    isLoading: state.isLoading,
+    isAuthenticated: state.isAuthenticated,
+    pendingVerification: state.pendingVerification
+  });
+
+  if (state.isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // If already authenticated and onboarded, redirect to dashboard
+  if (state.isAuthenticated && state.isOnboarded) {
+    console.log('[VerificationRoute] Already authenticated and onboarded, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Allow access to verification screen
+  // The screen itself will handle validation of required data
   return <>{children}</>;
 }
 
