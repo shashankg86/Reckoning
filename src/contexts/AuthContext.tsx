@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode } fr
 import { supabase } from '../lib/supabaseClient';
 import { authAPI } from '../api/auth';
 import { storesAPI } from '../api/stores';
+import { smsAPI } from '../api/sms';
 import toast from 'react-hot-toast';
 import type { User, Store } from '../types';
 
@@ -11,6 +12,12 @@ interface AuthState {
     isAuthenticated: boolean;
     isOnboarded: boolean;
     error: string | null;
+    isPhoneVerified: boolean;
+    pendingVerification: {
+        phone?: string;
+        email?: string;
+        name?: string;
+    } | null;
 }
 
 type AuthAction =
@@ -18,6 +25,8 @@ type AuthAction =
     | { type: 'SET_USER'; payload: User | null }
     | { type: 'SET_ERROR'; payload: string | null }
     | { type: 'CLEAR_ERROR' }
+    | { type: 'SET_PENDING_VERIFICATION'; payload: AuthState['pendingVerification'] }
+    | { type: 'SET_PHONE_VERIFIED'; payload: boolean }
     | { type: 'LOGOUT' };
 
 const initialState: AuthState = {
@@ -26,6 +35,8 @@ const initialState: AuthState = {
     isAuthenticated: false,
     isOnboarded: false,
     error: null,
+    isPhoneVerified: false,
+    pendingVerification: null,
 };
 
 function authReducer(state: AuthState, action: AuthAction): AuthState {
@@ -46,12 +57,17 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
                 isOnboarded: action.payload?.isOnboarded || false,
                 isLoading: false,
                 error: null,
+                isPhoneVerified: action.payload ? !!action.payload.phone : false,
             };
         case 'SET_ERROR':
             console.log('[AuthReducer] SET_ERROR:', action.payload);
             return { ...state, error: action.payload, isLoading: false };
         case 'CLEAR_ERROR':
             return { ...state, error: null };
+        case 'SET_PENDING_VERIFICATION':
+            return { ...state, pendingVerification: action.payload };
+        case 'SET_PHONE_VERIFIED':
+            return { ...state, isPhoneVerified: action.payload };
         case 'LOGOUT':
             console.log('[AuthReducer] LOGOUT');
             return { ...initialState, isLoading: false };
@@ -64,7 +80,9 @@ interface AuthContextType {
     state: AuthState;
     login: (email: string, password: string) => Promise<boolean>;
     loginWithGoogle: () => Promise<void>;
-    register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
+    register: (email: string, password: string, name: string, phone: string) => Promise<{ requiresPhoneVerification: boolean }>;
+    initiatePhoneVerification: (phone: string, email: string, name: string, password?: string, isSignup?: boolean) => Promise<void>;
+    completePhoneVerification: (phone: string, otp: string, signupData?: { email: string; password: string; name: string }) => Promise<boolean>;
     logout: () => Promise<void>;
     resetPassword: (email: string) => Promise<void>;
     completeOnboarding: (storeData: Store) => Promise<void>;
@@ -228,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const register = async (email: string, password: string, name: string, phone?: string) => {
+    const register = async (email: string, password: string, name: string, phone: string): Promise<{ requiresPhoneVerification: boolean }> => {
         try {
             console.log('[register] Starting registration for:', email);
             dispatch({ type: 'SET_LOADING', payload: true });
@@ -238,24 +256,114 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 throw new Error('Phone number is required');
             }
 
-            const { user } = await authAPI.signUpWithEmail(email, password, name, phone);
-            console.log('[register] Signup API response, user:', user?.email);
+            // Check if SMS service is configured
+            if (!smsAPI.isConfigured()) {
+                console.warn('[register] SMS not configured, proceeding without phone verification');
+                
+                // Fallback to direct registration without phone verification
+                const { user } = await authAPI.signUpWithEmail(email, password, name, phone);
+                
+                if (!user) {
+                    throw new Error('Signup succeeded but user data not returned');
+                }
 
-            if (!user) {
-                throw new Error('Signup succeeded but user data not returned');
+                await loadUserProfile(user.id);
+                toast.success('Account created successfully! Welcome!');
+                
+                return { requiresPhoneVerification: false };
             }
 
-            console.log('[register] Loading user profile...');
-            await loadUserProfile(user.id);
-
-            console.log('[register] Registration complete!');
-            toast.success('Account created successfully! Welcome!');
+            // Store registration data for phone verification
+            dispatch({ type: 'SET_PENDING_VERIFICATION', payload: { phone, email, name } });
+            
+            console.log('[register] Phone verification required, redirecting to verification screen');
+            return { requiresPhoneVerification: true };
         } catch (error: any) {
             console.error('[register] Registration error:', error);
             const errorMessage = error.message || 'Registration failed. Please try again.';
             dispatch({ type: 'SET_ERROR', payload: errorMessage });
             dispatch({ type: 'SET_LOADING', payload: false });
             toast.error(errorMessage);
+            throw error;
+        }
+    };
+
+    const initiatePhoneVerification = async (phone: string, email: string, name: string, password?: string, isSignup: boolean = true) => {
+        try {
+            console.log('[initiatePhoneVerification] Starting phone verification for:', phone);
+            dispatch({ type: 'SET_LOADING', payload: true });
+            dispatch({ type: 'CLEAR_ERROR' });
+
+            const result = await smsAPI.sendOTP(phone);
+            
+            if (!result.success) {
+                throw new Error(result.message);
+            }
+
+            // Store verification data
+            dispatch({ type: 'SET_PENDING_VERIFICATION', payload: { phone, email, name } });
+            
+            console.log('[initiatePhoneVerification] OTP sent successfully');
+            toast.success('OTP sent to your phone number');
+        } catch (error: any) {
+            console.error('[initiatePhoneVerification] Error:', error);
+            const errorMessage = error.message || 'Failed to send OTP. Please try again.';
+            dispatch({ type: 'SET_ERROR', payload: errorMessage });
+            toast.error(errorMessage);
+            throw error;
+        } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
+        }
+    };
+
+    const completePhoneVerification = async (phone: string, otp: string, signupData?: { email: string; password: string; name: string }): Promise<boolean> => {
+        try {
+            console.log('[completePhoneVerification] Verifying OTP for:', phone);
+            dispatch({ type: 'SET_LOADING', payload: true });
+            dispatch({ type: 'CLEAR_ERROR' });
+
+            const result = await smsAPI.verifyOTP(phone, otp);
+            
+            if (!result.success) {
+                throw new Error(result.message);
+            }
+
+            // Mark phone as verified
+            dispatch({ type: 'SET_PHONE_VERIFIED', payload: true });
+
+            // If this is signup flow, complete the registration
+            if (signupData) {
+                console.log('[completePhoneVerification] Completing signup after phone verification');
+                
+                const { user } = await authAPI.signUpWithEmail(
+                    signupData.email,
+                    signupData.password,
+                    signupData.name,
+                    phone
+                );
+
+                if (!user) {
+                    throw new Error('Signup succeeded but user data not returned');
+                }
+
+                await loadUserProfile(user.id);
+                toast.success('Account created successfully! Welcome!');
+            } else {
+                toast.success('Phone number verified successfully!');
+            }
+
+            // Clear pending verification
+            dispatch({ type: 'SET_PENDING_VERIFICATION', payload: null });
+            
+            return true;
+        } catch (error: any) {
+            console.error('[completePhoneVerification] Error:', error);
+            const errorMessage = error.message || 'Phone verification failed. Please try again.';
+            dispatch({ type: 'SET_ERROR', payload: errorMessage });
+            toast.error(errorMessage);
+            return false;
+        } finally {
+            dispatch({ type: 'SET_LOADING', payload: false });
         }
     };
 
@@ -334,6 +442,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 login,
                 loginWithGoogle,
                 register,
+                initiatePhoneVerification,
+                completePhoneVerification,
                 logout,
                 resetPassword,
                 completeOnboarding,
