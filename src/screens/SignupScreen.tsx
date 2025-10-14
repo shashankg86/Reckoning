@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../api/auth';
+import { smsAPI } from '../api/sms';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { BuildingStorefrontIcon, EnvelopeIcon, LockClosedIcon, PhoneIcon, EyeIcon, EyeSlashIcon, UserIcon } from '@heroicons/react/24/outline';
@@ -11,6 +12,7 @@ import toast from 'react-hot-toast';
 
 export function SignupScreen() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { register, loginWithGoogle, state } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
@@ -29,6 +31,7 @@ export function SignupScreen() {
     confirmPassword?: string;
   }>({});
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateForm = (): boolean => {
     const errors: typeof validationErrors = {};
@@ -65,11 +68,12 @@ export function SignupScreen() {
       return;
     }
 
-    // Check if email already exists
-    setIsCheckingEmail(true);
+    setIsSubmitting(true);
+
     try {
+      // Check if email already exists
+      setIsCheckingEmail(true);
       const emailExists = await authAPI.checkEmailExists(formData.email);
-      console.log({emailExists})
       
       if (emailExists) {
         setValidationErrors({
@@ -77,24 +81,66 @@ export function SignupScreen() {
           email: 'This email is already registered. Please log in or use "Sign in with Google" if you signed up with Google.'
         });
         toast.error('This email is already registered. Please log in instead.');
-        setIsCheckingEmail(false);
         return;
       }
-    } catch (error) {
-      console.error('Error checking email:', error);
-      // Continue with signup even if check fails
-    }
-    setIsCheckingEmail(false);
 
-    await register(formData.email, formData.password, formData.name, formData.phone);
+      setIsCheckingEmail(false);
+
+      console.log('[SignupScreen] Form validation passed, starting registration process');
+
+      // Check if SMS is configured for phone verification
+      if (smsAPI.isConfigured()) {
+        console.log('[SignupScreen] SMS configured, redirecting to phone verification');
+        
+        // Navigate to phone verification screen with signup data
+        navigate('/phone-verification', {
+          state: {
+            phone: formData.phone,
+            email: formData.email,
+            name: formData.name,
+            password: formData.password,
+            isSignup: true,
+          },
+        });
+      } else {
+        console.log('[SignupScreen] SMS not configured, proceeding with direct registration');
+        
+        // Fallback: Direct registration without phone verification
+        const result = await register(formData.email, formData.password, formData.name, formData.phone);
+        
+        if (!result.requiresPhoneVerification) {
+          // Registration completed successfully without phone verification
+          console.log('[SignupScreen] Registration completed without phone verification');
+        }
+      }
+    } catch (error: any) {
+      console.error('[SignupScreen] Signup error:', error);
+      
+      // Error handling is done by AuthContext, but we can add specific UI feedback here
+      if (error.message?.includes('email')) {
+        setValidationErrors({
+          ...validationErrors,
+          email: error.message
+        });
+      }
+    } finally {
+      setIsSubmitting(false);
+      setIsCheckingEmail(false);
+    }
   };
 
   const handleGoogleSignup = async () => {
-    // Google OAuth automatically handles both cases:
-    // - If user exists: logs them in and shows "Welcome back!"
-    // - If user is new: creates account and shows "Welcome! Your account has been created."
-    await loginWithGoogle(true);
+    try {
+      // For Google OAuth, we might still need phone verification
+      // This will be handled by the AuthContext after successful Google login
+      await loginWithGoogle();
+    } catch (error: any) {
+      console.error('[SignupScreen] Google signup error:', error);
+      // Error handling is done by AuthContext
+    }
   };
+
+  const isLoading = state.isLoading || isCheckingEmail || isSubmitting;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
@@ -137,6 +183,7 @@ export function SignupScreen() {
               placeholder={t('auth.enterFullName')}
               required
               error={validationErrors.name}
+              disabled={isLoading}
               className="pl-10"
             />
             <UserIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
@@ -156,9 +203,18 @@ export function SignupScreen() {
               placeholder={t('auth.enterMobile')}
               required
               error={validationErrors.phone}
+              disabled={isLoading}
               className="pl-10"
             />
             <PhoneIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            <div className="mt-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                📱 {smsAPI.isConfigured() 
+                  ? 'Phone verification required - OTP will be sent' 
+                  : 'Phone number for account security'
+                }
+              </p>
+            </div>
           </div>
 
           <div className="relative">
@@ -175,6 +231,7 @@ export function SignupScreen() {
               placeholder={t('auth.enterEmail')}
               required
               error={validationErrors.email}
+              disabled={isLoading}
               className="pl-10"
             />
             <EnvelopeIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
@@ -195,13 +252,15 @@ export function SignupScreen() {
               required
               error={validationErrors.password}
               helper="At least 8 characters"
+              disabled={isLoading}
               className="pl-10 pr-10"
             />
             <LockClosedIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-9 h-5 w-5 text-gray-400 hover:text-gray-600"
+              disabled={isLoading}
+              className="absolute right-3 top-9 h-5 w-5 text-gray-400 hover:text-gray-600 disabled:opacity-50"
             >
               {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
             </button>
@@ -221,13 +280,15 @@ export function SignupScreen() {
               placeholder={t('auth.confirmNewPassword')}
               required
               error={validationErrors.confirmPassword}
+              disabled={isLoading}
               className="pl-10 pr-10"
             />
             <LockClosedIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
             <button
               type="button"
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute right-3 top-9 h-5 w-5 text-gray-400 hover:text-gray-600"
+              disabled={isLoading}
+              className="absolute right-3 top-9 h-5 w-5 text-gray-400 hover:text-gray-600 disabled:opacity-50"
             >
               {showConfirmPassword ? <EyeSlashIcon /> : <EyeIcon />}
             </button>
@@ -235,14 +296,14 @@ export function SignupScreen() {
 
           <Button
             type="submit"
-            disabled={state.isLoading || isCheckingEmail}
+            disabled={isLoading}
             className="w-full"
           >
             {isCheckingEmail 
               ? 'Checking email...' 
-              : state.isLoading 
-                ? t('auth.creatingAccount') 
-                : t('auth.signup')
+              : isSubmitting
+                ? (smsAPI.isConfigured() ? 'Preparing verification...' : t('auth.creatingAccount'))
+                : (smsAPI.isConfigured() ? 'Continue to Phone Verification' : t('auth.signup'))
             }
           </Button>
 
@@ -261,7 +322,7 @@ export function SignupScreen() {
             type="button"
             variant="secondary"
             onClick={handleGoogleSignup}
-            disabled={state.isLoading}
+            disabled={isLoading}
             className="w-full"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -285,6 +346,15 @@ export function SignupScreen() {
             </Link>
           </div>
         </form>
+
+        {/* Development Info */}
+        {import.meta.env.DEV && (
+          <div className="mt-6 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
+            <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
+              🔧 Dev Mode: SMS {smsAPI.isConfigured() ? '✅ Configured' : '❌ Not Configured'}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
