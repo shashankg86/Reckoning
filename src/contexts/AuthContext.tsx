@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { authAPI } from '../api/auth';
 import { storesAPI } from '../api/stores';
@@ -34,7 +34,6 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SET_AUTH_SESSION_PRESENT': {
-      // Provisional auth: session exists, allow routing while profile loads
       const provisionalUser: User = {
         uid: action.payload.uid,
         email: action.payload.email,
@@ -43,7 +42,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         createdAt: new Date(),
         lastLoginAt: new Date(),
       } as any;
-      return { ...state, user: provisionalUser, isAuthenticated: true, isLoading: true };
+      return { ...state, user: provisionalUser, isAuthenticated: true, isLoading: false };
     }
     case 'SET_USER':
       return {
@@ -80,7 +79,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 async function upsertMinimalProfile(userId: string, email: string | null) {
-  // Create a minimal profile if missing to avoid first-login race conditions
   const name = email ? email.split('@')[0] : 'user';
   await supabase.from('profiles').upsert(
     { id: userId, email, name, phone: '', last_login_at: new Date().toISOString() },
@@ -90,12 +88,20 @@ async function upsertMinimalProfile(userId: string, email: string | null) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const lastUserIdRef = useRef<string | null>(null);
+  const lastProfileLoadAtRef = useRef<number>(0);
 
   const loadUserProfile = async (userId: string, email: string | null) => {
-    // Exponential backoff up to ~40s; create if still missing
+    const now = Date.now();
+    // Debounce repeated loads within 30s
+    if (now - lastProfileLoadAtRef.current < 30_000 && lastUserIdRef.current === userId) {
+      return;
+    }
+    lastProfileLoadAtRef.current = now;
+
     const startsAt = Date.now();
     let attempt = 0;
-    const maxMs = 40000;
+    const maxMs = 40_000;
 
     while (Date.now() - startsAt < maxMs) {
       const { data: profile, error } = await supabase
@@ -104,10 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error) {
-        console.error('[Auth] profile query error', error);
-        // Short sleep and retry
-      } else if (profile) {
+      if (!error && profile) {
         const stores = await storesAPI.getUserStores();
         const userStore = stores && stores.length > 0 ? stores[0] : undefined;
         const user: User = {
@@ -125,21 +128,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // After a few attempts, upsert a minimal profile to break the deadlock
       attempt++;
       if (attempt === 5) {
-        try {
-          await upsertMinimalProfile(userId, email);
-        } catch (e) {
-          console.warn('[Auth] upsert minimal profile failed or not needed', e);
-        }
+        try { await upsertMinimalProfile(userId, email); } catch {}
       }
-      // backoff: 300ms, 600ms, 1200ms, ... capping at 3000ms
       const delay = Math.min(300 * 2 ** attempt, 3000);
       await new Promise((r) => setTimeout(r, delay));
     }
 
-    // As a last resort, set a minimal user so routing can continue
     const minimal: User = {
       uid: userId,
       email,
@@ -149,7 +145,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       lastLoginAt: new Date(),
     } as any;
     dispatch({ type: 'SET_USER', payload: minimal });
-    toast.error('Profile is taking longer than usual to load. Some features may be limited.');
   };
 
   useEffect(() => {
@@ -157,15 +152,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          // Provisional auth immediately
-          dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: session.user.id, email: session.user.email ?? null } });
-          // Load profile asynchronously
-          loadUserProfile(session.user.id, session.user.email ?? null);
+          const uid = session.user.id;
+          lastUserIdRef.current = uid;
+          dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session.user.email ?? null } });
+          loadUserProfile(uid, session.user.email ?? null);
         } else {
           dispatch({ type: 'SET_LOADING', payload: false });
         }
-      } catch (e) {
-        console.error('[Auth] init error', e);
+      } catch {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
@@ -173,13 +167,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: session.user.id, email: session.user.email ?? null } });
-        loadUserProfile(session.user.id, session.user.email ?? null);
-      } else if (event === 'SIGNED_OUT') {
+      const uid = session?.user?.id ?? null;
+
+      if (event === 'SIGNED_IN' && uid) {
+        if (lastUserIdRef.current !== uid) {
+          lastUserIdRef.current = uid;
+          dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session!.user!.email ?? null } });
+          loadUserProfile(uid, session!.user!.email ?? null);
+        }
+        return;
+      }
+
+      if (event === 'TOKEN_REFRESHED') {
+        // Silent refresh: no loading, no profile reload
+        return;
+      }
+
+      if (event === 'USER_UPDATED' && uid) {
+        // Optional: reload if metadata affecting UI changed
+        loadUserProfile(uid, session!.user!.email ?? null);
+        return;
+      }
+
+      if (event === 'SIGNED_OUT') {
+        lastUserIdRef.current = null;
+        lastProfileLoadAtRef.current = 0;
         dispatch({ type: 'LOGOUT' });
-      } else if (event === 'USER_UPDATED' && session?.user) {
-        loadUserProfile(session.user.id, session.user.email ?? null);
       }
     });
 
@@ -188,11 +201,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
       const { user } = await authAPI.loginWithEmail(email, password);
       if (!user) throw new Error('Login succeeded but user data not returned');
-      // Provisional auth then profile load
+      lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
       loadUserProfile(user.id, user.email ?? null);
       toast.success('Login successful!');
@@ -205,35 +217,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithGoogle = async () => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
       await authAPI.loginWithGoogle();
-      // Redirect handled by Supabase; onAuthStateChange covers the rest
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Google login failed. Please try again.' });
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const register = async (email: string, password: string, name: string, phone?: string) => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
       const { user } = await authAPI.signUpWithEmail(email, password, name, phone);
       if (!user) throw new Error('Signup succeeded but user data not returned');
-      // Provisional auth then profile load
+      lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
       loadUserProfile(user.id, user.email ?? null);
       toast.success('Account created successfully! Welcome!');
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Registration failed. Please try again.' });
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const logout = async () => {
     try {
       await authAPI.logout();
+      lastUserIdRef.current = null;
+      lastProfileLoadAtRef.current = 0;
       dispatch({ type: 'LOGOUT' });
       toast.success('Logged out successfully');
     } catch {
@@ -243,21 +252,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
-      dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' });
       await authAPI.resetPassword(email);
       toast.success('Password reset email sent!');
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Failed to send reset email. Please try again.' });
-    } finally {
-      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   const completeOnboarding = async (storeData: Store) => {
     try {
       if (!state.user) throw new Error('No authenticated user');
-      dispatch({ type: 'SET_LOADING', payload: true });
       await storesAPI.createStore(storeData);
       await loadUserProfile(state.user.uid, state.user.email ?? null);
       toast.success('Store setup completed!');
