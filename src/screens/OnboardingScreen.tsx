@@ -1,296 +1,333 @@
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import PhoneInput, { isPossiblePhoneNumber, parsePhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import { useAuth } from '../contexts/AuthContext';
-import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
-import { BuildingStorefrontIcon, ChevronRightIcon, PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import type { Language, Currency, Theme, StoreType } from '../types';
+import { useNavigate } from 'react-router-dom';
+import { BRAND } from '../constants/branding';
+
+const storeSchema = z.object({
+  name: z.string().min(2, 'Store name must be at least 2 characters').max(100, 'Store name too long'),
+  type: z.enum(['restaurant', 'cafe', 'retail', 'salon', 'pharmacy', 'other'], {
+    errorMap: () => ({ message: 'Please select a store type' }),
+  }),
+  address: z.string().min(5, 'Address must be at least 5 characters').max(200, 'Address too long'),
+  city: z.string().min(2, 'City must be at least 2 characters').max(50, 'City name too long'),
+  state: z.string().min(2, 'State must be at least 2 characters').max(50, 'State name too long'),
+  country: z.string().min(2, 'Country is required').max(50, 'Country name too long'),
+  pincode: z.string().min(3, 'Pincode must be at least 3 characters').max(10, 'Pincode too long'),
+  phone: z.string().refine((phone) => {
+    if (!phone) return false;
+    return isPossiblePhoneNumber(phone);
+  }, 'Please enter a valid phone number'),
+  email: z.string().email('Please enter a valid email address').optional().or(z.literal('')),
+  gst_number: z.string().optional(),
+  language: z.enum(['en', 'hi', 'ar', 'mr']).default('en'),
+  currency: z.enum(['INR', 'USD', 'EUR', 'AED', 'GBP']).default('INR'),
+  theme: z.enum(['light', 'dark']).default('light'),
+});
+
+type StoreFormData = z.infer<typeof storeSchema>;
+
+const storeTypes = [
+  { value: 'restaurant', label: 'Restaurant' },
+  { value: 'cafe', label: 'Café' },
+  { value: 'retail', label: 'Retail Store' },
+  { value: 'salon', label: 'Salon/Spa' },
+  { value: 'pharmacy', label: 'Pharmacy' },
+  { value: 'other', label: 'Other' },
+];
+
+const countries = [
+  { value: 'India', label: 'India' },
+  { value: 'United States', label: 'United States' },
+  { value: 'United Kingdom', label: 'United Kingdom' },
+  { value: 'Canada', label: 'Canada' },
+  { value: 'Australia', label: 'Australia' },
+  { value: 'Germany', label: 'Germany' },
+  { value: 'France', label: 'France' },
+  { value: 'UAE', label: 'United Arab Emirates' },
+  { value: 'Singapore', label: 'Singapore' },
+];
 
 export function OnboardingScreen() {
-  const { t, i18n } = useTranslation();
   const { completeOnboarding, state } = useAuth();
-  const [step, setStep] = useState(1);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string>('');
-  const [formData, setFormData] = useState({
-    storeType: '' as StoreType | '',
-    storeName: '',
-    language: 'en' as Language,
-    currency: 'INR' as Currency,
-    theme: 'light' as Theme,
+  const navigate = useNavigate();
+  
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<StoreFormData>({
+    resolver: zodResolver(storeSchema),
+    defaultValues: {
+      language: 'en',
+      currency: 'INR',
+      theme: 'light',
+      country: 'India',
+    },
   });
 
-  const storeTypes = [
-    { value: '', label: t('onboarding.selectStoreType') },
-    { value: 'restaurant', label: t('onboarding.storeTypes.restaurant') },
-    { value: 'cafe', label: t('onboarding.storeTypes.cafe') },
-    { value: 'retail', label: t('onboarding.storeTypes.retail') },
-    { value: 'salon', label: t('onboarding.storeTypes.salon') },
-    { value: 'pharmacy', label: t('onboarding.storeTypes.pharmacy') },
-    { value: 'other', label: t('onboarding.storeTypes.other') },
-  ];
+  const phoneValue = watch('phone');
 
-  const languages = [
-    { value: 'en', label: 'English' },
-    { value: 'hi', label: 'हिंदी (Hindi)' },
-    { value: 'ar', label: 'العربية (Arabic)' },
-    { value: 'mr', label: 'मराठी (Marathi)' },
-    { value: 'ur', label: 'اردو (Urdu)' },
-    { value: 'bn', label: 'বাংলা (Bengali)' },
-    { value: 'ta', label: 'தமிழ் (Tamil)' },
-    { value: 'te', label: 'తెలుగు (Telugu)' },
-    { value: 'gu', label: 'ગુજરાતી (Gujarati)' },
-    { value: 'kn', label: 'ಕನ್ನಡ (Kannada)' },
-    { value: 'ml', label: 'മലയാളം (Malayalam)' },
-    { value: 'pa', label: 'ਪੰਜਾਬੀ (Punjabi)' },
-  ];
-
-  const currencies = [
-    { value: 'INR', label: '₹ Indian Rupee' },
-    { value: 'AED', label: 'د.إ UAE Dirham' },
-    { value: 'USD', label: '$ US Dollar' },
-    { value: 'EUR', label: '€ Euro' },
-    { value: 'GBP', label: '£ British Pound' },
-  ];
-
-  const themes = [
-    { value: 'light', label: t('onboarding.themes.light') },
-    { value: 'dark', label: t('onboarding.themes.dark') },
-  ];
-
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setLogoFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setLogoPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
+  const onSubmit = async (data: StoreFormData) => {
+    try {
+      await completeOnboarding(data as any);
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      console.error('Onboarding failed:', error);
     }
   };
 
-  const removeLogo = () => {
-    setLogoFile(null);
-    setLogoPreview('');
-  };
-
-  const getDefaultLogo = (): string => {
-    return state.user?.photoURL || '/default-store-logo.png';
-  };
-
-  const handleComplete = async () => {
-    const logoURL = logoPreview || getDefaultLogo();
-    
-    const storeData = {
-      name: formData.storeName,
-      type: formData.storeType as StoreType,
-      language: formData.language,
-      currency: formData.currency,
-      theme: formData.theme,
-      logoURL,
-    };
-
-    // Apply theme immediately during onboarding
-    const root = document.documentElement;
-    if (formData.theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    await completeOnboarding(storeData);
-  };
-
-  const nextStep = () => {
-    if (step < 4) setStep(step + 1);
-    else handleComplete();
-  };
-
-  const prevStep = () => {
-    if (step > 1) setStep(step - 1);
-  };
-
-  const canProceed = (): boolean => {
-    switch (step) {
-      case 1:
-        return formData.storeType !== '';
-      case 2:
-        return formData.storeName.trim() !== '';
-      case 3:
-      case 4:
-        return true;
-      default:
-        return false;
-    }
-  };
-
-  const handleLanguageChange = (language: Language) => {
-    setFormData({ ...formData, language });
-    i18n.changeLanguage(language);
-    
-    // Auto-set currency based on language
-    const defaultCurrency: Currency = 
-      language === 'ar' ? 'AED' : 
-      language === 'en' ? 'USD' : 'INR';
-    setFormData(prev => ({ ...prev, language, currency: defaultCurrency }));
-  };
+  if (state.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
-        <div className="text-center mb-8">
-          <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mb-4">
-            <BuildingStorefrontIcon className="w-8 h-8 text-orange-500 dark:text-orange-400" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {t('onboarding.welcome')}
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            {state.user?.name && (
-              <span className="block text-orange-600 dark:text-orange-400 font-medium">
-                {t('common.hello')}, {state.user.name}!
-              </span>
-            )}
-            {t('onboarding.letsSetup')}
-          </p>
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="flex justify-center">
+          <img
+            src={BRAND.LOGO_URL}
+            alt={BRAND.NAME}
+            className="h-12 w-auto"
+          />
         </div>
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          Set up your store
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          Complete your business profile to get started
+        </p>
+      </div>
 
-        {/* Progress Indicator */}
-        <div className="flex justify-center mb-8">
-          <div className="flex space-x-2">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className={`w-2 h-2 rounded-full ${i <= step ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'}`}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          {step === 1 && (
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
+        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
+            {/* Store Name */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('onboarding.businessType')}
-              </h2>
-              <Select
-                value={formData.storeType}
-                onChange={(e) => setFormData({ ...formData, storeType: e.target.value as StoreType })}
-                options={storeTypes}
+              <label className="block text-sm font-medium text-gray-700">
+                Store Name *
+              </label>
+              <input
+                {...register('name')}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter your store name"
               />
+              {errors.name && (
+                <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+              )}
             </div>
-          )}
 
-          {step === 2 && (
+            {/* Store Type */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('onboarding.storeName')}
-              </h2>
-              <Input
-                value={formData.storeName}
-                onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
-                placeholder={t('onboarding.enterStoreName')}
-                autoFocus
+              <label className="block text-sm font-medium text-gray-700">
+                Store Type *
+              </label>
+              <select
+                {...register('type')}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select store type</option>
+                {storeTypes.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+              {errors.type && (
+                <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>
+              )}
+            </div>
+
+            {/* Address */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Address *
+              </label>
+              <textarea
+                {...register('address')}
+                rows={2}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter your store address"
               />
-              
-              {/* Store Logo Upload */}
-              <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {t('onboarding.storeLogo')}
+              {errors.address && (
+                <p className="mt-1 text-sm text-red-600">{errors.address.message}</p>
+              )}
+            </div>
+
+            {/* City and State */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  City *
                 </label>
-                <div className="flex items-center space-x-4">
-                  <div className="w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center overflow-hidden">
-                    {logoPreview ? (
-                      <img src={logoPreview} alt="Store logo" className="w-full h-full object-cover" />
-                    ) : (
-                      <PhotoIcon className="w-8 h-8 text-gray-400" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoUpload}
-                      className="hidden"
-                      id="logo-upload"
-                    />
-                    <label
-                      htmlFor="logo-upload"
-                      className="cursor-pointer inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                    >
-                      {t('onboarding.uploadLogo')}
-                    </label>
-                    {logoPreview && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={removeLogo}
-                        className="ml-2 text-red-600"
-                      >
-                        <XMarkIcon className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  {t('onboarding.logoHint')}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('onboarding.chooseLanguage')}
-              </h2>
-              <Select
-                value={formData.language}
-                onChange={(e) => handleLanguageChange(e.target.value as Language)}
-                options={languages}
-              />
-              <div className="mt-4">
-                <h3 className="text-md font-medium text-gray-900 dark:text-white mb-2">
-                  {t('onboarding.chooseCurrency')}
-                </h3>
-                <Select
-                  value={formData.currency}
-                  onChange={(e) => setFormData({ ...formData, currency: e.target.value as Currency })}
-                  options={currencies}
+                <input
+                  {...register('city')}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="City"
                 />
+                {errors.city && (
+                  <p className="mt-1 text-sm text-red-600">{errors.city.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  State *
+                </label>
+                <input
+                  {...register('state')}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="State"
+                />
+                {errors.state && (
+                  <p className="mt-1 text-sm text-red-600">{errors.state.message}</p>
+                )}
               </div>
             </div>
-          )}
 
-          {step === 4 && (
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {t('onboarding.chooseTheme')}
-              </h2>
-              <Select
-                value={formData.theme}
-                onChange={(e) => setFormData({ ...formData, theme: e.target.value as Theme })}
-                options={themes}
-              />
+            {/* Country and Pincode */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Country *
+                </label>
+                <select
+                  {...register('country')}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {countries.map((country) => (
+                    <option key={country.value} value={country.value}>
+                      {country.label}
+                    </option>
+                  ))}
+                </select>
+                {errors.country && (
+                  <p className="mt-1 text-sm text-red-600">{errors.country.message}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Pincode *
+                </label>
+                <input
+                  {...register('pincode')}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Pincode"
+                />
+                {errors.pincode && (
+                  <p className="mt-1 text-sm text-red-600">{errors.pincode.message}</p>
+                )}
+              </div>
             </div>
-          )}
 
-          <div className="flex justify-between pt-4">
-            {step > 1 && (
-              <Button variant="secondary" onClick={prevStep}>
-                {t('onboarding.back')}
-              </Button>
-            )}
-            <Button
-              onClick={nextStep}
-              disabled={!canProceed() || state.isLoading}
-              className={step === 1 ? 'w-full' : 'ml-auto'}
-            >
-              {step === 4 ? t('onboarding.getStarted') : t('onboarding.next')}
-              <ChevronRightIcon className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
+            {/* Phone Number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Phone Number *
+              </label>
+              <PhoneInput
+                value={phoneValue}
+                onChange={(value) => setValue('phone', value || '')}
+                defaultCountry="IN"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter phone number"
+              />
+              {errors.phone && (
+                <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>
+              )}
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Email Address
+              </label>
+              <input
+                {...register('email')}
+                type="email"
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter email address (optional)"
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+              )}
+            </div>
+
+            {/* GST Number */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                GST Number
+              </label>
+              <input
+                {...register('gst_number')}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Enter GST number (optional)"
+              />
+              {errors.gst_number && (
+                <p className="mt-1 text-sm text-red-600">{errors.gst_number.message}</p>
+              )}
+            </div>
+
+            {/* Currency and Language */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Currency
+                </label>
+                <select
+                  {...register('currency')}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="INR">Indian Rupee (₹)</option>
+                  <option value="USD">US Dollar ($)</option>
+                  <option value="EUR">Euro (€)</option>
+                  <option value="AED">UAE Dirham (AED)</option>
+                  <option value="GBP">British Pound (£)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Language
+                </label>
+                <select
+                  {...register('language')}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="en">English</option>
+                  <option value="hi">Hindi</option>
+                  <option value="ar">Arabic</option>
+                  <option value="mr">Marathi</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <div className="flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Setting up store...
+                  </div>
+                ) : (
+                  'Complete Setup'
+                )}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
