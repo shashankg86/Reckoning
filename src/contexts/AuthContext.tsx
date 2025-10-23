@@ -19,6 +19,7 @@ type AuthAction =
   | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_AUTH_SESSION_PRESENT'; payload: { uid: string; email: string | null } }
+  | { type: 'SET_ONBOARDED'; payload: boolean }
   | { type: 'LOGOUT' };
 
 const initialState: AuthState = {
@@ -42,8 +43,14 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         createdAt: new Date(),
         lastLoginAt: new Date(),
       } as any;
-      return { ...state, user: provisionalUser, isAuthenticated: true, isLoading: false };
+      return { ...state, user: provisionalUser, isAuthenticated: true };
     }
+    case 'SET_ONBOARDED':
+      return {
+        ...state,
+        isOnboarded: action.payload,
+        isLoading: false,
+      };
     case 'SET_USER':
       return {
         ...state,
@@ -86,16 +93,31 @@ async function upsertMinimalProfile(userId: string, email: string | null) {
   );
 }
 
+// Fast membership probe for routing decisions
+async function probeOnboarded(userId: string): Promise<boolean> {
+  try {
+    const { count } = await supabase
+      .from('store_members')
+      .select('id', { count: 'exact' })
+      .eq('user_id', userId)
+      .eq('is_active', true);
+    return (count ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const lastUserIdRef = useRef<string | null>(null);
   const lastProfileLoadAtRef = useRef<number>(0);
 
-  const loadUserProfile = async (userId: string, email: string | null) => {
+  const loadUserProfile = async (userId: string, email: string | null, opts?: { force?: boolean }) => {
     const now = Date.now();
-    // Debounce repeated loads within 30s
-    if (now - lastProfileLoadAtRef.current < 30_000 && lastUserIdRef.current === userId) {
-      return;
+    if (!opts?.force) {
+      if (now - lastProfileLoadAtRef.current < 30_000 && lastUserIdRef.current === userId) {
+        return;
+      }
     }
     lastProfileLoadAtRef.current = now;
 
@@ -151,14 +173,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const init = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          const uid = session.user.id;
-          lastUserIdRef.current = uid;
-          dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session.user.email ?? null } });
-          loadUserProfile(uid, session.user.email ?? null);
-        } else {
+        if (!session?.user) {
           dispatch({ type: 'SET_LOADING', payload: false });
+          return;
         }
+        
+        const uid = session.user.id;
+        lastUserIdRef.current = uid;
+        
+        // Set provisional auth
+        dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session.user.email ?? null } });
+        
+        // Fast membership probe for routing
+        const onboarded = await probeOnboarded(uid);
+        dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
+        
+        // Load full profile in background
+        loadUserProfile(uid, session.user.email ?? null, { force: true });
       } catch {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
@@ -173,19 +204,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (lastUserIdRef.current !== uid) {
           lastUserIdRef.current = uid;
           dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session!.user!.email ?? null } });
-          loadUserProfile(uid, session!.user!.email ?? null);
+          
+          // Fast membership probe
+          const onboarded = await probeOnboarded(uid);
+          dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
+          
+          loadUserProfile(uid, session!.user!.email ?? null, { force: true });
         }
         return;
       }
 
       if (event === 'TOKEN_REFRESHED') {
-        // Silent refresh: no loading, no profile reload
         return;
       }
 
       if (event === 'USER_UPDATED' && uid) {
-        // Optional: reload if metadata affecting UI changed
-        loadUserProfile(uid, session!.user!.email ?? null);
+        loadUserProfile(uid, session!.user!.email ?? null, { force: true });
         return;
       }
 
@@ -206,7 +240,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) throw new Error('Login succeeded but user data not returned');
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
-      loadUserProfile(user.id, user.email ?? null);
+      
+      // Fast membership probe
+      const onboarded = await probeOnboarded(user.id);
+      dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
+      
+      loadUserProfile(user.id, user.email ?? null, { force: true });
       toast.success('Login successful!');
       return true;
     } catch (error: any) {
@@ -231,7 +270,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) throw new Error('Signup succeeded but user data not returned');
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
-      loadUserProfile(user.id, user.email ?? null);
+      dispatch({ type: 'SET_ONBOARDED', payload: false });
+      loadUserProfile(user.id, user.email ?? null, { force: true });
       toast.success('Account created successfully! Welcome!');
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Registration failed. Please try again.' });
@@ -263,11 +303,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const completeOnboarding = async (storeData: Store) => {
     try {
       if (!state.user) throw new Error('No authenticated user');
-      await storesAPI.createStore(storeData);
-      await loadUserProfile(state.user.uid, state.user.email ?? null);
+      const created = await storesAPI.createStore(storeData);
+      
+      // Immediate local state update
+      dispatch({ type: 'SET_ONBOARDED', payload: true });
+      
+      const nextUser = {
+        ...state.user,
+        isOnboarded: true,
+        store: created,
+      } as User;
+      dispatch({ type: 'SET_USER', payload: nextUser });
+      
+      // Background refresh
+      loadUserProfile(state.user.uid, state.user.email ?? null, { force: true });
+      
       toast.success('Store setup completed!');
     } catch {
       dispatch({ type: 'SET_ERROR', payload: 'Failed to complete setup. Please try again.' });
+      throw new Error('onboarding_failed');
     }
   };
 
@@ -275,7 +329,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (!state.user || !state.user.store) throw new Error('No authenticated user or store');
       await storesAPI.updateStore((state.user.store as any).id, updates);
-      await loadUserProfile(state.user.uid, state.user.email ?? null);
+      await loadUserProfile(state.user.uid, state.user.email ?? null, { force: true });
       toast.success('Settings updated successfully!');
     } catch {
       dispatch({ type: 'SET_ERROR', payload: 'Failed to update settings. Please try again.' });

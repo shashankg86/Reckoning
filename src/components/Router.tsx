@@ -31,6 +31,7 @@ export function Router() {
         
         {/* Onboarding route */}
         <Route path="/onboarding" element={<OnboardingRoute><OnboardingScreen /></OnboardingRoute>} />
+        <Route path="/get-started" element={<OnboardingRoute><OnboardingScreen /></OnboardingRoute>} />
         
         {/* Protected app routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardScreen /></ProtectedRoute>} />
@@ -49,7 +50,6 @@ export function Router() {
   );
 }
 
-// Separate route guard components
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
   
@@ -62,7 +62,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   
   if (!state.isOnboarded) {
-    return <Navigate to="/onboarding" replace />;
+    return <Navigate to="/get-started" replace />;
   }
   
   return <>{children}</>;
@@ -71,51 +71,31 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
 
-  console.log('[AuthRoute] state:', {
-    isLoading: state.isLoading,
-    isAuthenticated: state.isAuthenticated,
-    isOnboarded: state.isOnboarded
-  });
-
   if (state.isLoading) {
-    console.log('[AuthRoute] Still loading, showing loader');
     return <LoadingScreen />;
   }
 
   if (state.isAuthenticated) {
-    if (!state.isOnboarded) {
-      console.log('[AuthRoute] Authenticated but not onboarded, redirecting to /onboarding');
-      return <Navigate to="/onboarding" replace />;
+    if (state.isOnboarded) {
+      return <Navigate to="/dashboard" replace />;
     }
-    console.log('[AuthRoute] Authenticated and onboarded, redirecting to /dashboard');
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/get-started" replace />;
   }
 
-  console.log('[AuthRoute] Not authenticated, showing auth screen');
   return <>{children}</>;
 }
 
 function VerificationRoute({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
 
-  console.log('[VerificationRoute] state:', {
-    isLoading: state.isLoading,
-    isAuthenticated: state.isAuthenticated,
-    pendingVerification: state.pendingVerification
-  });
-
   if (state.isLoading) {
     return <LoadingScreen />;
   }
 
-  // If already authenticated and onboarded, redirect to dashboard
   if (state.isAuthenticated && state.isOnboarded) {
-    console.log('[VerificationRoute] Already authenticated and onboarded, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Allow access to verification screen
-  // The screen itself will handle validation of required data
   return <>{children}</>;
 }
 
@@ -130,6 +110,7 @@ function OnboardingRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
   
+  // Redirect to dashboard if already onboarded
   if (state.isOnboarded) {
     return <Navigate to="/dashboard" replace />;
   }
