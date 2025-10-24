@@ -1,86 +1,69 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import PhoneInput, { isPossiblePhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../api/auth';
 import { smsAPI } from '../api/sms';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { BuildingStorefrontIcon, EnvelopeIcon, LockClosedIcon, PhoneIcon, EyeIcon, EyeSlashIcon, UserIcon } from '@heroicons/react/24/outline';
-import { isValidEmail, isValidPhone, isValidName, validatePassword } from '../utils/validation';
+import { BuildingStorefrontIcon, EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon, UserIcon } from '@heroicons/react/24/outline';
+import { isValidEmail, isValidName, validatePassword } from '../utils/validation';
 import toast from 'react-hot-toast';
+import { BRAND } from '../constants/branding';
+
+const signupSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name too long'),
+  phone: z.string().refine((phone) => {
+    if (!phone) return false;
+    return isPossiblePhoneNumber(phone);
+  }, 'Please enter a valid phone number'),
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
+type SignupFormData = z.infer<typeof signupSchema>;
 
 export function SignupScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { register, loginWithGoogle, state } = useAuth();
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
+  const { register: authRegister, loginWithGoogle, state } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<{
-    name?: string;
-    phone?: string;
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-  }>({});
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<SignupFormData>({
+    resolver: zodResolver(signupSchema),
+  });
 
-  const validateForm = (): boolean => {
-    const errors: typeof validationErrors = {};
+  const phoneValue = watch('phone');
 
-    if (!isValidName(formData.name)) {
-      errors.name = 'Please enter a valid name (at least 2 characters, letters only)';
-    }
-
-    if (!isValidPhone(formData.phone)) {
-      errors.phone = 'Please enter a valid phone number (10-15 digits)';
-    }
-
-    if (!isValidEmail(formData.email)) {
-      errors.email = 'Please enter a valid email address';
-    }
-
-    const passwordValidation = validatePassword(formData.password);
-    if (!passwordValidation.isValid) {
-      errors.password = passwordValidation.errors[0];
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
-    }
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleEmailSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-
+  const onSubmit = async (data: SignupFormData) => {
     try {
       // Check if email already exists
       setIsCheckingEmail(true);
-      const emailExists = await authAPI.checkEmailExists(formData.email);
+      const emailExists = await authAPI.checkEmailExists(data.email);
       
       if (emailExists) {
-        setValidationErrors({
-          ...validationErrors,
-          email: 'This email is already registered. Please log in or use "Sign in with Google" if you signed up with Google.'
+        setError('email', {
+          message: t('auth.emailAlreadyExists')
         });
-        toast.error('This email is already registered. Please log in instead.');
+        toast.error(t('auth.emailAlreadyExists'));
         return;
       }
 
@@ -95,10 +78,10 @@ export function SignupScreen() {
         // Navigate to phone verification screen with signup data
         navigate('/phone-verification', {
           state: {
-            phone: formData.phone,
-            email: formData.email,
-            name: formData.name,
-            password: formData.password,
+            phone: data.phone,
+            email: data.email,
+            name: data.name,
+            password: data.password,
             isSignup: true,
           },
         });
@@ -106,7 +89,7 @@ export function SignupScreen() {
         console.log('[SignupScreen] SMS not configured, proceeding with direct registration');
         
         // Fallback: Direct registration without phone verification
-        const result = await register(formData.email, formData.password, formData.name, formData.phone);
+        const result = await authRegister(data.email, data.password, data.name, data.phone);
         
         if (!result.requiresPhoneVerification) {
           // Registration completed successfully without phone verification
@@ -118,13 +101,11 @@ export function SignupScreen() {
       
       // Error handling is done by AuthContext, but we can add specific UI feedback here
       if (error.message?.includes('email')) {
-        setValidationErrors({
-          ...validationErrors,
-          email: error.message
+        setError('email', {
+          message: error.message
         });
       }
     } finally {
-      setIsSubmitting(false);
       setIsCheckingEmail(false);
     }
   };
@@ -147,7 +128,11 @@ export function SignupScreen() {
       <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mb-4">
-            <BuildingStorefrontIcon className="w-8 h-8 text-orange-500 dark:text-orange-400" />
+            <img
+              src={BRAND.LOGO_URL}
+              alt={BRAND.NAME}
+              className="w-10 h-10 object-contain"
+            />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             {t('auth.createAccount')}
@@ -168,50 +153,41 @@ export function SignupScreen() {
           </div>
         )}
 
-        <form onSubmit={handleEmailSignup} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="relative">
             <Input
               label={t('auth.fullName')}
               type="text"
-              value={formData.name}
-              onChange={(e) => {
-                setFormData({ ...formData, name: e.target.value });
-                if (validationErrors.name) {
-                  setValidationErrors({ ...validationErrors, name: undefined });
-                }
-              }}
+              {...register('name')}
               placeholder={t('auth.enterFullName')}
               required
-              error={validationErrors.name}
+              error={errors.name?.message}
               disabled={isLoading}
               className="pl-10"
             />
             <UserIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
           </div>
 
-          <div className="relative">
-            <Input
-              label={t('auth.mobileNumber')}
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => {
-                setFormData({ ...formData, phone: e.target.value });
-                if (validationErrors.phone) {
-                  setValidationErrors({ ...validationErrors, phone: undefined });
-                }
-              }}
-              placeholder={t('auth.enterMobile')}
-              required
-              error={validationErrors.phone}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('auth.mobileNumber')} *
+            </label>
+            <PhoneInput
+              value={phoneValue}
+              onChange={(value) => setValue('phone', value || '')}
+              defaultCountry="IN"
+              className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md shadow-sm py-2 px-3 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder={t('auth.enterMobileNumber')}
               disabled={isLoading}
-              className="pl-10"
             />
-            <PhoneIcon className="absolute left-3 top-9 h-5 w-5 text-gray-400" />
+            {errors.phone && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone.message}</p>
+            )}
             <div className="mt-2">
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 📱 {smsAPI.isConfigured() 
-                  ? 'Phone verification required - OTP will be sent' 
-                  : 'Phone number for account security'
+                  ? t('auth.phoneVerificationRequired')
+                  : t('auth.phoneForSecurity')
                 }
               </p>
             </div>
@@ -221,16 +197,10 @@ export function SignupScreen() {
             <Input
               label={t('auth.email')}
               type="email"
-              value={formData.email}
-              onChange={(e) => {
-                setFormData({ ...formData, email: e.target.value });
-                if (validationErrors.email) {
-                  setValidationErrors({ ...validationErrors, email: undefined });
-                }
-              }}
+              {...register('email')}
               placeholder={t('auth.enterEmail')}
               required
-              error={validationErrors.email}
+              error={errors.email?.message}
               disabled={isLoading}
               className="pl-10"
             />
@@ -241,17 +211,11 @@ export function SignupScreen() {
             <Input
               label={t('auth.password')}
               type={showPassword ? 'text' : 'password'}
-              value={formData.password}
-              onChange={(e) => {
-                setFormData({ ...formData, password: e.target.value });
-                if (validationErrors.password) {
-                  setValidationErrors({ ...validationErrors, password: undefined });
-                }
-              }}
+              {...register('password')}
               placeholder={t('auth.createPassword')}
               required
-              error={validationErrors.password}
-              helper="At least 8 characters"
+              error={errors.password?.message}
+              helper={t('auth.passwordHelper')}
               disabled={isLoading}
               className="pl-10 pr-10"
             />
@@ -270,16 +234,10 @@ export function SignupScreen() {
             <Input
               label={t('auth.confirmPassword')}
               type={showConfirmPassword ? 'text' : 'password'}
-              value={formData.confirmPassword}
-              onChange={(e) => {
-                setFormData({ ...formData, confirmPassword: e.target.value });
-                if (validationErrors.confirmPassword) {
-                  setValidationErrors({ ...validationErrors, confirmPassword: undefined });
-                }
-              }}
+              {...register('confirmPassword')}
               placeholder={t('auth.confirmNewPassword')}
               required
-              error={validationErrors.confirmPassword}
+              error={errors.confirmPassword?.message}
               disabled={isLoading}
               className="pl-10 pr-10"
             />
@@ -300,10 +258,10 @@ export function SignupScreen() {
             className="w-full"
           >
             {isCheckingEmail 
-              ? 'Checking email...' 
+              ? t('auth.checkingEmail')
               : isSubmitting
-                ? (smsAPI.isConfigured() ? 'Preparing verification...' : t('auth.creatingAccount'))
-                : (smsAPI.isConfigured() ? 'Continue to Phone Verification' : t('auth.signup'))
+                ? (smsAPI.isConfigured() ? t('auth.preparingVerification') : t('auth.creatingAccount'))
+                : (smsAPI.isConfigured() ? t('auth.continueToVerification') : t('auth.signup'))
             }
           </Button>
 
@@ -351,7 +309,7 @@ export function SignupScreen() {
         {import.meta.env.DEV && (
           <div className="mt-6 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg">
             <p className="text-xs text-gray-600 dark:text-gray-400 text-center">
-              🔧 Dev Mode: SMS {smsAPI.isConfigured() ? '✅ Configured' : '❌ Not Configured'}
+              {t('auth.devMode')}: {t('auth.sms')} {smsAPI.isConfigured() ? t('common.configured') : t('common.notConfigured')}
             </p>
           </div>
         )}

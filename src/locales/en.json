@@ -34,12 +34,14 @@
     "fullName": "Full Name",
     "enterFullName": "Enter your full name",
     "mobileNumber": "Mobile Number",
+    "enterMobileNumber": "Enter your mobile number",
     "email": "Email",
     "enterEmail": "Enter your email address",
     "mobileOrEmail": "Mobile Number or Email",
     "password": "Password",
     "confirmPassword": "Confirm Password",
     "passwordMismatch": "Passwords do not match",
+    "passwordHelper": "At least 8 characters",
     "rememberMe": "Remember Me",
     "dontHaveAccount": "Don't have an account?",
     "alreadyHaveAccount": "Already have an account?",
@@ -49,6 +51,12 @@
     "confirmNewPassword": "Confirm your password",
     "loggingIn": "Logging in...",
     "creatingAccount": "Creating Account...",
+    "checkingEmail": "Checking email...",
+    "preparingVerification": "Preparing verification...",
+    "continueToVerification": "Continue to Phone Verification",
+    "phoneVerificationRequired": "Phone verification required - OTP will be sent",
+    "phoneForSecurity": "Phone number for account security",
+    "emailAlreadyExists": "This email is already registered. Please log in or use Sign in with Google if you signed up with Google.",
     "sendingReset": "Sending...",
     "sendResetInstructions": "Send Reset Instructions",
     "checkEmail": "Check Your Email",
@@ -56,7 +64,9 @@
     "backToLogin": "Back to Login",
     "resetPasswordDesc": "Enter your email address to receive password reset instructions",
     "orContinueWith": "Or continue with",
-    "continueWithGoogle": "Continue with Google"
+    "continueWithGoogle": "Continue with Google",
+    "devMode": "🔧 Dev Mode",
+    "sms": "SMS"
   },
   "onboarding": {
     "welcome": "Welcome to Universal POS",
@@ -260,7 +270,9 @@
     "cancel": "Cancel",
     "date": "Date",
     "justNow": "Just now",
-    "hoursAgo": "{count} hours ago"
+    "hoursAgo": "{count} hours ago",
+    "configured": "✅ Configured",
+    "notConfigured": "❌ Not Configured"
   },
   "welcome": {
     "title": "Welcome back!",
