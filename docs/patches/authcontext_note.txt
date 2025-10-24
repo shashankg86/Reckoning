@@ -1,0 +1,10 @@
+// inside AuthContext.tsx - added near init logic
+// after obtaining session.user
+import { ensureMinimalProfile } from '../api/profileUtils';
+
+// ... within init()
+if (session?.user) {
+  const uid = session.user.id;
+  const phone = (session.user.user_metadata as any)?.phone ?? null;
+  await ensureMinimalProfile(uid, session.user.email ?? null, (session.user.user_metadata as any)?.name ?? null, phone);
+}

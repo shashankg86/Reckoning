@@ -8,6 +8,7 @@ import { StoreBasics, StoreFormShape } from './onboarding/StoreBasics';
 import { StoreContacts } from './onboarding/StoreContacts';
 import { useAuth } from '../contexts/AuthContext';
 import { isPossiblePhoneNumber } from 'react-phone-number-input';
+import { onboardingAPI } from '../api/onboardingProgress';
 
 const storeSchema = z.object({
   name: z.string().min(2),
@@ -37,7 +38,7 @@ export function OnboardingScreen() {
   const defaultEmail = state.user?.email ?? '';
   const defaultPhone = (state.user as any)?.phone ?? '';
 
-  const { register, handleSubmit, setValue, watch, formState: { errors, isSubmitting } } = useForm<StoreFormData>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<StoreFormData>({
     resolver: zodResolver(storeSchema),
     defaultValues: {
       language: 'en',
@@ -49,8 +50,30 @@ export function OnboardingScreen() {
     },
   });
 
+  // Load saved progress (if any) and restore values
+  React.useEffect(() => {
+    (async () => {
+      if (!state.user) return;
+      const p = await onboardingAPI.get(state.user.uid);
+      if (p?.data) {
+        reset({ ...(p.data as any) });
+      }
+    })();
+  }, [state.user, reset]);
+
+  // Auto-save progress when form changes
+  const values = watch();
+  React.useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!state.user) return;
+      onboardingAPI.save(state.user.uid, 'basics', values as any).catch(() => {});
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [values, state.user]);
+
   const onSubmit = async (data: StoreFormData) => {
     await completeOnboarding(data as any);
+    if (state.user) await onboardingAPI.clear(state.user.uid);
     navigate('/dashboard', { replace: true });
   };
 
@@ -62,7 +85,6 @@ export function OnboardingScreen() {
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <StoreBasics register={register as any} errors={errors as any} />
             <StoreContacts watch={watch as any} setValue={setValue as any} errors={errors as any} defaultCountry={defaultCountry} email={defaultEmail} disableEmail />
-
             <div>
               <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
                 {isSubmitting ? t('onboarding.submitting') : t('onboarding.completeSetup')}
