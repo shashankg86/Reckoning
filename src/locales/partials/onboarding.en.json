@@ -1,0 +1,38 @@
+{
+  "onboarding": {
+    "title": "Set up your store",
+    "subtitle": "Complete your business profile to get started",
+    "form": {
+      "storeName": "Store Name",
+      "enterStoreName": "Enter your store name",
+      "storeType": "Store Type",
+      "selectStoreType": "Select store type",
+      "address": "Address",
+      "addressPlaceholder": "Enter your store address",
+      "city": "City",
+      "cityPlaceholder": "City",
+      "state": "State",
+      "statePlaceholder": "State",
+      "country": "Country",
+      "countryPlaceholder": "Country",
+      "pincode": "Pincode",
+      "pincodePlaceholder": "Pincode",
+      "primaryPhone": "Primary Mobile Number",
+      "secondaryPhone": "Secondary Mobile Number (optional)",
+      "phonePlaceholder": "Enter phone number",
+      "secondaryPhonePlaceholder": "Enter secondary phone number",
+      "email": "Email Address",
+      "emailLocked": "Email comes from signup and cannot be changed here"
+    },
+    "completeSetup": "Complete Setup",
+    "submitting": "Setting up store...",
+    "storeTypes": {
+      "restaurant": "Restaurant",
+      "cafe": "Café",
+      "retail": "Retail Store",
+      "salon": "Salon/Spa",
+      "pharmacy": "Pharmacy",
+      "other": "Other"
+    }
+  }
+}
