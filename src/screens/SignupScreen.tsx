@@ -14,6 +14,7 @@ import { PhoneField } from '../components/form/PhoneField';
 import { EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon, UserIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { BRAND } from '../constants/branding';
+import { ensureMinimalProfile } from '../api/profileUtils';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name too long'),
@@ -49,6 +50,7 @@ export function SignupScreen() {
       if (emailExists) {
         setError('email', { message: t('auth.emailAlreadyExists') });
         toast.error(t('auth.emailAlreadyExists'));
+        navigate('/login', { state: { email: data.email } });
         return;
       }
       setIsCheckingEmail(false);
@@ -57,8 +59,8 @@ export function SignupScreen() {
         navigate('/phone-verification', { state: { phone: data.phone, email: data.email, name: data.name, password: data.password, isSignup: true } });
       } else {
         const result = await authRegister(data.email, data.password, data.name, data.phone);
-        if (!result.requiresPhoneVerification) {
-          // proceed silently
+        if (result.session?.user) {
+          await ensureMinimalProfile(result.session.user.id, data.email, data.name, data.phone);
         }
       }
     } catch (error: any) {
@@ -130,7 +132,7 @@ export function SignupScreen() {
             {t('auth.continueWithGoogle')}
           </Button>
 
-          <div className="text-center"><span className="text-gray-600 dark:text-gray-400">{t('auth.alreadyHaveAccount')}{' '}</span><a href="/login" className="text-orange-500 hover:text-orange-600 font-medium">{t('auth.login')}</a></div>
+          <div className="text-center"><span className="text-gray-600 dark:text-gray-400">{t('auth.alreadyHaveAccount')}{' '}</span><Link to="/login" className="text-orange-500 hover:text-orange-600 font-medium">{t('auth.login')}</Link></div>
         </form>
       </div>
     </div>
