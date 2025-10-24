@@ -1,12 +1,11 @@
-import React from 'react';
-import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import PhoneInput, { isPossiblePhoneNumber, parsePhoneNumber } from 'react-phone-number-input';
+import { useForm } from 'react-hook-form';
+import PhoneInput, { isPossiblePhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
-import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { z } from 'zod';
 import { BRAND } from '../constants/branding';
+import { useAuth } from '../contexts/AuthContext';
 
 const storeSchema = z.object({
   name: z.string().min(2, 'Store name must be at least 2 characters').max(100, 'Store name too long'),
