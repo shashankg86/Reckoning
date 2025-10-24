@@ -1,3 +1,4 @@
+import React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -50,7 +51,6 @@ export function OnboardingScreen() {
     },
   });
 
-  // Load saved progress (if any) and restore values
   React.useEffect(() => {
     (async () => {
       if (!state.user) return;
@@ -61,7 +61,6 @@ export function OnboardingScreen() {
     })();
   }, [state.user, reset]);
 
-  // Auto-save progress when form changes
   const values = watch();
   React.useEffect(() => {
     const timeout = setTimeout(() => {
