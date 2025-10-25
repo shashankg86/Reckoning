@@ -105,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const lastUserIdRef = useRef<string | null>(null);
   const lastProfileLoadAtRef = useRef<number>(0);
+  const lastLoginToastAtRef = useRef<number>(0);
 
   const loadUserProfile = async (userId: string, email: string | null, opts?: { force?: boolean }) => {
     const now = Date.now();
@@ -257,16 +258,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const onboarded = await probeOnboarded(user.id);
       dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
-      // Check for onboarding progress and show appropriate toast
-      const hasProgress = await onboardingAPI.hasProgress(user.id);
+      // Check for onboarding progress and show appropriate toast (with deduplication)
+      const now = Date.now();
+      const shouldShowToast = now - lastLoginToastAtRef.current > 3000; // Only show toast if 3 seconds passed
+
+      if (shouldShowToast) {
+        const hasProgress = await onboardingAPI.hasProgress(user.id);
+
+        if (!onboarded && hasProgress) {
+          toast.success('Welcome back! Continuing your store setup...');
+        } else {
+          toast.success('Login successful!');
+        }
+        lastLoginToastAtRef.current = now;
+      }
 
       loadUserProfile(user.id, user.email ?? null, { force: true });
-
-      if (!onboarded && hasProgress) {
-        toast.success('Welcome back! Continuing your store setup...');
-      } else {
-        toast.success('Login successful!');
-      }
 
       return true;
     } catch (error: any) {
