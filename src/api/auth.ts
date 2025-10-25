@@ -24,11 +24,43 @@ export const authAPI = {
     }
   },
 
+  /**
+   * Ensure user profile exists (create or update)
+   * Critical for both email signup and OAuth flows
+   */
+  async ensureProfile(userId: string, email: string | null, name?: string, phone?: string) {
+    try {
+      const profileData = {
+        id: userId,
+        email: email?.toLowerCase() || null,
+        name: name || email?.split('@')[0] || 'User',
+        phone: phone || '',
+        last_login_at: new Date().toISOString(),
+      };
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert(profileData, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error ensuring profile:', error);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in ensureProfile:', error);
+      return null;
+    }
+  },
+
   async signUpWithEmail(email: string, password: string, name: string, phone: string) {
     try {
       // Check if email already exists
       const emailExists = await this.checkEmailExists(email);
-      
+
       if (emailExists) {
         throw new Error(
           'This email is already registered. Please log in instead, or use "Sign in with Google" if you previously signed up with Google.'
@@ -52,14 +84,19 @@ export const authAPI = {
         }
         throw error;
       }
-      
+
+      // Immediately create profile after successful signup
+      if (data.user) {
+        await this.ensureProfile(data.user.id, email, name, phone);
+      }
+
       return {
         user: data.user,
         session: data.session,
       };
     } catch (error: any) {
       console.error('Sign up error:', error);
-      throw new Error(error.message || 'Failed to sign up');
+      throw error; // Re-throw to preserve error details
     }
   },
 
@@ -80,11 +117,11 @@ export const authAPI = {
         throw error;
       }
 
+      // Ensure profile exists and update last login
       if (data.user) {
-        await supabase
-          .from('profiles')
-          .update({ last_login_at: new Date().toISOString() })
-          .eq('id', data.user.id);
+        const name = data.user.user_metadata?.name || data.user.email?.split('@')[0];
+        const phone = data.user.user_metadata?.phone || '';
+        await this.ensureProfile(data.user.id, data.user.email, name, phone);
       }
 
       return {
@@ -93,7 +130,7 @@ export const authAPI = {
       };
     } catch (error: any) {
       console.error('Login error:', error);
-      throw new Error(error.message || 'Failed to login');
+      throw error; // Re-throw to preserve error details
     }
   },
 
