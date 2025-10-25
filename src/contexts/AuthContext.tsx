@@ -185,18 +185,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Ensure profile exists for OAuth users (Google, etc.)
         if (session.user.app_metadata.provider === 'google') {
-          const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
-          const phone = session.user.user_metadata?.phone || '';
-          await authAPI.ensureProfile(uid, session.user.email, name, phone);
+          try {
+            const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
+            const phone = session.user.user_metadata?.phone || '';
+            await authAPI.ensureProfile(uid, session.user.email, name, phone);
+          } catch (err) {
+            console.error('Failed to ensure OAuth profile:', err);
+          }
         }
 
-        // Fast membership probe for routing
-        const onboarded = await probeOnboarded(uid);
+        // Fast membership probe for routing (with timeout protection)
+        let onboarded = false;
+        try {
+          const probePromise = probeOnboarded(uid);
+          const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000));
+          onboarded = await Promise.race([probePromise, timeoutPromise]);
+        } catch (err) {
+          console.error('Onboarding probe failed:', err);
+        }
+
         dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
         // Load full profile in background
         loadUserProfile(uid, session.user.email ?? null, { force: true });
-      } catch {
+      } catch (err) {
+        console.error('Init error:', err);
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
@@ -213,13 +226,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Ensure profile exists for OAuth users
           if (session!.user!.app_metadata.provider === 'google') {
-            const name = session!.user!.user_metadata?.full_name || session!.user!.email?.split('@')[0];
-            const phone = session!.user!.user_metadata?.phone || '';
-            await authAPI.ensureProfile(uid, session!.user!.email, name, phone);
+            try {
+              const name = session!.user!.user_metadata?.full_name || session!.user!.email?.split('@')[0];
+              const phone = session!.user!.user_metadata?.phone || '';
+              await authAPI.ensureProfile(uid, session!.user!.email, name, phone);
+            } catch (err) {
+              console.error('Failed to ensure OAuth profile on SIGNED_IN:', err);
+            }
           }
 
-          // Fast membership probe
-          const onboarded = await probeOnboarded(uid);
+          // Fast membership probe (with timeout protection)
+          let onboarded = false;
+          try {
+            const probePromise = probeOnboarded(uid);
+            const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000));
+            onboarded = await Promise.race([probePromise, timeoutPromise]);
+          } catch (err) {
+            console.error('Onboarding probe failed on SIGNED_IN:', err);
+          }
+
           dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
           loadUserProfile(uid, session!.user!.email ?? null, { force: true });
