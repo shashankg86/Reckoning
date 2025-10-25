@@ -105,7 +105,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const lastUserIdRef = useRef<string | null>(null);
   const lastProfileLoadAtRef = useRef<number>(0);
-  const lastLoginToastAtRef = useRef<number>(0);
 
   const loadUserProfile = async (userId: string, email: string | null, opts?: { force?: boolean }) => {
     const now = Date.now();
@@ -198,15 +197,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let onboarded = false;
         try {
           const probePromise = probeOnboarded(uid);
-          const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000));
+          const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
           onboarded = await Promise.race([probePromise, timeoutPromise]);
         } catch (err) {
           console.error('Onboarding probe failed:', err);
         }
 
+        // CRITICAL: Always clear loading state to prevent infinite loader
         dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
-        // Load full profile in background
+        // Load full profile in background (non-blocking)
         loadUserProfile(uid, session.user.email ?? null, { force: true });
       } catch (err) {
         console.error('Init error:', err);
@@ -214,7 +214,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    init();
+    // Safety timeout: Force clear loading after 5 seconds to prevent infinite loader
+    const safetyTimeout = setTimeout(() => {
+      console.warn('Safety timeout: Forcing loading state to false');
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }, 5000);
+
+    init().finally(() => {
+      clearTimeout(safetyTimeout);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const uid = session?.user?.id ?? null;
@@ -239,7 +247,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           let onboarded = false;
           try {
             const probePromise = probeOnboarded(uid);
-            const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5000));
+            const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
             onboarded = await Promise.race([probePromise, timeoutPromise]);
           } catch (err) {
             console.error('Onboarding probe failed on SIGNED_IN:', err);
@@ -279,25 +287,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
 
-      // Fast membership probe
-      const onboarded = await probeOnboarded(user.id);
-      dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
-
-      // Check for onboarding progress and show appropriate toast (with deduplication)
-      const now = Date.now();
-      const shouldShowToast = now - lastLoginToastAtRef.current > 3000; // Only show toast if 3 seconds passed
-
-      if (shouldShowToast) {
-        const hasProgress = await onboardingAPI.hasProgress(user.id);
-
-        if (!onboarded && hasProgress) {
-          toast.success('Welcome back! Continuing your store setup...');
-        } else {
-          toast.success('Login successful!');
-        }
-        lastLoginToastAtRef.current = now;
+      // Fast membership probe with timeout
+      let onboarded = false;
+      try {
+        const probePromise = probeOnboarded(user.id);
+        const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
+        onboarded = await Promise.race([probePromise, timeoutPromise]);
+      } catch (err) {
+        console.error('Onboarding probe failed during login:', err);
       }
 
+      dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
+
+      // Simple success toast (no API calls, no complexity)
+      toast.success('Login successful!');
+
+      // Load profile in background without blocking
       loadUserProfile(user.id, user.email ?? null, { force: true });
 
       return true;
