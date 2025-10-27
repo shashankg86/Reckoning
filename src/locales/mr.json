@@ -35,5 +35,42 @@
     "error": "त्रुटी",
     "success": "यशस्वी",
     "currency": "₹"
+  },
+  "onboarding": {
+    "welcome": "युनिव्हर्सल पीओएस मध्ये आपले स्वागत आहे",
+    "letsSetup": "चला आपले स्टोअर सेटअप करूया",
+    "submitting": "सेटअप पूर्ण करत आहे...",
+    "completeSetup": "सेटअप पूर्ण करा",
+    "storeTypes": {
+      "restaurant": "रेस्टॉरंट",
+      "cafe": "कॅफे",
+      "retail": "रिटेल दुकान",
+      "salon": "सलून",
+      "pharmacy": "फार्मसी",
+      "other": "इतर"
+    },
+    "form": {
+      "storeName": "दुकानाचे नाव",
+      "enterStoreName": "तुमच्या दुकानाचे नाव प्रविष्ट करा",
+      "storeType": "दुकानाचा प्रकार",
+      "selectStoreType": "दुकानाचा प्रकार निवडा",
+      "address": "पत्ता",
+      "addressPlaceholder": "रस्त्याचा पत्ता, इमारत क्रमांक",
+      "country": "देश",
+      "selectCountry": "देश निवडा",
+      "selectCountryFirst": "प्रथम देश निवडा",
+      "state": "राज्य/प्रांत",
+      "selectState": "राज्य निवडा",
+      "city": "शहर",
+      "cityPlaceholder": "शहराचे नाव प्रविष्ट करा",
+      "pincode": "पिन कोड",
+      "pincodePlaceholder": "पिन/झिप कोड प्रविष्ट करा",
+      "primaryPhone": "प्राथमिक फोन",
+      "phonePlaceholder": "फोन नंबर प्रविष्ट करा",
+      "secondaryPhone": "दुय्यम फोन (ऐच्छिक)",
+      "secondaryPhonePlaceholder": "पर्यायी फोन नंबर",
+      "email": "ईमेल पत्ता",
+      "emailLocked": "ईमेल तुमच्या खात्याशी लॉक केलेले आहे"
+    }
   }
 }

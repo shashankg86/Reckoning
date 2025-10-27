@@ -82,6 +82,31 @@
     "themes": {
       "light": "فاتح",
       "dark": "داكن"
+    },
+    "submitting": "جاري إكمال الإعداد...",
+    "completeSetup": "إكمال الإعداد",
+    "form": {
+      "storeName": "اسم المتجر",
+      "enterStoreName": "أدخل اسم متجرك",
+      "storeType": "نوع المتجر",
+      "selectStoreType": "اختر نوع المتجر",
+      "address": "العنوان",
+      "addressPlaceholder": "عنوان الشارع، رقم المبنى",
+      "country": "الدولة",
+      "selectCountry": "اختر الدولة",
+      "selectCountryFirst": "اختر الدولة أولاً",
+      "state": "الولاية/المحافظة",
+      "selectState": "اختر الولاية",
+      "city": "المدينة",
+      "cityPlaceholder": "أدخل اسم المدينة",
+      "pincode": "الرمز البريدي",
+      "pincodePlaceholder": "أدخل الرمز البريدي",
+      "primaryPhone": "الهاتف الأساسي",
+      "phonePlaceholder": "أدخل رقم الهاتف",
+      "secondaryPhone": "الهاتف الثانوي (اختياري)",
+      "secondaryPhonePlaceholder": "رقم هاتف بديل",
+      "email": "عنوان البريد الإلكتروني",
+      "emailLocked": "البريد الإلكتروني مرتبط بحسابك"
     }
   },
   "navigation": {

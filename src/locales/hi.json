@@ -82,6 +82,31 @@
     "themes": {
       "light": "हल्का",
       "dark": "गहरा"
+    },
+    "submitting": "सेटअप पूरा हो रहा है...",
+    "completeSetup": "सेटअप पूरा करें",
+    "form": {
+      "storeName": "दुकान का नाम",
+      "enterStoreName": "अपनी दुकान का नाम दर्ज करें",
+      "storeType": "दुकान का प्रकार",
+      "selectStoreType": "दुकान का प्रकार चुनें",
+      "address": "पता",
+      "addressPlaceholder": "सड़क का पता, भवन संख्या",
+      "country": "देश",
+      "selectCountry": "देश चुनें",
+      "selectCountryFirst": "पहले देश चुनें",
+      "state": "राज्य/प्रांत",
+      "selectState": "राज्य चुनें",
+      "city": "शहर",
+      "cityPlaceholder": "शहर का नाम दर्ज करें",
+      "pincode": "पिन कोड",
+      "pincodePlaceholder": "पिन/जिप कोड दर्ज करें",
+      "primaryPhone": "प्राथमिक फ़ोन",
+      "phonePlaceholder": "फ़ोन नंबर दर्ज करें",
+      "secondaryPhone": "द्वितीयक फ़ोन (वैकल्पिक)",
+      "secondaryPhonePlaceholder": "वैकल्पिक फ़ोन नंबर",
+      "email": "ईमेल पता",
+      "emailLocked": "ईमेल आपके खाते से जुड़ा है"
     }
   },
   "navigation": {
