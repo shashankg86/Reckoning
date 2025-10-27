@@ -10,11 +10,13 @@ import { StoreContacts } from './onboarding/StoreContacts';
 import { useAuth } from '../contexts/AuthContext';
 import { isPossiblePhoneNumber } from 'react-phone-number-input';
 import { onboardingAPI } from '../api/onboardingProgress';
+import { storageAPI } from '../api/storage';
+import { toast } from 'react-hot-toast';
 
 const storeSchema = z.object({
   name: z.string().min(2),
   type: z.enum(['restaurant','cafe','retail','salon','pharmacy','other']),
-  logo_url: z.string().optional(),
+  logo_url: z.union([z.string(), z.instanceof(File)]).optional(),
   address: z.string().min(5),
   city: z.string().min(2),
   state: z.string().min(2),
@@ -41,7 +43,7 @@ export function OnboardingScreen() {
   const defaultEmail = state.user?.email ?? '';
   const defaultPhone = (state.user as any)?.phone ?? '';
 
-  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<StoreFormData>({
+  const { register, handleSubmit, setValue, watch, reset, control, formState: { errors, isSubmitting } } = useForm<StoreFormData>({
     resolver: zodResolver(storeSchema),
     defaultValues: {
       language: 'en',
@@ -87,9 +89,30 @@ export function OnboardingScreen() {
   }, [saveProgress]);
 
   const onSubmit = async (data: StoreFormData) => {
-    await completeOnboarding(data as any);
-    if (state.user) await onboardingAPI.clear(state.user.uid);
-    navigate('/dashboard', { replace: true });
+    try {
+      let logoUrl = data.logo_url;
+
+      // If logo_url is a File, upload it first
+      if (logoUrl instanceof File) {
+        toast.loading('Uploading logo...', { id: 'logo-upload' });
+        const uploadResult = await storageAPI.uploadStoreLogo(logoUrl);
+        logoUrl = uploadResult.url;
+        toast.success('Logo uploaded!', { id: 'logo-upload' });
+      }
+
+      // Complete onboarding with the logo URL
+      const storeData = {
+        ...data,
+        logo_url: typeof logoUrl === 'string' ? logoUrl : undefined,
+      };
+
+      await completeOnboarding(storeData as any);
+      if (state.user) await onboardingAPI.clear(state.user.uid);
+      navigate('/dashboard', { replace: true });
+    } catch (error: any) {
+      console.error('Onboarding error:', error);
+      toast.error(error.message || 'Failed to complete setup');
+    }
   };
 
   return (
@@ -98,7 +121,7 @@ export function OnboardingScreen() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <StoreBasics register={register as any} errors={errors as any} onBlur={saveProgress} watch={watch as any} setValue={setValue as any} />
+            <StoreBasics register={register as any} errors={errors as any} onBlur={saveProgress} watch={watch as any} setValue={setValue as any} control={control as any} />
             <StoreContacts watch={watch as any} setValue={setValue as any} errors={errors as any} defaultCountry={defaultCountry} email={defaultEmail} disableEmail onBlur={saveProgress} />
             <div>
               <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 transition-colors">

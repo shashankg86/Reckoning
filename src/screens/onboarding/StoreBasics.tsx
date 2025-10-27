@@ -1,12 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { UseFormRegister, FieldErrors, UseFormWatch, UseFormSetValue } from 'react-hook-form';
+import { UseFormRegister, FieldErrors, UseFormWatch, UseFormSetValue, Control, Controller } from 'react-hook-form';
 import { COUNTRIES, getStatesByCountry } from '../../utils/countriesData';
+import ImageUpload from '../../components/form/ImageUpload';
 
 export type StoreFormShape = {
   name: string;
   type: 'restaurant'|'cafe'|'retail'|'salon'|'pharmacy'|'other';
-  logo_url?: string;
+  logo_url?: string | File;
   address: string;
   country: string;
   state: string;
@@ -20,13 +21,15 @@ export function StoreBasics({
   errors,
   onBlur,
   watch,
-  setValue
+  setValue,
+  control
 }: {
   register: UseFormRegister<StoreFormShape>,
   errors: FieldErrors<StoreFormShape>,
   onBlur?: () => void,
   watch: UseFormWatch<StoreFormShape>,
-  setValue: UseFormSetValue<StoreFormShape>
+  setValue: UseFormSetValue<StoreFormShape>,
+  control: Control<StoreFormShape>
 }) {
   const { t } = useTranslation();
   const storeTypes = ['restaurant','cafe','retail','salon','pharmacy','other'] as const;
@@ -71,17 +74,25 @@ export function StoreBasics({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">
-          {t('onboarding.form.storeLogo')} <span className="text-gray-400 text-xs ml-1">(Optional)</span>
-        </label>
-        <input
-          {...register('logo_url', { onBlur })}
-          type="url"
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
-          placeholder={t('onboarding.form.logoUrlPlaceholder')}
+        <Controller
+          name="logo_url"
+          control={control}
+          render={({ field }) => (
+            <ImageUpload
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={() => {
+                field.onBlur();
+                onBlur?.();
+              }}
+              maxSizeMB={5}
+              label={t('onboarding.form.storeLogo')}
+              hint={t('onboarding.form.logoHint')}
+              placeholder={t('onboarding.form.logoUploadPlaceholder')}
+              error={errors.logo_url ? String(errors.logo_url.message) : undefined}
+            />
+          )}
         />
-        <p className="mt-1 text-xs text-gray-500">{t('onboarding.form.logoHint')}</p>
-        {errors.logo_url && <p className="mt-1 text-sm text-red-600">{String(errors.logo_url.message)}</p>}
       </div>
 
       <div>
