@@ -6,11 +6,13 @@ import { COUNTRIES, getStatesByCountry } from '../../utils/countriesData';
 export type StoreFormShape = {
   name: string;
   type: 'restaurant'|'cafe'|'retail'|'salon'|'pharmacy'|'other';
+  logo_url?: string;
   address: string;
   country: string;
   state: string;
   city: string;
   pincode: string;
+  gst_number?: string;
 };
 
 export function StoreBasics({
@@ -66,6 +68,20 @@ export function StoreBasics({
           {storeTypes.map((v) => <option key={v} value={v}>{t(`onboarding.storeTypes.${v}`)}</option>)}
         </select>
         {errors.type && <p className="mt-1 text-sm text-red-600">{String(errors.type.message)}</p>}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          {t('onboarding.form.storeLogo')} <span className="text-gray-400 text-xs ml-1">(Optional)</span>
+        </label>
+        <input
+          {...register('logo_url', { onBlur })}
+          type="url"
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+          placeholder={t('onboarding.form.logoUrlPlaceholder')}
+        />
+        <p className="mt-1 text-xs text-gray-500">{t('onboarding.form.logoHint')}</p>
+        {errors.logo_url && <p className="mt-1 text-sm text-red-600">{String(errors.logo_url.message)}</p>}
       </div>
 
       <div>
@@ -131,6 +147,20 @@ export function StoreBasics({
           placeholder={t('onboarding.form.pincodePlaceholder')}
         />
         {errors.pincode && <p className="mt-1 text-sm text-red-600">{String(errors.pincode.message)}</p>}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          {t('onboarding.form.gstNumber')} <span className="text-gray-400 text-xs ml-1">(Optional)</span>
+        </label>
+        <input
+          {...register('gst_number', { onBlur })}
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
+          placeholder={t('onboarding.form.gstNumberPlaceholder')}
+          maxLength={15}
+        />
+        <p className="mt-1 text-xs text-gray-500">{t('onboarding.form.gstHint')}</p>
+        {errors.gst_number && <p className="mt-1 text-sm text-red-600">{String(errors.gst_number.message)}</p>}
       </div>
     </>
   );
