@@ -97,10 +97,10 @@ export function OnboardingScreen() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <StoreBasics register={register as any} errors={errors as any} onBlur={saveProgress} />
+            <StoreBasics register={register as any} errors={errors as any} onBlur={saveProgress} watch={watch as any} setValue={setValue as any} />
             <StoreContacts watch={watch as any} setValue={setValue as any} errors={errors as any} defaultCountry={defaultCountry} email={defaultEmail} disableEmail onBlur={saveProgress} />
             <div>
-              <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
+              <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 transition-colors">
                 {isSubmitting ? t('onboarding.submitting') : t('onboarding.completeSetup')}
               </button>
             </div>

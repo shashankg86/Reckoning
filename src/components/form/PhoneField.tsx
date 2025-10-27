@@ -67,8 +67,8 @@ export function PhoneField({ label, value, onChange, defaultCountry = 'IN', plac
           color: white;
         }
         .rpni:focus-within .PhoneInputInput {
-          border-color: rgb(59 130 246);
-          box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+          border-color: rgb(249 115 22);
+          box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
         }
         .rpni .PhoneInputCountryIcon {
           width: 1.5rem;
