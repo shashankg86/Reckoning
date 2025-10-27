@@ -46,7 +46,7 @@ export function OnboardingScreen() {
       language: 'en',
       currency: 'INR',
       theme: 'light',
-      country: 'India',
+      country: '', // Empty so user sees "Select country" placeholder
       email: defaultEmail,
       phone: defaultPhone,
     },
