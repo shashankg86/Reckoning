@@ -12,26 +12,103 @@ import { isPossiblePhoneNumber } from 'react-phone-number-input';
 import { onboardingAPI } from '../api/onboardingProgress';
 import { storageAPI } from '../api/storage';
 import { toast } from 'react-hot-toast';
+import { validatePostalCode, validateGSTNumber, getPostalCodeFormat } from '../utils/validation';
 
-const storeSchema = z.object({
-  name: z.string().min(2),
-  type: z.enum(['restaurant','cafe','retail','salon','pharmacy','other']),
-  logo_url: z.union([z.string(), z.instanceof(File)]).optional(),
-  address: z.string().min(5),
-  city: z.string().min(2),
-  state: z.string().min(2),
-  country: z.string().min(2),
-  pincode: z.string().min(3).max(10),
-  gst_number: z.string().optional(),
-  phone: z.string().refine((v) => v && isPossiblePhoneNumber(v), 'Invalid phone number'),
-  secondary_phone: z.string().optional(),
-  email: z.string().email().optional(),
-  language: z.enum(['en','hi','ar','mr']).default('en'),
-  currency: z.enum(['INR','USD','EUR','AED','GBP']).default('INR'),
-  theme: z.enum(['light','dark']).default('light'),
-});
+/**
+ * Create validation schema with proper, user-friendly error messages
+ */
+function createStoreSchema(t: (key: string) => string) {
+  return z.object({
+    name: z.string({
+      required_error: t('validation.storeNameRequired'),
+      invalid_type_error: t('validation.storeNameInvalid')
+    })
+      .min(2, { message: t('validation.storeNameMinLength') })
+      .max(100, { message: t('validation.storeNameMaxLength') }),
 
-type StoreFormData = z.infer<typeof storeSchema> & StoreFormShape;
+    type: z.enum(['restaurant', 'cafe', 'retail', 'salon', 'pharmacy', 'other'], {
+      required_error: t('validation.storeTypeRequired'),
+      invalid_type_error: t('validation.storeTypeInvalid')
+    }),
+
+    logo_url: z.union([z.string(), z.instanceof(File)]).optional(),
+
+    address: z.string({
+      required_error: t('validation.addressRequired'),
+      invalid_type_error: t('validation.addressInvalid')
+    })
+      .min(10, { message: t('validation.addressMinLength') })
+      .max(200, { message: t('validation.addressMaxLength') }),
+
+    city: z.string({
+      required_error: t('validation.cityRequired'),
+      invalid_type_error: t('validation.cityInvalid')
+    })
+      .min(2, { message: t('validation.cityMinLength') })
+      .max(50, { message: t('validation.cityMaxLength') }),
+
+    state: z.string({
+      required_error: t('validation.stateRequired'),
+      invalid_type_error: t('validation.stateInvalid')
+    })
+      .min(2, { message: t('validation.stateMinLength') })
+      .max(50, { message: t('validation.stateMaxLength') }),
+
+    country: z.string({
+      required_error: t('validation.countryRequired'),
+      invalid_type_error: t('validation.countryInvalid')
+    })
+      .min(2, { message: t('validation.countryMinLength') }),
+
+    pincode: z.string({
+      required_error: t('validation.postalCodeRequired'),
+      invalid_type_error: t('validation.postalCodeInvalid')
+    })
+      .min(3, { message: t('validation.postalCodeMinLength') })
+      .max(10, { message: t('validation.postalCodeMaxLength') }),
+
+    gst_number: z.string()
+      .optional()
+      .refine(
+        (val) => !val || validateGSTNumber(val),
+        { message: t('validation.gstNumberInvalid') }
+      ),
+
+    phone: z.string({
+      required_error: t('validation.phoneRequired'),
+      invalid_type_error: t('validation.phoneInvalid')
+    })
+      .refine((v) => v && isPossiblePhoneNumber(v), {
+        message: t('validation.phoneInvalid')
+      }),
+
+    secondary_phone: z.string().optional(),
+
+    email: z.string()
+      .email({ message: t('validation.emailInvalid') })
+      .optional(),
+
+    language: z.enum(['en', 'hi', 'ar', 'mr']).default('en'),
+    currency: z.enum(['INR', 'USD', 'EUR', 'AED', 'GBP']).default('INR'),
+    theme: z.enum(['light', 'dark']).default('light'),
+  })
+  .refine(
+    (data) => {
+      // Country-specific postal code validation
+      if (!data.pincode || !data.country) return true;
+      return validatePostalCode(data.pincode, data.country);
+    },
+    {
+      message: (data: any) => {
+        const format = getPostalCodeFormat(data.country);
+        return `${data.country} postal code format: ${format}`;
+      },
+      path: ['pincode']
+    }
+  );
+}
+
+type StoreFormData = z.infer<ReturnType<typeof createStoreSchema>> & StoreFormShape;
 
 export function OnboardingScreen() {
   const { t } = useTranslation();
@@ -42,6 +119,9 @@ export function OnboardingScreen() {
   const defaultCountry = 'IN';
   const defaultEmail = state.user?.email ?? '';
   const defaultPhone = (state.user as any)?.phone ?? '';
+
+  // Create schema with translated error messages
+  const storeSchema = React.useMemo(() => createStoreSchema(t), [t]);
 
   const { register, handleSubmit, setValue, watch, reset, control, formState: { errors, isSubmitting } } = useForm<StoreFormData>({
     resolver: zodResolver(storeSchema),

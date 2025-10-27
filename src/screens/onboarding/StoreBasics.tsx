@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { UseFormRegister, FieldErrors, UseFormWatch, UseFormSetValue, Control, Controller } from 'react-hook-form';
 import { COUNTRIES, getStatesByCountry } from '../../utils/countriesData';
+import { getPostalCodeFormat } from '../../utils/validation';
 import ImageUpload from '../../components/form/ImageUpload';
 
 export type StoreFormShape = {
@@ -37,6 +38,11 @@ export function StoreBasics({
   const selectedCountry = watch('country');
   const availableStates = React.useMemo(() => {
     return selectedCountry ? getStatesByCountry(selectedCountry) : [];
+  }, [selectedCountry]);
+
+  // Get expected postal code format for selected country
+  const postalCodeFormat = React.useMemo(() => {
+    return selectedCountry ? getPostalCodeFormat(selectedCountry) : '';
   }, [selectedCountry]);
 
   // Reset state when country changes
@@ -155,8 +161,11 @@ export function StoreBasics({
         <input
           {...register('pincode', { onBlur })}
           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
-          placeholder={t('onboarding.form.pincodePlaceholder')}
+          placeholder={postalCodeFormat || t('onboarding.form.pincodePlaceholder')}
         />
+        {postalCodeFormat && !errors.pincode && (
+          <p className="mt-1 text-xs text-gray-500">Format: {postalCodeFormat}</p>
+        )}
         {errors.pincode && <p className="mt-1 text-sm text-red-600">{String(errors.pincode.message)}</p>}
       </div>
 
