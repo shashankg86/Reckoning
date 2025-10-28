@@ -117,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const startsAt = Date.now();
     let attempt = 0;
-    const maxMs = 40_000;
+    const maxMs = 10_000; // Reduced timeout to 10 seconds
 
     while (Date.now() - startsAt < maxMs) {
       const { data: profile, error } = await supabase
@@ -145,26 +145,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       attempt++;
-      if (attempt === 5) {
-        try {
-          await authAPI.ensureProfile(userId, email);
-        } catch (err) {
-          console.error('Failed to ensure profile:', err);
-        }
-      }
       const delay = Math.min(300 * 2 ** attempt, 3000);
       await new Promise((r) => setTimeout(r, delay));
     }
 
-    const minimal: User = {
-      uid: userId,
-      email,
-      name: email ? email.split('@')[0] : null,
-      isOnboarded: false,
-      createdAt: new Date(),
-      lastLoginAt: new Date(),
-    } as any;
-    dispatch({ type: 'SET_USER', payload: minimal });
+    // CRITICAL: If profile not found after retries, logout for security
+    console.error('Profile not found for user:', userId, '- Logging out for security');
+    toast.error('Your account profile was not found. Please sign up first.');
+
+    try {
+      await authAPI.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+
+    dispatch({ type: 'LOGOUT' });
   };
 
   useEffect(() => {
