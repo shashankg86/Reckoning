@@ -264,6 +264,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log('🟠 [SIGNED_IN] User signed in:', uid, 'Provider:', session!.user!.app_metadata.provider);
         if (lastUserIdRef.current !== uid) {
           console.log('🟠 [SIGNED_IN] New user session detected');
+
+          // For email/password users: Skip handling here - the login() function handles validation
+          // This prevents race condition where SIGNED_IN fires before login() completes
+          if (session!.user!.app_metadata.provider === 'email') {
+            console.log('🟠 [SIGNED_IN] Email/password user - skipping (login function will handle)');
+            return;
+          }
+
           lastUserIdRef.current = uid;
           dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session!.user!.email ?? null } });
 
@@ -278,8 +286,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (err) {
               console.error('🔴 [SIGNED_IN] Failed to ensure OAuth profile:', err);
             }
-          } else {
-            console.log('🟠 [SIGNED_IN] Email/password user, skipping ensureProfile');
           }
 
           // Fast membership probe (with timeout protection)
