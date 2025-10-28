@@ -102,22 +102,12 @@ export const authAPI = {
 
   async loginWithEmail(email: string, password: string) {
     try {
-      console.log('🔵 [LOGIN] Starting login for email:', email);
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      console.log('🔵 [LOGIN] Supabase auth response:', {
-        hasUser: !!data.user,
-        userId: data.user?.id,
-        hasError: !!error,
-        errorMessage: error?.message
-      });
-
       if (error) {
-        console.log('🔴 [LOGIN] Supabase auth failed:', error.message);
         if (error.message.includes('Invalid login credentials')) {
           throw new Error('Invalid email or password. Please try again.');
         }
@@ -129,43 +119,29 @@ export const authAPI = {
 
       // CRITICAL: Check if user has a profile (must have signed up through app)
       if (data.user) {
-        console.log('🔵 [LOGIN] Checking for profile in database for user:', data.user.id);
-
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('id')
           .eq('id', data.user.id)
           .maybeSingle();
 
-        console.log('🔵 [LOGIN] Profile check result:', {
-          hasProfile: !!profile,
-          profileId: profile?.id,
-          hasError: !!profileError,
-          errorCode: profileError?.code
-        });
-
         if (profileError) {
-          console.error('🔴 [LOGIN] Error checking profile during login:', profileError);
+          console.error('Error checking profile during login:', profileError);
           await supabase.auth.signOut();
           throw new Error('Failed to verify account. Please try again.');
         }
 
         if (!profile) {
           // User exists in Supabase auth but not in profiles table = never signed up through app
-          console.error('🔴 [LOGIN] REJECTED: No profile found for user', data.user.id);
-          console.log('🔵 [LOGIN] Logging out Supabase session...');
           await supabase.auth.signOut();
-          console.log('🔵 [LOGIN] Logout complete');
           throw new Error('No account found. Please sign up first.');
         }
 
-        console.log('✅ [LOGIN] Profile found! Updating last login...');
         // Profile exists - just update last login timestamp (DO NOT create)
         await supabase
           .from('profiles')
           .update({ last_login_at: new Date().toISOString() })
           .eq('id', data.user.id);
-        console.log('✅ [LOGIN] Login successful!');
       }
 
       return {
@@ -173,7 +149,7 @@ export const authAPI = {
         session: data.session,
       };
     } catch (error: any) {
-      console.error('🔴 [LOGIN] Login error:', error);
+      console.error('Login error:', error);
       throw error; // Re-throw to preserve error details
     }
   },
