@@ -12,16 +12,18 @@ import { isPossiblePhoneNumber } from 'react-phone-number-input';
 import { onboardingAPI } from '../api/onboardingProgress';
 
 const storeSchema = z.object({
-  name: z.string().min(2),
-  type: z.enum(['restaurant','cafe','retail','salon','pharmacy','other']),
-  address: z.string().min(5),
-  city: z.string().min(2),
-  state: z.string().min(2),
-  country: z.string().min(2),
-  pincode: z.string().min(3).max(10),
-  phone: z.string().refine((v) => v && isPossiblePhoneNumber(v), 'Invalid phone number'),
+  name: z.string().min(2, 'Store name must be at least 2 characters'),
+  type: z.enum(['restaurant','cafe','retail','salon','pharmacy','other'], {
+    errorMap: () => ({ message: 'Please select a store type' })
+  }),
+  address: z.string().min(5, 'Address must be at least 5 characters'),
+  city: z.string().min(2, 'Please select or enter a city'),
+  state: z.string().min(2, 'Please select a state'),
+  country: z.string().min(2, 'Please select a country'),
+  pincode: z.string().min(3, 'Pincode must be at least 3 characters').max(10, 'Pincode cannot exceed 10 characters'),
+  phone: z.string().refine((v) => v && isPossiblePhoneNumber(v), 'Please enter a valid phone number'),
   secondary_phone: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().email('Please enter a valid email').optional(),
   gst_number: z.string().optional(),
   language: z.enum(['en','hi','ar','mr']).default('en'),
   currency: z.enum(['INR','USD','EUR','AED','GBP']).default('INR'),
