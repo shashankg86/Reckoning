@@ -34,6 +34,7 @@ export function OnboardingScreen() {
   const { t } = useTranslation();
   const { state, completeOnboarding } = useAuth();
   const navigate = useNavigate();
+  const progressLoadedRef = React.useRef(false);
 
   const defaultCountry = 'IN';
   const defaultEmail = state.user?.email ?? '';
@@ -51,24 +52,38 @@ export function OnboardingScreen() {
     },
   });
 
+  // Load saved progress once on mount
   React.useEffect(() => {
-    (async () => {
-      if (!state.user) return;
-      const p = await onboardingAPI.get(state.user.uid);
-      if (p?.data) {
-        reset({ ...(p.data as any) });
-      }
-    })();
-  }, [state.user, reset]);
+    if (progressLoadedRef.current || !state.user) return;
 
-  const values = watch();
+    (async () => {
+      const savedProgress = await onboardingAPI.get(state.user!.uid);
+      if (savedProgress?.data) {
+        // Merge saved progress with user profile data
+        const mergedData = {
+          ...(savedProgress.data as any),
+          email: defaultEmail, // Always use profile email
+          phone: (savedProgress.data as any).phone || defaultPhone, // Prefer saved, fallback to profile
+        };
+        reset(mergedData);
+      }
+      progressLoadedRef.current = true;
+    })();
+  }, [state.user, reset, defaultEmail, defaultPhone]);
+
+  // Save progress on blur/input events
+  const saveProgress = React.useCallback(() => {
+    if (!state.user || !progressLoadedRef.current) return;
+    const currentValues = watch();
+    onboardingAPI.save(state.user.uid, 'basics', currentValues as any).catch(() => {});
+  }, [state.user, watch]);
+
+  // Save on page unload/refresh
   React.useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!state.user) return;
-      onboardingAPI.save(state.user.uid, 'basics', values as any).catch(() => {});
-    }, 500);
-    return () => clearTimeout(timeout);
-  }, [values, state.user]);
+    const handleBeforeUnload = () => saveProgress();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [saveProgress]);
 
   const onSubmit = async (data: StoreFormData) => {
     await completeOnboarding(data as any);
@@ -82,8 +97,8 @@ export function OnboardingScreen() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <StoreBasics register={register as any} errors={errors as any} />
-            <StoreContacts watch={watch as any} setValue={setValue as any} errors={errors as any} defaultCountry={defaultCountry} email={defaultEmail} disableEmail />
+            <StoreBasics register={register as any} errors={errors as any} onBlur={saveProgress} />
+            <StoreContacts watch={watch as any} setValue={setValue as any} errors={errors as any} defaultCountry={defaultCountry} email={defaultEmail} disableEmail onBlur={saveProgress} />
             <div>
               <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
                 {isSubmitting ? t('onboarding.submitting') : t('onboarding.completeSetup')}

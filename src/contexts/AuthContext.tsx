@@ -2,6 +2,7 @@ import React, { createContext, useContext, useReducer, useEffect, useRef, ReactN
 import { supabase } from '../lib/supabaseClient';
 import { authAPI } from '../api/auth';
 import { storesAPI } from '../api/stores';
+import { onboardingAPI } from '../api/onboardingProgress';
 import toast from 'react-hot-toast';
 import type { User, Store } from '../types';
 
@@ -85,13 +86,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-async function upsertMinimalProfile(userId: string, email: string | null) {
-  const name = email ? email.split('@')[0] : 'user';
-  await supabase.from('profiles').upsert(
-    { id: userId, email, name, phone: '', last_login_at: new Date().toISOString() },
-    { onConflict: 'id' }
-  );
-}
 
 // Fast membership probe for routing decisions
 async function probeOnboarded(userId: string): Promise<boolean> {
@@ -152,7 +146,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       attempt++;
       if (attempt === 5) {
-        try { await upsertMinimalProfile(userId, email); } catch {}
+        try {
+          await authAPI.ensureProfile(userId, email);
+        } catch (err) {
+          console.error('Failed to ensure profile:', err);
+        }
       }
       const delay = Math.min(300 * 2 ** attempt, 3000);
       await new Promise((r) => setTimeout(r, delay));
@@ -177,25 +175,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           dispatch({ type: 'SET_LOADING', payload: false });
           return;
         }
-        
+
         const uid = session.user.id;
         lastUserIdRef.current = uid;
-        
+
         // Set provisional auth
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session.user.email ?? null } });
-        
-        // Fast membership probe for routing
-        const onboarded = await probeOnboarded(uid);
+
+        // Ensure profile exists for OAuth users (Google, etc.)
+        if (session.user.app_metadata.provider === 'google') {
+          try {
+            const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
+            const phone = session.user.user_metadata?.phone || '';
+            await authAPI.ensureProfile(uid, session.user.email, name, phone);
+          } catch (err) {
+            console.error('Failed to ensure OAuth profile:', err);
+          }
+        }
+
+        // Fast membership probe for routing (with timeout protection)
+        let onboarded = false;
+        try {
+          const probePromise = probeOnboarded(uid);
+          const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
+          onboarded = await Promise.race([probePromise, timeoutPromise]);
+        } catch (err) {
+          console.error('Onboarding probe failed:', err);
+        }
+
+        // CRITICAL: Always clear loading state to prevent infinite loader
         dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
-        
-        // Load full profile in background
+
+        // Load full profile in background (non-blocking)
         loadUserProfile(uid, session.user.email ?? null, { force: true });
-      } catch {
+      } catch (err) {
+        console.error('Init error:', err);
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
 
-    init();
+    // Safety timeout: Force clear loading after 5 seconds to prevent infinite loader
+    const safetyTimeout = setTimeout(() => {
+      console.warn('Safety timeout: Forcing loading state to false');
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }, 5000);
+
+    init().finally(() => {
+      clearTimeout(safetyTimeout);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const uid = session?.user?.id ?? null;
@@ -204,11 +231,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (lastUserIdRef.current !== uid) {
           lastUserIdRef.current = uid;
           dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session!.user!.email ?? null } });
-          
-          // Fast membership probe
-          const onboarded = await probeOnboarded(uid);
+
+          // Ensure profile exists for OAuth users
+          if (session!.user!.app_metadata.provider === 'google') {
+            try {
+              const name = session!.user!.user_metadata?.full_name || session!.user!.email?.split('@')[0];
+              const phone = session!.user!.user_metadata?.phone || '';
+              await authAPI.ensureProfile(uid, session!.user!.email, name, phone);
+            } catch (err) {
+              console.error('Failed to ensure OAuth profile on SIGNED_IN:', err);
+            }
+          }
+
+          // Fast membership probe (with timeout protection)
+          let onboarded = false;
+          try {
+            const probePromise = probeOnboarded(uid);
+            const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
+            onboarded = await Promise.race([probePromise, timeoutPromise]);
+          } catch (err) {
+            console.error('Onboarding probe failed on SIGNED_IN:', err);
+          }
+
           dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
-          
+
           loadUserProfile(uid, session!.user!.email ?? null, { force: true });
         }
         return;
@@ -240,13 +286,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) throw new Error('Login succeeded but user data not returned');
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
-      
-      // Fast membership probe
-      const onboarded = await probeOnboarded(user.id);
+
+      // Fast membership probe with timeout
+      let onboarded = false;
+      try {
+        const probePromise = probeOnboarded(user.id);
+        const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
+        onboarded = await Promise.race([probePromise, timeoutPromise]);
+      } catch (err) {
+        console.error('Onboarding probe failed during login:', err);
+      }
+
       dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
-      
-      loadUserProfile(user.id, user.email ?? null, { force: true });
+
+      // Simple success toast (no API calls, no complexity)
       toast.success('Login successful!');
+
+      // Load profile in background without blocking
+      loadUserProfile(user.id, user.email ?? null, { force: true });
+
       return true;
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Login failed. Please try again.' });
@@ -266,7 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, name: string, phone?: string) => {
     try {
       dispatch({ type: 'CLEAR_ERROR' });
-      const { user } = await authAPI.signUpWithEmail(email, password, name, phone);
+      const { user } = await authAPI.signUpWithEmail(email, password, name, phone || '');
       if (!user) throw new Error('Signup succeeded but user data not returned');
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
@@ -274,7 +332,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loadUserProfile(user.id, user.email ?? null, { force: true });
       toast.success('Account created successfully! Welcome!');
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message || 'Registration failed. Please try again.' });
+      const errorMessage = error.message || 'Registration failed. Please try again.';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      throw error; // Re-throw so SignupScreen can handle it
     }
   };
 
@@ -304,20 +364,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (!state.user) throw new Error('No authenticated user');
       const created = await storesAPI.createStore(storeData);
-      
+
+      // Clear onboarding progress
+      await onboardingAPI.clear(state.user.uid);
+
       // Immediate local state update
       dispatch({ type: 'SET_ONBOARDED', payload: true });
-      
+
       const nextUser = {
         ...state.user,
         isOnboarded: true,
         store: created,
       } as User;
       dispatch({ type: 'SET_USER', payload: nextUser });
-      
+
       // Background refresh
       loadUserProfile(state.user.uid, state.user.email ?? null, { force: true });
-      
+
       toast.success('Store setup completed!');
     } catch {
       dispatch({ type: 'SET_ERROR', payload: 'Failed to complete setup. Please try again.' });
