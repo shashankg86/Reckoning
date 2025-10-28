@@ -117,11 +117,32 @@ export const authAPI = {
         throw error;
       }
 
-      // Ensure profile exists and update last login
+      // CRITICAL: Check if user has a profile (must have signed up through app)
       if (data.user) {
-        const name = data.user.user_metadata?.name || data.user.email?.split('@')[0];
-        const phone = data.user.user_metadata?.phone || '';
-        await this.ensureProfile(data.user.id, data.user.email, name, phone);
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error('Error checking profile during login:', profileError);
+          await supabase.auth.signOut();
+          throw new Error('Failed to verify account. Please try again.');
+        }
+
+        if (!profile) {
+          // User exists in Supabase auth but not in profiles table = never signed up through app
+          console.error('Login rejected: No profile found for user', data.user.id);
+          await supabase.auth.signOut();
+          throw new Error('No account found. Please sign up first.');
+        }
+
+        // Profile exists - just update last login timestamp (DO NOT create)
+        await supabase
+          .from('profiles')
+          .update({ last_login_at: new Date().toISOString() })
+          .eq('id', data.user.id);
       }
 
       return {
