@@ -107,9 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastProfileLoadAtRef = useRef<number>(0);
 
   const loadUserProfile = async (userId: string, email: string | null, opts?: { force?: boolean }) => {
+    console.log('🟢 [LOAD_PROFILE] Starting for user:', userId);
+
     const now = Date.now();
     if (!opts?.force) {
       if (now - lastProfileLoadAtRef.current < 30_000 && lastUserIdRef.current === userId) {
+        console.log('🟢 [LOAD_PROFILE] Skipping (cached)');
         return;
       }
     }
@@ -120,13 +123,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const maxMs = 40_000;
 
     while (Date.now() - startsAt < maxMs) {
+      attempt++;
+      console.log(`🟢 [LOAD_PROFILE] Attempt ${attempt} - Fetching profile from database...`);
+
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
 
+      console.log(`🟢 [LOAD_PROFILE] Attempt ${attempt} result:`, {
+        hasProfile: !!profile,
+        profileId: profile?.id,
+        hasError: !!error,
+        errorCode: error?.code
+      });
+
       if (!error && profile) {
+        console.log('✅ [LOAD_PROFILE] Profile found! Loading stores...');
         const stores = await storesAPI.getUserStores();
         const userStore = stores && stores.length > 0 ? stores[0] : undefined;
         const user: User = {
@@ -140,33 +154,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           createdAt: new Date(profile.created_at),
           lastLoginAt: new Date(profile.last_login_at),
         } as any;
+        console.log('✅ [LOAD_PROFILE] Dispatching SET_USER');
         dispatch({ type: 'SET_USER', payload: user });
         return;
       }
 
-      attempt++;
       const delay = Math.min(300 * 2 ** attempt, 3000);
+      console.log(`🟢 [LOAD_PROFILE] Profile not found, waiting ${delay}ms before retry...`);
       await new Promise((r) => setTimeout(r, delay));
     }
 
     // CRITICAL: If profile not found after retries, logout user
-    console.error('Profile not found for user:', userId, '- Logging out');
+    console.error('🔴 [LOAD_PROFILE] Profile not found after all retries for user:', userId);
+    console.log('🔴 [LOAD_PROFILE] Logging out user...');
     toast.error('Account profile not found. Please sign up first.');
 
     try {
       await authAPI.logout();
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error('🔴 [LOAD_PROFILE] Logout error:', err);
     }
 
+    console.log('🔴 [LOAD_PROFILE] Dispatching LOGOUT');
     dispatch({ type: 'LOGOUT' });
   };
 
   useEffect(() => {
     const init = async () => {
       try {
+        console.log('🟡 [INIT] Starting auth initialization...');
         const { data: { session } } = await supabase.auth.getSession();
+
+        console.log('🟡 [INIT] Session check:', {
+          hasSession: !!session,
+          hasUser: !!session?.user,
+          userId: session?.user?.id,
+          provider: session?.user?.app_metadata?.provider
+        });
+
         if (!session?.user) {
+          console.log('🟡 [INIT] No session found, setting loading to false');
           dispatch({ type: 'SET_LOADING', payload: false });
           return;
         }
@@ -174,37 +201,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const uid = session.user.id;
         lastUserIdRef.current = uid;
 
+        console.log('🟡 [INIT] Session found for user:', uid);
+
         // Set provisional auth
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session.user.email ?? null } });
 
         // Ensure profile exists for OAuth users (Google, etc.)
         if (session.user.app_metadata.provider === 'google') {
+          console.log('🟡 [INIT] Google OAuth user detected, ensuring profile...');
           try {
             const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
             const phone = session.user.user_metadata?.phone || '';
             await authAPI.ensureProfile(uid, session.user.email, name, phone);
+            console.log('✅ [INIT] Google OAuth profile ensured');
           } catch (err) {
-            console.error('Failed to ensure OAuth profile:', err);
+            console.error('🔴 [INIT] Failed to ensure OAuth profile:', err);
           }
+        } else {
+          console.log('🟡 [INIT] Email/password user (provider: ' + session.user.app_metadata.provider + '), skipping ensureProfile');
         }
 
         // Fast membership probe for routing (with timeout protection)
+        console.log('🟡 [INIT] Checking if user is onboarded...');
         let onboarded = false;
         try {
           const probePromise = probeOnboarded(uid);
           const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
           onboarded = await Promise.race([probePromise, timeoutPromise]);
+          console.log('🟡 [INIT] Onboarded status:', onboarded);
         } catch (err) {
-          console.error('Onboarding probe failed:', err);
+          console.error('🔴 [INIT] Onboarding probe failed:', err);
         }
 
         // CRITICAL: Always clear loading state to prevent infinite loader
         dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
         // Load full profile in background (non-blocking)
+        console.log('🟡 [INIT] Loading user profile in background...');
         loadUserProfile(uid, session.user.email ?? null, { force: true });
       } catch (err) {
-        console.error('Init error:', err);
+        console.error('🔴 [INIT] Init error:', err);
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
@@ -222,35 +258,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const uid = session?.user?.id ?? null;
 
+      console.log('🟠 [AUTH_CHANGE] Event:', event, 'User ID:', uid);
+
       if (event === 'SIGNED_IN' && uid) {
+        console.log('🟠 [SIGNED_IN] User signed in:', uid, 'Provider:', session!.user!.app_metadata.provider);
         if (lastUserIdRef.current !== uid) {
+          console.log('🟠 [SIGNED_IN] New user session detected');
           lastUserIdRef.current = uid;
           dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session!.user!.email ?? null } });
 
           // Ensure profile exists for OAuth users
           if (session!.user!.app_metadata.provider === 'google') {
+            console.log('🟠 [SIGNED_IN] Google OAuth user, ensuring profile...');
             try {
               const name = session!.user!.user_metadata?.full_name || session!.user!.email?.split('@')[0];
               const phone = session!.user!.user_metadata?.phone || '';
               await authAPI.ensureProfile(uid, session!.user!.email, name, phone);
+              console.log('✅ [SIGNED_IN] Google OAuth profile ensured');
             } catch (err) {
-              console.error('Failed to ensure OAuth profile on SIGNED_IN:', err);
+              console.error('🔴 [SIGNED_IN] Failed to ensure OAuth profile:', err);
             }
+          } else {
+            console.log('🟠 [SIGNED_IN] Email/password user, skipping ensureProfile');
           }
 
           // Fast membership probe (with timeout protection)
+          console.log('🟠 [SIGNED_IN] Checking onboarded status...');
           let onboarded = false;
           try {
             const probePromise = probeOnboarded(uid);
             const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
             onboarded = await Promise.race([probePromise, timeoutPromise]);
+            console.log('🟠 [SIGNED_IN] Onboarded status:', onboarded);
           } catch (err) {
-            console.error('Onboarding probe failed on SIGNED_IN:', err);
+            console.error('🔴 [SIGNED_IN] Onboarding probe failed:', err);
           }
 
           dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
+          console.log('🟠 [SIGNED_IN] Loading user profile...');
           loadUserProfile(uid, session!.user!.email ?? null, { force: true });
+        } else {
+          console.log('🟠 [SIGNED_IN] Same user, skipping profile load');
         }
         return;
       }
@@ -276,20 +325,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
+      console.log('🔵 [LOGIN_CTX] Login function called for email:', email);
       dispatch({ type: 'CLEAR_ERROR' });
+
+      console.log('🔵 [LOGIN_CTX] Calling authAPI.loginWithEmail...');
       const { user } = await authAPI.loginWithEmail(email, password);
+
+      console.log('🔵 [LOGIN_CTX] authAPI.loginWithEmail returned:', {
+        hasUser: !!user,
+        userId: user?.id
+      });
+
       if (!user) throw new Error('Login succeeded but user data not returned');
+
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
 
       // Fast membership probe with timeout
+      console.log('🔵 [LOGIN_CTX] Checking onboarded status...');
       let onboarded = false;
       try {
         const probePromise = probeOnboarded(user.id);
         const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
         onboarded = await Promise.race([probePromise, timeoutPromise]);
+        console.log('🔵 [LOGIN_CTX] Onboarded status:', onboarded);
       } catch (err) {
-        console.error('Onboarding probe failed during login:', err);
+        console.error('🔴 [LOGIN_CTX] Onboarding probe failed:', err);
       }
 
       dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
@@ -298,10 +359,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.success('Login successful!');
 
       // Load profile in background without blocking
+      console.log('🔵 [LOGIN_CTX] Loading user profile in background...');
       loadUserProfile(user.id, user.email ?? null, { force: true });
 
+      console.log('✅ [LOGIN_CTX] Login function completed successfully');
       return true;
     } catch (error: any) {
+      console.error('🔴 [LOGIN_CTX] Login function error:', error);
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Login failed. Please try again.' });
       return false;
     }
