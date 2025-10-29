@@ -197,12 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                 if (existingProfile && existingProfile.id !== uid) {
                   // Email belongs to a different account - DUPLICATE DETECTED!
-                  console.error('Duplicate account detected in init():', {
-                    email: userEmail,
-                    existingProvider: existingProfile.auth_provider,
-                    existingUserId: existingProfile.id,
-                    attemptedGoogleUserId: uid,
-                  });
+                  console.error(`Duplicate account: ${userEmail} already registered with ${existingProfile.auth_provider}`);
 
                   // Logout the Google user immediately
                   await authAPI.logout();
@@ -293,11 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                   if (existingProfile && existingProfile.id !== uid) {
                     // Email belongs to a different account
-                    console.error('Duplicate account detected:', {
-                      email: userEmail,
-                      existingProvider: existingProfile.auth_provider,
-                      attemptedProvider: 'google',
-                    });
+                    console.error(`Duplicate account: ${userEmail} already registered with ${existingProfile.auth_provider}`);
 
                     // Logout the user immediately
                     await authAPI.logout();
