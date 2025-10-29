@@ -207,8 +207,8 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
                 ? t('onboarding.form.loadingCities') || 'Loading cities...'
                 : t('onboarding.form.selectCity') || 'Select City'}
             </option>
-            {cities.map((city) => (
-              <option key={city.name} value={city.name}>
+            {cities.map((city, index) => (
+              <option key={`${selectedState}-${city.name}-${index}`} value={city.name}>
                 {city.name}
               </option>
             ))}

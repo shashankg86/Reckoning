@@ -66,5 +66,41 @@ export const storesAPI = {
     }
   },
 
-  // ... rest of file unchanged
+  async getUserStores() {
+    try {
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) throw new Error('Not authenticated');
+
+      // Step 1: fetch memberships for current user only
+      const { data: memberships, error: memErr } = await supabase
+        .from('store_members')
+        .select('store_id, role, is_active')
+        .eq('user_id', user.data.user.id)
+        .eq('is_active', true);
+
+      if (memErr) throw memErr;
+      if (!memberships || memberships.length === 0) return [];
+
+      const activeStoreIds = memberships.map((m) => m.store_id);
+
+      // Step 2: fetch stores by id list (no join)
+      const { data: stores, error: storesErr } = await supabase
+        .from('stores')
+        .select('*')
+        .in('id', activeStoreIds)
+        .eq('is_active', true);
+
+      if (storesErr) throw storesErr;
+
+      // Merge membership role into stores result
+      const roleByStore: Record<string, any> = {};
+      memberships.forEach((m: any) => (roleByStore[m.store_id] = { role: m.role, is_active: m.is_active }));
+
+      return (stores || []).map((s: any) => ({ ...s, membership: roleByStore[s.id] }));
+    } catch (error: any) {
+      console.error('Get user stores error:', error);
+      // Return empty rather than throw to avoid blocking auth flow
+      return [] as any[];
+    }
+  },
 };
