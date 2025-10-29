@@ -182,6 +182,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Ensure profile exists for OAuth users (Google, etc.)
         if (session.user.app_metadata.provider === 'google') {
           try {
+            const userEmail = session.user.email;
+
+            // CRITICAL: Check if email already exists with a different user ID (duplicate account prevention)
+            if (userEmail) {
+              const emailExists = await authAPI.checkEmailExists(userEmail);
+              if (emailExists) {
+                // Check if the existing profile belongs to a different user
+                const { data: existingProfile } = await supabase
+                  .from('profiles')
+                  .select('id, auth_provider')
+                  .eq('email', userEmail.toLowerCase())
+                  .maybeSingle();
+
+                if (existingProfile && existingProfile.id !== uid) {
+                  // Email belongs to a different account - DUPLICATE DETECTED!
+                  console.error('Duplicate account detected in init():', {
+                    email: userEmail,
+                    existingProvider: existingProfile.auth_provider,
+                    existingUserId: existingProfile.id,
+                    attemptedGoogleUserId: uid,
+                  });
+
+                  // Logout the Google user immediately
+                  await authAPI.logout();
+                  lastUserIdRef.current = null;
+                  dispatch({ type: 'LOGOUT' });
+                  dispatch({ type: 'SET_LOADING', payload: false });
+
+                  // Show error message
+                  const providerName = existingProfile.auth_provider === 'email' ? 'email/password' : existingProfile.auth_provider;
+                  const errorMsg = `This email is already registered with ${providerName}. Please sign in using ${providerName} instead.`;
+                  dispatch({ type: 'SET_ERROR', payload: errorMsg });
+                  toast.error(errorMsg);
+
+                  return; // STOP - Do not continue initialization
+                }
+              }
+            }
+
+            // No duplicate found - proceed with profile creation
             const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
             const phone = session.user.user_metadata?.phone || '';
             await authAPI.ensureProfile(uid, session.user.email, name, phone);
