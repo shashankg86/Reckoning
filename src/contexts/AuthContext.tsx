@@ -120,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const maxMs = 40_000;
 
     while (Date.now() - startsAt < maxMs) {
+      attempt++;
+
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
@@ -144,33 +146,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      attempt++;
-      if (attempt === 5) {
-        try {
-          await authAPI.ensureProfile(userId, email);
-        } catch (err) {
-          console.error('Failed to ensure profile:', err);
-        }
-      }
       const delay = Math.min(300 * 2 ** attempt, 3000);
       await new Promise((r) => setTimeout(r, delay));
     }
 
-    const minimal: User = {
-      uid: userId,
-      email,
-      name: email ? email.split('@')[0] : null,
-      isOnboarded: false,
-      createdAt: new Date(),
-      lastLoginAt: new Date(),
-    } as any;
-    dispatch({ type: 'SET_USER', payload: minimal });
+    // CRITICAL: If profile not found after retries, logout user
+    console.error('Profile not found after retries for user:', userId);
+    toast.error('Account profile not found. Please sign up first.');
+
+    try {
+      await authAPI.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+
+    dispatch({ type: 'LOGOUT' });
   };
 
   useEffect(() => {
     const init = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+
         if (!session?.user) {
           dispatch({ type: 'SET_LOADING', payload: false });
           return;
@@ -229,6 +226,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (event === 'SIGNED_IN' && uid) {
         if (lastUserIdRef.current !== uid) {
+          // For email/password users: Skip handling here - the login() function handles validation
+          // This prevents race condition where SIGNED_IN fires before login() completes
+          if (session!.user!.app_metadata.provider === 'email') {
+            return;
+          }
+
           lastUserIdRef.current = uid;
           dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session!.user!.email ?? null } });
 
@@ -283,7 +286,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'CLEAR_ERROR' });
       const { user } = await authAPI.loginWithEmail(email, password);
+
       if (!user) throw new Error('Login succeeded but user data not returned');
+
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
 
@@ -307,7 +312,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return true;
     } catch (error: any) {
+      console.error('Login error:', error);
       dispatch({ type: 'SET_ERROR', payload: error.message || 'Login failed. Please try again.' });
+      toast.error(error.message || 'Login failed. Please try again.');
       return false;
     }
   };

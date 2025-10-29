@@ -12,16 +12,18 @@ import { isPossiblePhoneNumber } from 'react-phone-number-input';
 import { onboardingAPI } from '../api/onboardingProgress';
 
 const storeSchema = z.object({
-  name: z.string().min(2),
-  type: z.enum(['restaurant','cafe','retail','salon','pharmacy','other']),
-  address: z.string().min(5),
-  city: z.string().min(2),
-  state: z.string().min(2),
-  country: z.string().min(2),
-  pincode: z.string().min(3).max(10),
-  phone: z.string().refine((v) => v && isPossiblePhoneNumber(v), 'Invalid phone number'),
+  name: z.string().min(2, 'Store name must be at least 2 characters'),
+  type: z.enum(['restaurant','cafe','retail','salon','pharmacy','other'], {
+    errorMap: () => ({ message: 'Please select a store type' })
+  }),
+  address: z.string().min(5, 'Address must be at least 5 characters'),
+  city: z.string().min(2, 'Please select or enter a city'),
+  state: z.string().min(2, 'Please select a state'),
+  country: z.string().min(2, 'Please select a country'),
+  pincode: z.string().min(3, 'Pincode must be at least 3 characters').max(10, 'Pincode cannot exceed 10 characters'),
+  phone: z.string().refine((v) => v && isPossiblePhoneNumber(v), 'Please enter a valid phone number'),
   secondary_phone: z.string().optional(),
-  email: z.string().email().optional(),
+  email: z.string().email('Please enter a valid email').optional(),
   gst_number: z.string().optional(),
   language: z.enum(['en','hi','ar','mr']).default('en'),
   currency: z.enum(['INR','USD','EUR','AED','GBP']).default('INR'),
@@ -46,7 +48,7 @@ export function OnboardingScreen() {
       language: 'en',
       currency: 'INR',
       theme: 'light',
-      country: 'India',
+      country: '',
       email: defaultEmail,
       phone: defaultPhone,
     },
@@ -97,10 +99,10 @@ export function OnboardingScreen() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <StoreBasics register={register as any} errors={errors as any} onBlur={saveProgress} />
+            <StoreBasics register={register as any} errors={errors as any} setValue={setValue} watch={watch} onBlur={saveProgress} />
             <StoreContacts watch={watch as any} setValue={setValue as any} errors={errors as any} defaultCountry={defaultCountry} email={defaultEmail} disableEmail onBlur={saveProgress} />
             <div>
-              <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">
+              <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50">
                 {isSubmitting ? t('onboarding.submitting') : t('onboarding.completeSetup')}
               </button>
             </div>
