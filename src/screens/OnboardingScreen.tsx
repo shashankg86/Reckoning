@@ -39,6 +39,7 @@ export function OnboardingScreen() {
   const { state, completeOnboarding, logout } = useAuth();
   const navigate = useNavigate();
   const progressLoadedRef = React.useRef(false);
+  const profileVerifiedRef = React.useRef(false);
 
   const defaultCountry = 'IN';
   const defaultEmail = state.user?.email ?? '';
@@ -58,7 +59,9 @@ export function OnboardingScreen() {
 
   // Verify profile exists in database (single API call on mount)
   React.useEffect(() => {
-    if (!state.user) return;
+    if (!state.user || profileVerifiedRef.current) return;
+
+    profileVerifiedRef.current = true;
 
     (async () => {
       try {
@@ -81,7 +84,7 @@ export function OnboardingScreen() {
         navigate('/login', { replace: true });
       }
     })();
-  }, []); // Run only once on mount
+  }, [state.user, logout, navigate]); // Run only once on mount
 
   // Load saved progress once on mount
   React.useEffect(() => {

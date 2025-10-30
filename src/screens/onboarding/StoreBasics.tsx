@@ -33,12 +33,17 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
   const [loadingStates, setLoadingStates] = React.useState(false);
   const [loadingCities, setLoadingCities] = React.useState(false);
 
+  const countriesLoadedRef = React.useRef(false);
+
   const selectedCountry = watch('country');
   const selectedState = watch('state');
   const selectedCity = watch('city');
 
-  // Load countries on mount
+  // Load countries on mount (only once)
   React.useEffect(() => {
+    if (countriesLoadedRef.current) return;
+
+    countriesLoadedRef.current = true;
     locationAPI.getCountries().then(setCountries).catch(console.error);
   }, []);
 
