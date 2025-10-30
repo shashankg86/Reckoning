@@ -10,6 +10,8 @@ import { StoreContacts } from './onboarding/StoreContacts';
 import { useAuth } from '../contexts/AuthContext';
 import { isPossiblePhoneNumber } from 'react-phone-number-input';
 import { onboardingAPI } from '../api/onboardingProgress';
+import { supabase } from '../lib/supabaseClient';
+import toast from 'react-hot-toast';
 
 const storeSchema = z.object({
   name: z.string().min(2, 'Store name must be at least 2 characters'),
@@ -34,7 +36,7 @@ type StoreFormData = z.infer<typeof storeSchema> & StoreFormShape;
 
 export function OnboardingScreen() {
   const { t } = useTranslation();
-  const { state, completeOnboarding } = useAuth();
+  const { state, completeOnboarding, logout } = useAuth();
   const navigate = useNavigate();
   const progressLoadedRef = React.useRef(false);
 
@@ -53,6 +55,33 @@ export function OnboardingScreen() {
       phone: defaultPhone,
     },
   });
+
+  // Verify profile exists in database (single API call on mount)
+  React.useEffect(() => {
+    if (!state.user) return;
+
+    (async () => {
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', state.user!.uid)
+          .maybeSingle();
+
+        if (error || !profile) {
+          console.error('Profile not found in database - logging out');
+          toast.error('Account profile not found. Please sign in again.');
+          await logout();
+          navigate('/login', { replace: true });
+        }
+      } catch (err) {
+        console.error('Profile verification error:', err);
+        toast.error('Unable to verify account. Please sign in again.');
+        await logout();
+        navigate('/login', { replace: true });
+      }
+    })();
+  }, []); // Run only once on mount
 
   // Load saved progress once on mount
   React.useEffect(() => {
