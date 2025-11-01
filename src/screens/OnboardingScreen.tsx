@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -36,62 +36,119 @@ export function OnboardingScreen() {
   const { t } = useTranslation();
   const { state, completeOnboarding } = useAuth();
   const navigate = useNavigate();
-  const progressLoadedRef = React.useRef(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  const defaultCountry = 'IN';
-  const defaultEmail = state.user?.email ?? '';
-  const defaultPhone = (state.user as any)?.phone ?? '';
+  // Step 1: Extract user data from auth session (no API call needed)
+  const userData = useMemo(() => {
+    if (!state.isAuthenticated || !state.user) {
+      return null;
+    }
+
+    return {
+      uid: state.user.uid,
+      email: state.user.email ?? '',
+      phone: (state.user as any)?.phone ?? '',
+    };
+  }, [state.isAuthenticated, state.user]);
+
+  // Step 2: Initialize form with default values
+  const defaultValues: Partial<StoreFormData> = useMemo(() => ({
+    language: 'en',
+    currency: 'INR',
+    theme: 'light',
+    country: 'IN',
+    email: userData?.email || '',
+    phone: userData?.phone || '',
+  }), [userData]);
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<StoreFormData>({
     resolver: zodResolver(storeSchema),
-    defaultValues: {
-      language: 'en',
-      currency: 'INR',
-      theme: 'light',
-      country: '',
-      email: defaultEmail,
-      phone: defaultPhone,
-    },
+    defaultValues,
   });
 
-  // Load saved progress once on mount
-  React.useEffect(() => {
-    if (progressLoadedRef.current || !state.user) return;
+  // Step 3: Single initialization effect - loads saved progress and prefills form
+  useEffect(() => {
+    if (!userData || isInitialized) return;
 
-    (async () => {
-      const savedProgress = await onboardingAPI.get(state.user!.uid);
-      if (savedProgress?.data) {
-        // Merge saved progress with user profile data
-        const mergedData = {
-          ...(savedProgress.data as any),
-          email: defaultEmail, // Always use profile email
-          phone: (savedProgress.data as any).phone || defaultPhone, // Prefer saved, fallback to profile
-        };
-        reset(mergedData);
+    let isMounted = true;
+
+    const initializeForm = async () => {
+      try {
+        // Fetch saved onboarding progress from table
+        const savedProgress = await onboardingAPI.get(userData.uid);
+
+        if (!isMounted) return;
+
+        // If progress exists, merge with user profile data (profile data takes precedence)
+        if (savedProgress?.data && Object.keys(savedProgress.data).length > 0) {
+          const prefilledData: Partial<StoreFormData> = {
+            ...savedProgress.data,
+            email: userData.email,  // Profile email always overrides
+            phone: savedProgress.data.phone || userData.phone, // Prefer saved, fallback to profile
+          };
+
+          reset(prefilledData);
+        }
+
+        setIsInitialized(true);
+      } catch (error) {
+        console.error('[OnboardingScreen] Failed to load progress:', error);
+        // Still mark as initialized to allow user to proceed
+        if (isMounted) setIsInitialized(true);
       }
-      progressLoadedRef.current = true;
-    })();
-  }, [state.user, reset, defaultEmail, defaultPhone]);
+    };
 
-  // Save progress on blur/input events
-  const saveProgress = React.useCallback(() => {
-    if (!state.user || !progressLoadedRef.current) return;
+    initializeForm();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userData, isInitialized, reset]);
+
+  // Step 4: Auto-save progress handler (debounced via callback)
+  const saveProgress = useCallback(() => {
+    if (!userData || !isInitialized) return;
+
     const currentValues = watch();
-    onboardingAPI.save(state.user.uid, 'basics', currentValues as any).catch(() => {});
-  }, [state.user, watch]);
+    onboardingAPI.save(userData.uid, 'basics', currentValues as any).catch((error) => {
+      console.error('[OnboardingScreen] Failed to save progress:', error);
+    });
+  }, [userData, isInitialized, watch]);
 
-  // Save on page unload/refresh
-  React.useEffect(() => {
-    const handleBeforeUnload = () => saveProgress();
+  // Step 5: Save progress before page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isInitialized) saveProgress();
+    };
+
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [saveProgress]);
+  }, [isInitialized, saveProgress]);
 
+  // Step 6: Handle form submission
   const onSubmit = async (data: StoreFormData) => {
-    await completeOnboarding(data as any);
-    if (state.user) await onboardingAPI.clear(state.user.uid);
-    navigate('/dashboard', { replace: true });
+    if (!userData) return;
+
+    try {
+      await completeOnboarding(data as any);
+      await onboardingAPI.clear(userData.uid);
+      navigate('/dashboard', { replace: true });
+    } catch (error) {
+      console.error('[OnboardingScreen] Onboarding completion failed:', error);
+    }
   };
+
+  // Show loading state while initializing (optional - can be removed if not needed)
+  if (!userData || !isInitialized) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-orange-600 border-r-transparent"></div>
+          <p className="mt-2 text-sm text-gray-600">{t('onboarding.loadingProgress')}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -99,10 +156,28 @@ export function OnboardingScreen() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <StoreBasics register={register as any} errors={errors as any} setValue={setValue} watch={watch} onBlur={saveProgress} />
-            <StoreContacts watch={watch as any} setValue={setValue as any} errors={errors as any} defaultCountry={defaultCountry} email={defaultEmail} disableEmail onBlur={saveProgress} />
+            <StoreBasics
+              register={register as any}
+              errors={errors as any}
+              setValue={setValue}
+              watch={watch}
+              onBlur={saveProgress}
+            />
+            <StoreContacts
+              watch={watch as any}
+              setValue={setValue as any}
+              errors={errors as any}
+              defaultCountry="IN"
+              email={userData.email}
+              disableEmail
+              onBlur={saveProgress}
+            />
             <div>
-              <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {isSubmitting ? t('onboarding.submitting') : t('onboarding.completeSetup')}
               </button>
             </div>
