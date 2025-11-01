@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -39,6 +39,7 @@ export function OnboardingScreen() {
   const { state, completeOnboarding, logout } = useAuth();
   const navigate = useNavigate();
   const [isInitialized, setIsInitialized] = useState(false);
+  const initializingRef = useRef(false);
 
   // Step 1: Extract user data from auth session (no additional API call needed)
   const userData = useMemo(() => {
@@ -78,24 +79,33 @@ export function OnboardingScreen() {
     console.log('[OnboardingScreen] useEffect triggered', {
       hasUserData: !!userData,
       isInitialized,
+      initializingRef: initializingRef.current,
       userId: userData?.uid
     });
 
+    // Don't initialize if no user data
     if (!userData) {
       console.log('[OnboardingScreen] Skipping initialization - no user data');
       return;
     }
 
+    // Don't initialize if already initialized
     if (isInitialized) {
       console.log('[OnboardingScreen] Skipping initialization - already initialized');
       return;
     }
 
-    let isMounted = true;
+    // Don't initialize if already initializing (prevents duplicate calls in StrictMode)
+    if (initializingRef.current) {
+      console.log('[OnboardingScreen] Skipping initialization - already initializing');
+      return;
+    }
+
+    // Mark as initializing
+    initializingRef.current = true;
+    console.log('[OnboardingScreen] Starting initialization for user:', userData.uid);
 
     const initializeOnboarding = async () => {
-      console.log('[OnboardingScreen] Starting initialization for user:', userData.uid);
-
       try {
         // Sub-step 3.1: Verify profile exists in database
         console.log('[OnboardingScreen] Checking if profile exists in database...');
@@ -107,14 +117,10 @@ export function OnboardingScreen() {
 
         console.log('[OnboardingScreen] Profile check result:', { profile, profileError });
 
-        if (!isMounted) {
-          console.log('[OnboardingScreen] Component unmounted, stopping initialization');
-          return;
-        }
-
         if (profileError || !profile) {
           console.error('[OnboardingScreen] Profile not found in database - logging out');
           toast.error('Account profile not found. Please sign in again.');
+          initializingRef.current = false; // Reset flag before logout
           await logout();
           navigate('/login', { replace: true });
           return;
@@ -126,11 +132,6 @@ export function OnboardingScreen() {
         console.log('[OnboardingScreen] Fetching saved onboarding progress...');
         const savedProgress = await onboardingAPI.get(userData.uid);
         console.log('[OnboardingScreen] Saved progress:', savedProgress);
-
-        if (!isMounted) {
-          console.log('[OnboardingScreen] Component unmounted after fetching progress');
-          return;
-        }
 
         // Sub-step 3.3: Prefill form if progress exists
         if (savedProgress?.data && Object.keys(savedProgress.data).length > 0) {
@@ -147,12 +148,11 @@ export function OnboardingScreen() {
           console.log('[OnboardingScreen] No saved progress found, using default values');
         }
 
-        console.log('[OnboardingScreen] Initialization complete');
+        console.log('[OnboardingScreen] Initialization complete - setting isInitialized to true');
         setIsInitialized(true);
       } catch (error) {
         console.error('[OnboardingScreen] Initialization failed:', error);
-
-        if (!isMounted) return;
+        initializingRef.current = false; // Reset flag on error
 
         // Critical error - profile verification failed
         toast.error('Unable to verify account. Please sign in again.');
@@ -162,11 +162,6 @@ export function OnboardingScreen() {
     };
 
     initializeOnboarding();
-
-    return () => {
-      console.log('[OnboardingScreen] Cleanup - setting isMounted to false');
-      isMounted = false;
-    };
   }, [userData, isInitialized, reset, logout, navigate]);
 
   // Step 4: Auto-save progress handler
