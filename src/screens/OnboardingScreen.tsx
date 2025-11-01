@@ -38,7 +38,7 @@ export function OnboardingScreen() {
   const { t } = useTranslation();
   const { state, completeOnboarding, logout } = useAuth();
   const navigate = useNavigate();
-  const progressLoadedRef = React.useRef(false);
+  const [progressLoaded, setProgressLoaded] = React.useState(false);
   const profileVerifiedRef = React.useRef(false);
 
   const defaultCountry = 'IN';
@@ -84,11 +84,11 @@ export function OnboardingScreen() {
         navigate('/login', { replace: true });
       }
     })();
-  }, [state.user, logout, navigate]); // Run only once on mount
+  }, [state.user, logout, navigate]);
 
   // Load saved progress once on mount
   React.useEffect(() => {
-    if (progressLoadedRef.current || !state.user) return;
+    if (progressLoaded || !state.user) return;
 
     (async () => {
       const savedProgress = await onboardingAPI.get(state.user!.uid);
@@ -101,16 +101,16 @@ export function OnboardingScreen() {
         };
         reset(mergedData);
       }
-      progressLoadedRef.current = true;
+      setProgressLoaded(true);
     })();
-  }, [state.user, reset, defaultEmail, defaultPhone]);
+  }, [state.user, progressLoaded, reset, defaultEmail, defaultPhone]);
 
   // Save progress on blur/input events
   const saveProgress = React.useCallback(() => {
-    if (!state.user || !progressLoadedRef.current) return;
+    if (!state.user || !progressLoaded) return;
     const currentValues = watch();
     onboardingAPI.save(state.user.uid, 'basics', currentValues as any).catch(() => {});
-  }, [state.user, watch]);
+  }, [state.user, progressLoaded, watch]);
 
   // Save on page unload/refresh
   React.useEffect(() => {
