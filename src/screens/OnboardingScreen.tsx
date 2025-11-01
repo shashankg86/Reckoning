@@ -10,6 +10,8 @@ import { StoreContacts } from './onboarding/StoreContacts';
 import { useAuth } from '../contexts/AuthContext';
 import { isPossiblePhoneNumber } from 'react-phone-number-input';
 import { onboardingAPI } from '../api/onboardingProgress';
+import { supabase } from '../lib/supabaseClient';
+import toast from 'react-hot-toast';
 
 const storeSchema = z.object({
   name: z.string().min(2, 'Store name must be at least 2 characters'),
@@ -34,7 +36,7 @@ type StoreFormData = z.infer<typeof storeSchema> & StoreFormShape;
 
 export function OnboardingScreen() {
   const { t } = useTranslation();
-  const { state, completeOnboarding } = useAuth();
+  const { state, completeOnboarding, logout } = useAuth();
   const navigate = useNavigate();
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -66,20 +68,37 @@ export function OnboardingScreen() {
     defaultValues,
   });
 
-  // Step 3: Single initialization effect - loads saved progress and prefills form
+  // Step 3: Single initialization effect - verifies profile AND loads saved progress
   useEffect(() => {
     if (!userData || isInitialized) return;
 
     let isMounted = true;
 
-    const initializeForm = async () => {
+    const initializeOnboarding = async () => {
       try {
-        // Fetch saved onboarding progress from table
+        // Sub-step 3.1: Verify profile exists in database
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', userData.uid)
+          .maybeSingle();
+
+        if (!isMounted) return;
+
+        if (profileError || !profile) {
+          console.error('[OnboardingScreen] Profile not found in database - logging out');
+          toast.error('Account profile not found. Please sign in again.');
+          await logout();
+          navigate('/login', { replace: true });
+          return;
+        }
+
+        // Sub-step 3.2: Fetch saved onboarding progress
         const savedProgress = await onboardingAPI.get(userData.uid);
 
         if (!isMounted) return;
 
-        // If progress exists, merge with user profile data (profile data takes precedence)
+        // Sub-step 3.3: Prefill form if progress exists
         if (savedProgress?.data && Object.keys(savedProgress.data).length > 0) {
           const prefilledData: Partial<StoreFormData> = {
             ...savedProgress.data,
@@ -92,18 +111,23 @@ export function OnboardingScreen() {
 
         setIsInitialized(true);
       } catch (error) {
-        console.error('[OnboardingScreen] Failed to load progress:', error);
-        // Still mark as initialized to allow user to proceed
-        if (isMounted) setIsInitialized(true);
+        console.error('[OnboardingScreen] Initialization failed:', error);
+
+        if (!isMounted) return;
+
+        // Critical error - profile verification failed
+        toast.error('Unable to verify account. Please sign in again.');
+        await logout();
+        navigate('/login', { replace: true });
       }
     };
 
-    initializeForm();
+    initializeOnboarding();
 
     return () => {
       isMounted = false;
     };
-  }, [userData, isInitialized, reset]);
+  }, [userData, isInitialized, reset, logout, navigate]);
 
   // Step 4: Auto-save progress handler (debounced via callback)
   const saveProgress = useCallback(() => {
