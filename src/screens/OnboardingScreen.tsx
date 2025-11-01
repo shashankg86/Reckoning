@@ -40,20 +40,25 @@ export function OnboardingScreen() {
   const navigate = useNavigate();
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Step 1: Extract user data from auth session (no API call needed)
+  // Step 1: Extract user data from auth session (no additional API call needed)
   const userData = useMemo(() => {
+    // Check authentication from session state
     if (!state.isAuthenticated || !state.user) {
+      console.log('[OnboardingScreen] User not authenticated or user data missing');
       return null;
     }
 
-    return {
+    const data = {
       uid: state.user.uid,
       email: state.user.email ?? '',
       phone: (state.user as any)?.phone ?? '',
     };
+
+    console.log('[OnboardingScreen] User data extracted from session:', data);
+    return data;
   }, [state.isAuthenticated, state.user]);
 
-  // Step 2: Initialize form with default values
+  // Step 2: Initialize form with default values from session
   const defaultValues: Partial<StoreFormData> = useMemo(() => ({
     language: 'en',
     currency: 'INR',
@@ -70,20 +75,42 @@ export function OnboardingScreen() {
 
   // Step 3: Single initialization effect - verifies profile AND loads saved progress
   useEffect(() => {
-    if (!userData || isInitialized) return;
+    console.log('[OnboardingScreen] useEffect triggered', {
+      hasUserData: !!userData,
+      isInitialized,
+      userId: userData?.uid
+    });
+
+    if (!userData) {
+      console.log('[OnboardingScreen] Skipping initialization - no user data');
+      return;
+    }
+
+    if (isInitialized) {
+      console.log('[OnboardingScreen] Skipping initialization - already initialized');
+      return;
+    }
 
     let isMounted = true;
 
     const initializeOnboarding = async () => {
+      console.log('[OnboardingScreen] Starting initialization for user:', userData.uid);
+
       try {
         // Sub-step 3.1: Verify profile exists in database
+        console.log('[OnboardingScreen] Checking if profile exists in database...');
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('id')
           .eq('id', userData.uid)
           .maybeSingle();
 
-        if (!isMounted) return;
+        console.log('[OnboardingScreen] Profile check result:', { profile, profileError });
+
+        if (!isMounted) {
+          console.log('[OnboardingScreen] Component unmounted, stopping initialization');
+          return;
+        }
 
         if (profileError || !profile) {
           console.error('[OnboardingScreen] Profile not found in database - logging out');
@@ -93,13 +120,21 @@ export function OnboardingScreen() {
           return;
         }
 
-        // Sub-step 3.2: Fetch saved onboarding progress
-        const savedProgress = await onboardingAPI.get(userData.uid);
+        console.log('[OnboardingScreen] Profile verified successfully');
 
-        if (!isMounted) return;
+        // Sub-step 3.2: Fetch saved onboarding progress
+        console.log('[OnboardingScreen] Fetching saved onboarding progress...');
+        const savedProgress = await onboardingAPI.get(userData.uid);
+        console.log('[OnboardingScreen] Saved progress:', savedProgress);
+
+        if (!isMounted) {
+          console.log('[OnboardingScreen] Component unmounted after fetching progress');
+          return;
+        }
 
         // Sub-step 3.3: Prefill form if progress exists
         if (savedProgress?.data && Object.keys(savedProgress.data).length > 0) {
+          console.log('[OnboardingScreen] Prefilling form with saved progress');
           const prefilledData: Partial<StoreFormData> = {
             ...savedProgress.data,
             email: userData.email,  // Profile email always overrides
@@ -107,8 +142,12 @@ export function OnboardingScreen() {
           };
 
           reset(prefilledData);
+          console.log('[OnboardingScreen] Form prefilled with data:', prefilledData);
+        } else {
+          console.log('[OnboardingScreen] No saved progress found, using default values');
         }
 
+        console.log('[OnboardingScreen] Initialization complete');
         setIsInitialized(true);
       } catch (error) {
         console.error('[OnboardingScreen] Initialization failed:', error);
@@ -125,11 +164,12 @@ export function OnboardingScreen() {
     initializeOnboarding();
 
     return () => {
+      console.log('[OnboardingScreen] Cleanup - setting isMounted to false');
       isMounted = false;
     };
   }, [userData, isInitialized, reset, logout, navigate]);
 
-  // Step 4: Auto-save progress handler (debounced via callback)
+  // Step 4: Auto-save progress handler
   const saveProgress = useCallback(() => {
     if (!userData || !isInitialized) return;
 
@@ -162,17 +202,20 @@ export function OnboardingScreen() {
     }
   };
 
-  // Show loading state while initializing (optional - can be removed if not needed)
+  // Show loading state while initializing
   if (!userData || !isInitialized) {
+    console.log('[OnboardingScreen] Rendering loading state', { hasUserData: !!userData, isInitialized });
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-orange-600 border-r-transparent"></div>
-          <p className="mt-2 text-sm text-gray-600">{t('onboarding.loadingProgress')}</p>
+          <p className="mt-2 text-sm text-gray-600">{t('common.loading')}</p>
         </div>
       </div>
     );
   }
+
+  console.log('[OnboardingScreen] Rendering form');
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
