@@ -1,9 +1,7 @@
 import { supabase } from '../lib/supabaseClient';
+import { onboardingAPI } from './onboardingProgress';
 
 export const authAPI = {
-  /**
-   * Check if email already exists in the system
-   */
   async checkEmailExists(email: string): Promise<boolean> {
     try {
       const { data, error } = await supabase
@@ -11,23 +9,13 @@ export const authAPI = {
         .select('id')
         .eq('email', email.toLowerCase())
         .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error checking email:', error);
-        return false;
-      }
-
+      if (error && error.code !== 'PGRST116') return false;
       return !!data;
-    } catch (error) {
-      console.error('Error checking email existence:', error);
+    } catch {
       return false;
     }
   },
 
-  /**
-   * Ensure user profile exists (create or update)
-   * Critical for both email signup and OAuth flows
-   */
   async ensureProfile(userId: string, email: string | null, name?: string, phone?: string) {
     try {
       const profileData = {
@@ -37,203 +25,118 @@ export const authAPI = {
         phone: phone || '',
         last_login_at: new Date().toISOString(),
       };
-
       const { data, error } = await supabase
         .from('profiles')
         .upsert(profileData, { onConflict: 'id' })
         .select()
         .single();
-
-      if (error) {
-        console.error('Error ensuring profile:', error);
-        return null;
-      }
-
+      if (error) return null;
       return data;
-    } catch (error) {
-      console.error('Error in ensureProfile:', error);
+    } catch {
       return null;
     }
   },
 
   async signUpWithEmail(email: string, password: string, name: string, phone: string) {
-    try {
-      // Check if email already exists
-      const emailExists = await this.checkEmailExists(email);
+    const emailExists = await this.checkEmailExists(email);
+    if (emailExists) throw new Error('This email is already registered. Please log in instead.');
 
-      if (emailExists) {
-        throw new Error(
-          'This email is already registered. Please log in instead, or use "Sign in with Google" if you previously signed up with Google.'
-        );
-      }
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name, phone } },
+    });
+    if (error) throw error;
 
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            phone,
-          },
-        },
-      });
+    if (data.user) await this.ensureProfile(data.user.id, email, name, phone);
 
-      if (error) {
-        if (error.message.includes('already registered')) {
-          throw new Error('This email is already registered. Please log in instead.');
-        }
-        throw error;
-      }
+    // Post-auth init: fetch profile + onboarding progress, return to caller
+    const sessionRes = await supabase.auth.getSession();
+    const user = sessionRes.data.session?.user;
+    const profile = user ? await this.ensureProfile(user.id, user.email ?? null, name, phone) : null;
+    const progress = user ? await onboardingAPI.get(user.id) : null;
 
-      // Immediately create profile after successful signup
-      if (data.user) {
-        await this.ensureProfile(data.user.id, email, name, phone);
-      }
-
-      return {
-        user: data.user,
-        session: data.session,
-      };
-    } catch (error: any) {
-      console.error('Sign up error:', error);
-      throw error; // Re-throw to preserve error details
-    }
+    return { user: data.user, session: data.session, profile, progress } as const;
   },
 
   async loginWithEmail(email: string, password: string) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
 
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Invalid email or password. Please try again.');
-        }
-        if (error.message.includes('Email not confirmed')) {
-          throw new Error('Please verify your email before logging in.');
-        }
-        throw error;
+    if (data.user) {
+      const { data: profileRow, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email, phone, name')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      if (profileError) {
+        await supabase.auth.signOut();
+        throw new Error('Failed to verify account. Please try again.');
       }
-
-      // CRITICAL: Check if user has a profile (must have signed up through app)
-      if (data.user) {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error('Error checking profile during login:', profileError);
-          await supabase.auth.signOut();
-          throw new Error('Failed to verify account. Please try again.');
-        }
-
-        if (!profile) {
-          // User exists in Supabase auth but not in profiles table = never signed up through app
-          await supabase.auth.signOut();
-          throw new Error('No account found. Please sign up first.');
-        }
-
-        // Profile exists - just update last login timestamp (DO NOT create)
-        await supabase
-          .from('profiles')
-          .update({ last_login_at: new Date().toISOString() })
-          .eq('id', data.user.id);
+      if (!profileRow) {
+        await supabase.auth.signOut();
+        throw new Error('No account found. Please sign up first.');
       }
-
-      return {
-        user: data.user,
-        session: data.session,
-      };
-    } catch (error: any) {
-      console.error('Login error:', error);
-      throw error; // Re-throw to preserve error details
+      await supabase
+        .from('profiles')
+        .update({ last_login_at: new Date().toISOString() })
+        .eq('id', data.user.id);
     }
+
+    // Post-auth init: gather profile and onboarding progress
+    const sessionRes = await supabase.auth.getSession();
+    const user = sessionRes.data.session?.user;
+    let profile = null as any;
+    if (user) {
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('id, email, phone, name')
+        .eq('id', user.id)
+        .single();
+      profile = p;
+    }
+    const progress = user ? await onboardingAPI.get(user.id) : null;
+
+    return { user: data.user, session: data.session, profile, progress } as const;
   },
 
   async loginWithGoogle() {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
-
-      if (error) throw error;
-      return data;
-    } catch (error: any) {
-      console.error('Google login error:', error);
-      throw new Error(error.message || 'Failed to login with Google');
-    }
+    // Keep existing OAuth start; the callback screen should perform the same post-auth init
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/onboarding`,
+        queryParams: { access_type: 'offline', prompt: 'consent' },
+      },
+    });
+    if (error) throw error;
+    return data;
   },
 
   async logout() {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-    } catch (error: any) {
-      console.error('Logout error:', error);
-      throw new Error(error.message || 'Failed to logout');
-    }
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   },
 
   async getCurrentUser() {
-    try {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-      if (error) throw error;
-      return user;
-    } catch (error: any) {
-      console.error('Get user error:', error);
-      return null;
-    }
+    const { data, error } = await supabase.auth.getUser();
+    if (error) return null;
+    return data.user;
   },
 
   async getSession() {
-    try {
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
-      if (error) throw error;
-      return session;
-    } catch (error: any) {
-      console.error('Get session error:', error);
-      return null;
-    }
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return null;
+    return data.session;
   },
 
   async resetPassword(email: string) {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      console.error('Reset password error:', error);
-      throw new Error(error.message || 'Failed to send reset email');
-    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
+    if (error) throw error;
   },
 
   async updatePassword(newPassword: string) {
-    try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      console.error('Update password error:', error);
-      throw new Error(error.message || 'Failed to update password');
-    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
   },
 };
