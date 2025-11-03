@@ -18,13 +18,13 @@ export function LogoUpload({ value, onChange, error, disabled }: LogoUploadProps
   const handleFileSelect = useCallback((file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert(t('onboarding.form.invalidFileType') || 'Please select an image file');
+      alert(t('onboarding.invalidFileType'));
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert(t('onboarding.form.fileTooLarge') || 'File size must be less than 5MB');
+      alert(t('onboarding.fileTooLarge'));
       return;
     }
 
@@ -89,7 +89,7 @@ export function LogoUpload({ value, onChange, error, disabled }: LogoUploadProps
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium text-gray-700">
-        {t('onboarding.form.storeLogo')} <span className="text-gray-400 text-xs ml-1">({t('common.optional')})</span>
+        {t('onboarding.storeLogo')} <span className="text-gray-400 text-xs ml-1">({t('common.optional')})</span>
       </label>
 
       {preview ? (
@@ -153,12 +153,12 @@ export function LogoUpload({ value, onChange, error, disabled }: LogoUploadProps
             <div className="text-center">
               <p className="text-sm font-medium text-gray-700">
                 {isDragging
-                  ? t('onboarding.form.dropImageHere') || 'Drop image here'
-                  : t('onboarding.form.dragDropOrClick') || 'Drag & drop or click to upload'
+                  ? t('onboarding.dropImageHere')
+                  : t('onboarding.dragDropOrClick')
                 }
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                {t('onboarding.form.logoRequirements') || 'PNG, JPG, GIF up to 5MB'}
+                {t('onboarding.logoRequirements')}
               </p>
             </div>
           </div>
@@ -176,7 +176,7 @@ export function LogoUpload({ value, onChange, error, disabled }: LogoUploadProps
           disabled={disabled}
           className="text-sm text-orange-600 hover:text-orange-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t('onboarding.form.changeImage') || 'Change image'}
+          {t('onboarding.changeImage')}
         </button>
       )}
     </div>
