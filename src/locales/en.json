@@ -87,6 +87,13 @@
     "storeLogo": "Store Logo",
     "uploadLogo": "Upload Logo",
     "logoHint": "Upload your store logo or we'll use your profile picture as default",
+    "dragDropOrClick": "Drag & drop or click to upload",
+    "dropImageHere": "Drop image here",
+    "logoRequirements": "PNG, JPG, GIF up to 5MB",
+    "changeImage": "Change image",
+    "invalidFileType": "Please select an image file",
+    "fileTooLarge": "File size must be less than 5MB",
+    "uploadingLogo": "Uploading logo...",
     "storeTypes": {
       "restaurant": "Restaurant",
       "cafe": "Cafe",
@@ -233,6 +240,7 @@
   },
   "common": {
     "loading": "Loading...",
+    "optional": "Optional",
     "noDataFound": "No data found",
     "tryDifferentSearch": "Try adjusting your search terms",
     "showing": "Showing",
