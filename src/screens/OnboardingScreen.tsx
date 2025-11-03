@@ -138,7 +138,7 @@ export function OnboardingScreen() {
 
       // Upload to Supabase storage
       const { data, error } = await supabase.storage
-        .from('public-assets')
+        .from('store-assets')
         .upload(filePath, logoFile, {
           cacheControl: '3600',
           upsert: false,
@@ -151,7 +151,7 @@ export function OnboardingScreen() {
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('public-assets')
+        .from('store-assets')
         .getPublicUrl(filePath);
 
       setIsUploadingLogo(false);
