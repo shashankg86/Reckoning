@@ -11,6 +11,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   isOnboarded: boolean;
+  onboardingProgress: any | null;  // Pre-fetched onboarding progress
   error: string | null;
 }
 
@@ -21,6 +22,7 @@ type AuthAction =
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_AUTH_SESSION_PRESENT'; payload: { uid: string; email: string | null } }
   | { type: 'SET_ONBOARDED'; payload: boolean }
+  | { type: 'SET_ONBOARDING_PROGRESS'; payload: any | null }
   | { type: 'LOGOUT' };
 
 const initialState: AuthState = {
@@ -28,6 +30,7 @@ const initialState: AuthState = {
   isLoading: true,
   isAuthenticated: false,
   isOnboarded: false,
+  onboardingProgress: null,
   error: null,
 };
 
@@ -51,6 +54,11 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         ...state,
         isOnboarded: action.payload,
         isLoading: false,
+      };
+    case 'SET_ONBOARDING_PROGRESS':
+      return {
+        ...state,
+        onboardingProgress: action.payload,
       };
     case 'SET_USER':
       return {
@@ -161,6 +169,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     dispatch({ type: 'LOGOUT' });
+  };
+
+  /**
+   * Prepare onboarding data before redirecting to onboarding screen
+   * This ensures profile exists and fetches onboarding progress
+   */
+  const prepareOnboarding = async (userId: string, email: string | null): Promise<void> => {
+    try {
+      console.log('[prepareOnboarding] Starting preparation for user:', userId);
+
+      // Step 1: Verify profile exists in database
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email, name, phone')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profileError || !profile) {
+        console.error('[prepareOnboarding] Profile not found in database');
+        throw new Error('Profile not found. Please sign up first.');
+      }
+
+      console.log('[prepareOnboarding] Profile verified:', profile.email);
+
+      // Step 2: Fetch onboarding progress
+      const progress = await onboardingAPI.get(userId);
+      console.log('[prepareOnboarding] Onboarding progress fetched:', progress?.data ? 'exists' : 'none');
+
+      // Step 3: Store in context
+      dispatch({ type: 'SET_ONBOARDING_PROGRESS', payload: progress?.data || null });
+
+      console.log('[prepareOnboarding] Preparation complete');
+    } catch (error: any) {
+      console.error('[prepareOnboarding] Failed:', error);
+      throw error;
+    }
   };
 
   useEffect(() => {
@@ -373,6 +417,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
+      // If user needs onboarding, prepare data before redirect
+      if (!onboarded) {
+        try {
+          await prepareOnboarding(user.id, user.email ?? null);
+        } catch (err: any) {
+          // Profile verification failed - logout and show error
+          console.error('Onboarding preparation failed:', err);
+          await authAPI.logout();
+          dispatch({ type: 'LOGOUT' });
+          toast.error(err.message || 'Account verification failed');
+          return false;
+        }
+      }
+
       // Simple success toast (no API calls, no complexity)
       toast.success('Login successful!');
 
@@ -402,10 +460,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'CLEAR_ERROR' });
       const { user } = await authAPI.signUpWithEmail(email, password, name, phone || '');
       if (!user) throw new Error('Signup succeeded but user data not returned');
+
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
       dispatch({ type: 'SET_ONBOARDED', payload: false });
+
+      // Prepare onboarding data before redirect
+      try {
+        await prepareOnboarding(user.id, user.email ?? null);
+      } catch (err: any) {
+        // Profile verification failed - logout and show error
+        console.error('Onboarding preparation failed during signup:', err);
+        await authAPI.logout();
+        dispatch({ type: 'LOGOUT' });
+        const errorMsg = err.message || 'Account verification failed';
+        dispatch({ type: 'SET_ERROR', payload: errorMsg });
+        throw new Error(errorMsg);
+      }
+
+      // Load full profile in background
       loadUserProfile(user.id, user.email ?? null, { force: true });
+
       toast.success('Account created successfully! Welcome!');
     } catch (error: any) {
       const errorMessage = error.message || 'Registration failed. Please try again.';

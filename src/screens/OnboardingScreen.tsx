@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -51,16 +51,18 @@ export function OnboardingScreen() {
   const { t } = useTranslation();
   const { state, completeOnboarding } = useAuth();
   const navigate = useNavigate();
-  const progressLoadedRef = React.useRef(false);
 
   // Logo state
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
-  const defaultCountry = 'IN';
-  const defaultEmail = state.user?.email ?? '';
-  const defaultPhone = (state.user as any)?.phone ?? '';
+  // Extract user data from auth context (no API call needed)
+  const userData = {
+    uid: state.user?.uid || '',
+    email: state.user?.email || '',
+    phone: (state.user as any)?.phone || '',
+  };
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<StoreFormData>({
     resolver: zodResolver(storeSchema),
@@ -68,50 +70,53 @@ export function OnboardingScreen() {
       language: 'en',
       currency: 'INR',
       theme: 'light',
-      country: '',
-      email: defaultEmail,
-      phone: defaultPhone,
+      country: 'IN',
+      email: userData.email,
+      phone: userData.phone,
     },
   });
 
-  // Load saved progress once on mount
-  React.useEffect(() => {
-    if (progressLoadedRef.current || !state.user) return;
+  // Simple one-time initialization with pre-fetched data from context
+  useEffect(() => {
+    console.log('[OnboardingScreen] Initializing with pre-fetched data');
 
-    (async () => {
-      const savedProgress = await onboardingAPI.get(state.user!.uid);
-      if (savedProgress?.data) {
-        // Merge saved progress with user profile data
-        const mergedData = {
-          ...(savedProgress.data as any),
-          email: defaultEmail, // Always use profile email
-          phone: (savedProgress.data as any).phone || defaultPhone, // Prefer saved, fallback to profile
-        };
+    // Use pre-fetched onboarding progress from AuthContext
+    if (state.onboardingProgress) {
+      console.log('[OnboardingScreen] Restoring saved progress');
+      const mergedData = {
+        ...state.onboardingProgress,
+        email: userData.email, // Always use profile email
+        phone: state.onboardingProgress.phone || userData.phone,
+      };
 
-        // Restore logo preview if exists
-        if (savedProgress.data.logoUrl) {
-          setLogoPreview(savedProgress.data.logoUrl);
-        }
-
-        reset(mergedData);
+      // Restore logo preview if exists
+      if (state.onboardingProgress.logoUrl) {
+        setLogoPreview(state.onboardingProgress.logoUrl);
       }
-      progressLoadedRef.current = true;
-    })();
-  }, [state.user, reset, defaultEmail, defaultPhone]);
+
+      reset(mergedData);
+    }
+
+    console.log('[OnboardingScreen] Initialization complete');
+  }, []); // Empty dependency array - runs only once!
 
   // Save progress on blur/input events
   const saveProgress = React.useCallback(() => {
-    if (!state.user || !progressLoadedRef.current) return;
+    if (!userData.uid) return;
+
     const currentValues = watch();
     const dataToSave = {
       ...currentValues,
-      logoUrl: logoPreview, // Save logo preview URL
+      logoUrl: logoPreview,
     };
-    onboardingAPI.save(state.user.uid, 'basics', dataToSave as any).catch(() => {});
-  }, [state.user, watch, logoPreview]);
+
+    onboardingAPI.save(userData.uid, 'basics', dataToSave as any).catch((err) => {
+      console.error('[OnboardingScreen] Failed to save progress:', err);
+    });
+  }, [userData.uid, watch, logoPreview]);
 
   // Save on page unload/refresh
-  React.useEffect(() => {
+  useEffect(() => {
     const handleBeforeUnload = () => saveProgress();
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -126,18 +131,16 @@ export function OnboardingScreen() {
 
   // Upload logo to Supabase storage
   const uploadLogo = async (): Promise<string | null> => {
-    if (!logoFile || !state.user) return null;
+    if (!logoFile || !userData.uid) return null;
 
     try {
       setIsUploadingLogo(true);
 
-      // Generate unique filename
       const fileExt = logoFile.name.split('.').pop();
-      const fileName = `${state.user.uid}-${Date.now()}.${fileExt}`;
+      const fileName = `${userData.uid}-${Date.now()}.${fileExt}`;
       const filePath = `store-logos/${fileName}`;
 
-      // Upload to Supabase storage
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('store-assets')
         .upload(filePath, logoFile, {
           cacheControl: '3600',
@@ -149,7 +152,6 @@ export function OnboardingScreen() {
         throw error;
       }
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('store-assets')
         .getPublicUrl(filePath);
@@ -166,7 +168,7 @@ export function OnboardingScreen() {
 
   const onSubmit = async (data: StoreFormData) => {
     try {
-      let logoUrl = logoPreview; // Use existing preview if no new file
+      let logoUrl = logoPreview;
 
       // Upload logo if a new file is selected
       if (logoFile) {
@@ -182,13 +184,25 @@ export function OnboardingScreen() {
         logoURL: logoUrl,
       } as any);
 
-      if (state.user) await onboardingAPI.clear(state.user.uid);
+      if (userData.uid) await onboardingAPI.clear(userData.uid);
       navigate('/dashboard', { replace: true });
     } catch (error) {
       console.error('Onboarding submission error:', error);
       toast.error('Failed to complete onboarding. Please try again.');
     }
   };
+
+  // Loading state check
+  if (!state.isAuthenticated || !userData.uid) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-orange-600 border-r-transparent"></div>
+          <p className="mt-2 text-sm text-gray-600">{t('common.loading')}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -217,8 +231,8 @@ export function OnboardingScreen() {
               watch={watch as any}
               setValue={setValue as any}
               errors={errors as any}
-              defaultCountry={defaultCountry}
-              email={defaultEmail}
+              defaultCountry="IN"
+              email={userData.email}
               disableEmail
               onBlur={saveProgress}
             />
