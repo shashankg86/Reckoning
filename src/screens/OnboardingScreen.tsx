@@ -40,8 +40,6 @@ export function OnboardingScreen() {
   const { completeOnboarding, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isReady, setIsReady] = React.useState(false);
   const [userSession, setUserSession] = React.useState<any>(null);
   const [logoFile, setLogoFile] = React.useState<File | null>(null);
   const [logoPreview, setLogoPreview] = React.useState<string | null>(null);
@@ -60,9 +58,8 @@ export function OnboardingScreen() {
 
   // Single init using persisted session (no re-auth) => session -> profile -> progress
   React.useEffect(() => {
-    const init = async () => {
+    (async () => {
       try {
-        setIsLoading(true);
         const { data: sessionRes } = await supabase.auth.getSession();
         const user = sessionRes?.session?.user;
         if (!user) {
@@ -105,24 +102,19 @@ export function OnboardingScreen() {
         } else {
           reset(defaults);
         }
-
-        setIsReady(true);
       } catch (e) {
         console.error('Onboarding init failed', e);
         toast.error('Failed to initialize onboarding');
         await logout();
         navigate('/login', { replace: true });
-      } finally {
-        setIsLoading(false);
       }
-    };
-    init();
+    })();
   }, [logout, navigate, reset]);
 
   // Debounced save progress
   const saveTimeoutRef = React.useRef<NodeJS.Timeout>();
   const saveProgress = React.useCallback(() => {
-    if (!userSession || !isReady) return;
+    if (!userSession) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(async () => {
       try {
@@ -132,13 +124,9 @@ export function OnboardingScreen() {
         console.error('Save progress failed', e);
       }
     }, 800);
-  }, [userSession, isReady, watch, logoPreview]);
+  }, [userSession, watch, logoPreview]);
 
-  React.useEffect(() => {
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    };
-  }, []);
+  React.useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); }, []);
 
   const onSubmit = async (data: StoreFormData) => {
     try {
@@ -151,15 +139,6 @@ export function OnboardingScreen() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Loading onboarding...</div>
-      </div>
-    );
-  }
-  if (!isReady || !userSession) return null;
-
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <OnboardingHeader />
@@ -168,7 +147,7 @@ export function OnboardingScreen() {
           <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
             <LogoUpload value={logoPreview || undefined} onChange={(file, url) => { setLogoFile(file); setLogoPreview(url); saveProgress(); }} />
             <StoreBasics register={register as any} errors={errors as any} setValue={setValue} watch={watch} onBlur={saveProgress} />
-            <StoreContacts watch={watch as any} setValue={setValue as any} errors={errors as any} defaultCountry="IN" email={userSession.email || ''} disableEmail onBlur={saveProgress} />
+            <StoreContacts watch={watch as any} setValue={setValue as any} errors={errors as any} defaultCountry="IN" email={userSession?.email || ''} disableEmail onBlur={saveProgress} />
             <div>
               <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-2 px-4 rounded-md text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50">
                 {isSubmitting ? t('onboarding.submitting') : t('onboarding.completeSetup')}
