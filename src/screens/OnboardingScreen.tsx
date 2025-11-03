@@ -179,7 +179,7 @@ export function OnboardingScreen() {
       // Complete onboarding with logo URL
       await completeOnboarding({
         ...data,
-        logo_url: logoUrl,
+        logoURL: logoUrl,
       } as any);
 
       if (state.user) await onboardingAPI.clear(state.user.uid);
