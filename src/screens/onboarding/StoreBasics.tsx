@@ -2,24 +2,13 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { UseFormRegister, FieldErrors, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import { locationAPI, Country, State, City } from '../../api/location';
-
-export type StoreFormShape = {
-  name: string;
-  type: 'restaurant' | 'cafe' | 'retail' | 'salon' | 'pharmacy' | 'other';
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  pincode: string;
-  customCity?: string;
-  gst_number?: string;
-};
+import { OnboardingFormData } from '../../types/onboarding';
 
 interface StoreBasicsProps {
-  register: UseFormRegister<StoreFormShape>;
-  errors: FieldErrors<StoreFormShape>;
-  setValue: UseFormSetValue<StoreFormShape>;
-  watch: UseFormWatch<StoreFormShape>;
+  register: UseFormRegister<OnboardingFormData>;
+  errors: FieldErrors<OnboardingFormData>;
+  setValue: UseFormSetValue<OnboardingFormData>;
+  watch: UseFormWatch<OnboardingFormData>;
   onBlur?: () => void;
 }
 

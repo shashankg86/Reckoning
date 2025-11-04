@@ -5,8 +5,8 @@ import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { OnboardingHeader } from './onboarding/OnboardingHeader';
-import { StoreBasics, StoreFormShape } from './onboarding/StoreBasics';
-import { StoreContacts, ContactShape } from './onboarding/StoreContacts';
+import { StoreBasics } from './onboarding/StoreBasics';
+import { StoreContacts } from './onboarding/StoreContacts';
 import { LogoUpload } from '../components/form/LogoUpload';
 import { useAuth } from '../contexts/AuthContext';
 import { isPossiblePhoneNumber } from 'react-phone-number-input';
@@ -14,6 +14,7 @@ import { onboardingAPI, OnboardingData } from '../api/onboardingProgress';
 import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
 import type { Store } from '../types';
+import type { OnboardingFormData } from '../types/onboarding';
 
 // GSTIN validation regex (15 characters: 2-digit state code + 10-char PAN + 3 additional)
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -46,8 +47,6 @@ const storeSchema = z.object({
   path: ['gst_number']
 });
 
-type StoreFormData = z.infer<typeof storeSchema> & StoreFormShape;
-
 export function OnboardingScreen() {
   const { t } = useTranslation();
   const { state, completeOnboarding } = useAuth();
@@ -63,7 +62,7 @@ export function OnboardingScreen() {
   const defaultEmail = state.user?.email ?? '';
   const defaultPhone = state.user?.phone ?? '';
 
-  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<StoreFormData>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<OnboardingFormData>({
     resolver: zodResolver(storeSchema),
     defaultValues: {
       language: 'en',
@@ -83,7 +82,7 @@ export function OnboardingScreen() {
       const savedProgress = await onboardingAPI.get(state.user!.uid);
       if (savedProgress?.data) {
         // Merge saved progress with user profile data
-        const mergedData: Partial<StoreFormData> = {
+        const mergedData: Partial<OnboardingFormData> = {
           ...savedProgress.data,
           email: defaultEmail, // Always use profile email
           phone: savedProgress.data.phone || defaultPhone, // Prefer saved, fallback to profile
@@ -165,7 +164,7 @@ export function OnboardingScreen() {
     }
   };
 
-  const onSubmit = async (data: StoreFormData) => {
+  const onSubmit = async (data: OnboardingFormData) => {
     try {
       let logoUrl = logoPreview; // Use existing preview if no new file
 
