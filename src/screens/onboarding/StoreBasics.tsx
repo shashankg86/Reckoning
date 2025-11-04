@@ -101,7 +101,7 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
           placeholder={t('onboarding.form.enterStoreName')}
         />
-        {errors.name && <p className="mt-1 text-sm text-red-600">{String(errors.name.message)}</p>}
+        {errors.name?.message && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
       </div>
 
       <div>
@@ -119,7 +119,7 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
             </option>
           ))}
         </select>
-        {errors.type && <p className="mt-1 text-sm text-red-600">{String(errors.type.message)}</p>}
+        {errors.type?.message && <p className="mt-1 text-sm text-red-600">{errors.type.message}</p>}
       </div>
 
       <div>
@@ -132,7 +132,7 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
           className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
           placeholder={t('onboarding.form.addressPlaceholder')}
         />
-        {errors.address && <p className="mt-1 text-sm text-red-600">{String(errors.address.message)}</p>}
+        {errors.address?.message && <p className="mt-1 text-sm text-red-600">{errors.address.message}</p>}
       </div>
 
       {/* Country Dropdown */}
@@ -158,7 +158,7 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
             </option>
           ))}
         </select>
-        {errors.country && <p className="mt-1 text-sm text-red-600">{String(errors.country.message)}</p>}
+        {errors.country?.message && <p className="mt-1 text-sm text-red-600">{errors.country.message}</p>}
       </div>
 
       {/* State Dropdown */}
@@ -188,7 +188,7 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
             </option>
           ))}
         </select>
-        {errors.state && <p className="mt-1 text-sm text-red-600">{String(errors.state.message)}</p>}
+        {errors.state?.message && <p className="mt-1 text-sm text-red-600">{errors.state.message}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -218,7 +218,7 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
               </option>
             )}
           </select>
-          {errors.city && <p className="mt-1 text-sm text-red-600">{String(errors.city.message)}</p>}
+          {errors.city?.message && <p className="mt-1 text-sm text-red-600">{errors.city.message}</p>}
         </div>
 
         {/* Pincode */}
@@ -231,7 +231,7 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500"
             placeholder={t('onboarding.form.pincodePlaceholder')}
           />
-          {errors.pincode && <p className="mt-1 text-sm text-red-600">{String(errors.pincode.message)}</p>}
+          {errors.pincode?.message && <p className="mt-1 text-sm text-red-600">{errors.pincode.message}</p>}
         </div>
       </div>
 
@@ -274,7 +274,7 @@ export function StoreBasics({ register, errors, setValue, watch, onBlur }: Store
                 : t('onboarding.form.taxNumberPlaceholder') || 'Enter Tax/VAT Registration Number'
             }
           />
-          {errors.gst_number && <p className="mt-1 text-sm text-red-600">{String(errors.gst_number.message)}</p>}
+          {errors.gst_number?.message && <p className="mt-1 text-sm text-red-600">{errors.gst_number.message}</p>}
         </div>
       )}
     </>

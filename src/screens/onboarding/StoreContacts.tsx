@@ -27,7 +27,7 @@ export function StoreContacts({ watch, setValue, errors, defaultCountry, email, 
           onChange={(v) => setValue('phone', v, { shouldValidate: true })}
           defaultCountry={defaultCountry}
           placeholder={t('onboarding.form.phonePlaceholder')}
-          error={errors.phone?.message as string | undefined}
+          error={errors.phone?.message}
           onBlur={onBlur}
         />
       </div>
@@ -43,7 +43,7 @@ export function StoreContacts({ watch, setValue, errors, defaultCountry, email, 
           onChange={(v) => setValue('secondary_phone', v, { shouldValidate: false })}
           defaultCountry={defaultCountry}
           placeholder={t('onboarding.form.secondaryPhonePlaceholder')}
-          error={errors.secondary_phone?.message as string | undefined}
+          error={errors.secondary_phone?.message}
           onBlur={onBlur}
         />
       </div>

@@ -6,13 +6,14 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { OnboardingHeader } from './onboarding/OnboardingHeader';
 import { StoreBasics, StoreFormShape } from './onboarding/StoreBasics';
-import { StoreContacts } from './onboarding/StoreContacts';
+import { StoreContacts, ContactShape } from './onboarding/StoreContacts';
 import { LogoUpload } from '../components/form/LogoUpload';
 import { useAuth } from '../contexts/AuthContext';
 import { isPossiblePhoneNumber } from 'react-phone-number-input';
-import { onboardingAPI } from '../api/onboardingProgress';
+import { onboardingAPI, OnboardingData } from '../api/onboardingProgress';
 import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
+import type { Store } from '../types';
 
 // GSTIN validation regex (15 characters: 2-digit state code + 10-char PAN + 3 additional)
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -60,7 +61,7 @@ export function OnboardingScreen() {
 
   const defaultCountry = 'IN';
   const defaultEmail = state.user?.email ?? '';
-  const defaultPhone = (state.user as any)?.phone ?? '';
+  const defaultPhone = state.user?.phone ?? '';
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<StoreFormData>({
     resolver: zodResolver(storeSchema),
@@ -82,10 +83,10 @@ export function OnboardingScreen() {
       const savedProgress = await onboardingAPI.get(state.user!.uid);
       if (savedProgress?.data) {
         // Merge saved progress with user profile data
-        const mergedData = {
-          ...(savedProgress.data as any),
+        const mergedData: Partial<StoreFormData> = {
+          ...savedProgress.data,
           email: defaultEmail, // Always use profile email
-          phone: (savedProgress.data as any).phone || defaultPhone, // Prefer saved, fallback to profile
+          phone: savedProgress.data.phone || defaultPhone, // Prefer saved, fallback to profile
         };
 
         // Restore logo preview if exists
@@ -103,11 +104,11 @@ export function OnboardingScreen() {
   const saveProgress = React.useCallback(() => {
     if (!state.user || !progressLoadedRef.current) return;
     const currentValues = watch();
-    const dataToSave = {
+    const dataToSave: OnboardingData = {
       ...currentValues,
-      logoUrl: logoPreview, // Save logo preview URL
+      logoUrl: logoPreview ?? undefined, // Save logo preview URL
     };
-    onboardingAPI.save(state.user.uid, 'basics', dataToSave as any).catch(() => {});
+    onboardingAPI.save(state.user.uid, 'basics', dataToSave).catch(() => {});
   }, [state.user, watch, logoPreview]);
 
   // Save on page unload/refresh
@@ -177,10 +178,16 @@ export function OnboardingScreen() {
       }
 
       // Complete onboarding with logo URL
-      await completeOnboarding({
-        ...data,
-        logoURL: logoUrl,
-      } as any);
+      const storeData: Store = {
+        name: data.name,
+        type: data.type,
+        language: data.language,
+        currency: data.currency,
+        theme: data.theme,
+        logoURL: logoUrl ?? undefined,
+      };
+
+      await completeOnboarding(storeData);
 
       if (state.user) await onboardingAPI.clear(state.user.uid);
       navigate('/dashboard', { replace: true });
@@ -205,8 +212,8 @@ export function OnboardingScreen() {
 
             {/* Store Basics */}
             <StoreBasics
-              register={register as any}
-              errors={errors as any}
+              register={register}
+              errors={errors}
               setValue={setValue}
               watch={watch}
               onBlur={saveProgress}
@@ -214,9 +221,9 @@ export function OnboardingScreen() {
 
             {/* Store Contacts */}
             <StoreContacts
-              watch={watch as any}
-              setValue={setValue as any}
-              errors={errors as any}
+              watch={watch}
+              setValue={setValue}
+              errors={errors}
               defaultCountry={defaultCountry}
               email={defaultEmail}
               disableEmail

@@ -1,9 +1,28 @@
 import { supabase } from '../lib/supabaseClient';
 
+export type OnboardingData = {
+  name?: string;
+  type?: 'restaurant' | 'cafe' | 'retail' | 'salon' | 'pharmacy' | 'other';
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+  phone?: string;
+  secondary_phone?: string;
+  email?: string;
+  gst_number?: string;
+  customCity?: string;
+  language?: 'en' | 'hi' | 'ar' | 'mr';
+  currency?: 'INR' | 'USD' | 'EUR' | 'AED' | 'GBP';
+  theme?: 'light' | 'dark';
+  logoUrl?: string;
+};
+
 export type OnboardingProgress = {
   user_id: string;
   current_step: 'basics' | 'contacts' | 'review';
-  data: Record<string, any>;
+  data: OnboardingData;
   updated_at: string;
 };
 
@@ -34,7 +53,7 @@ export const onboardingAPI = {
   /**
    * Save or update onboarding progress
    */
-  async save(userId: string, step: OnboardingProgress['current_step'], payload: Record<string, any>) {
+  async save(userId: string, step: OnboardingProgress['current_step'], payload: OnboardingData) {
     try {
       const { data, error } = await supabase
         .from('onboarding_progress')
