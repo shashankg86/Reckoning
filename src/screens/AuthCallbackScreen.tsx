@@ -43,8 +43,13 @@ export function AuthCallbackScreen() {
         }
 
         // CRITICAL: Ensure profile exists after email verification
-        // This is needed because with email verification ON, the profile might not have been created during signup
         const user = session.user;
+
+        // Verify email is confirmed
+        if (!user.email_confirmed_at) {
+          throw new Error('Email not verified');
+        }
+
         const name = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
         const phone = user.user_metadata?.phone || '';
 
@@ -53,7 +58,8 @@ export function AuthCallbackScreen() {
           userId: user.id,
           email: user.email,
           name: name,
-          phone: phone
+          phone: phone,
+          emailVerified: true
         });
 
         try {
@@ -61,21 +67,17 @@ export function AuthCallbackScreen() {
           console.log('[AuthCallback] Profile created successfully');
         } catch (profileError: any) {
           console.error('[AuthCallback] FAILED to create profile:', profileError);
-          // Show more helpful error to user
-          throw new Error(`Profile creation failed: ${profileError.message}. Please contact support with your email.`);
+          throw new Error(`Profile creation failed: ${profileError.message}. Please contact support.`);
         }
 
         // Email verified successfully!
         setStatus('success');
-        toast.success('Email verified successfully!');
+        toast.success('Email verified! Redirecting to onboarding...');
 
-        // Redirect to login after 2 seconds
+        // Redirect directly to onboarding since user is already authenticated
         setTimeout(() => {
-          navigate('/login', {
-            replace: true,
-            state: { verified: true }
-          });
-        }, 2000);
+          navigate('/onboarding', { replace: true });
+        }, 1500);
 
       } catch (error: any) {
         console.error('Email verification error:', error);
@@ -83,9 +85,9 @@ export function AuthCallbackScreen() {
         setErrorMessage(error.message || 'Failed to verify email');
         toast.error(error.message || 'Email verification failed');
 
-        // Redirect to login after 3 seconds even on error
+        // Redirect to signup after 3 seconds on error
         setTimeout(() => {
-          navigate('/login', { replace: true });
+          navigate('/signup', { replace: true });
         }, 3000);
       }
     };
@@ -123,7 +125,7 @@ export function AuthCallbackScreen() {
                   {t('auth.verificationSuccess')}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                  {t('auth.redirectingToLogin')}
+                  Redirecting to onboarding...
                 </p>
               </>
             )}
@@ -140,13 +142,13 @@ export function AuthCallbackScreen() {
                   {errorMessage || t('auth.verificationError')}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                  {t('auth.redirectingToLogin')}
+                  Redirecting to signup...
                 </p>
                 <button
-                  onClick={() => navigate('/login', { replace: true })}
+                  onClick={() => navigate('/signup', { replace: true })}
                   className="mt-4 text-sm text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 font-medium"
                 >
-                  {t('auth.goToLogin')}
+                  Go to Signup
                 </button>
               </>
             )}
