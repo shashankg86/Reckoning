@@ -76,7 +76,7 @@ interface AuthContextType {
   state: AuthState;
   login: (email: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<void>;
-  register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
+  register: (email: string, password: string, name: string, phone?: string) => Promise<{ requiresEmailVerification: boolean; email: string }>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   completeOnboarding: (storeData: Store) => Promise<void>;
@@ -400,13 +400,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, name: string, phone?: string) => {
     try {
       dispatch({ type: 'CLEAR_ERROR' });
-      const { user } = await authAPI.signUpWithEmail(email, password, name, phone || '');
-      if (!user) throw new Error('Signup succeeded but user data not returned');
+      const { user, session } = await authAPI.signUpWithEmail(email, password, name, phone || '');
+
+      if (!user) throw new Error('Signup failed');
+
+      // Check if email verification is required (session will be null if verification is ON)
+      if (!session) {
+        // Email verification is ON - user needs to verify their email
+        console.log('[Register] Email verification required - no session returned');
+        toast.success('Account created! Please check your email to verify your account.');
+        return { requiresEmailVerification: true, email: user.email || email };
+      }
+
+      // Email verification is OFF - proceed with normal flow
+      console.log('[Register] No email verification required - session exists');
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
       dispatch({ type: 'SET_ONBOARDED', payload: false });
       loadUserProfile(user.id, user.email ?? null, { force: true });
       toast.success('Account created successfully! Welcome!');
+      return { requiresEmailVerification: false, email: user.email || email };
     } catch (error: any) {
       const errorMessage = error.message || 'Registration failed. Please try again.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });

@@ -59,9 +59,16 @@ export function SignupScreen() {
         navigate('/phone-verification', { state: { phone: data.phone, email: data.email, name: data.name, password: data.password, isSignup: true } });
       } else {
         const result = await authRegister(data.email, data.password, data.name, data.phone);
-        if (result.session?.user) {
-          await ensureMinimalProfile(result.session.user.id, data.email, data.name, data.phone);
+
+        // Check if email verification is required
+        if (result.requiresEmailVerification) {
+          // Redirect to email verification screen
+          navigate('/verify-email', {
+            replace: true,
+            state: { email: result.email }
+          });
         }
+        // If no email verification required, user is already logged in and redirected by AuthContext
       }
     } catch (error: any) {
       if (error?.message?.includes('email')) {

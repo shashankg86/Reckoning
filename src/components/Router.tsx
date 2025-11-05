@@ -8,6 +8,8 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { SignupScreen } from '../screens/SignupScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { PhoneVerificationScreen } from '../screens/PhoneVerificationScreen';
+import { EmailVerificationScreen } from '../screens/EmailVerificationScreen';
+import { AuthCallbackScreen } from '../screens/AuthCallbackScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 
 // App screens
@@ -25,7 +27,11 @@ export function Router() {
         <Route path="/login" element={<AuthRoute><LoginScreen /></AuthRoute>} />
         <Route path="/signup" element={<AuthRoute><SignupScreen /></AuthRoute>} />
         <Route path="/forgot-password" element={<AuthRoute><ForgotPasswordScreen /></AuthRoute>} />
-        
+
+        {/* Email verification routes */}
+        <Route path="/verify-email" element={<EmailVerificationScreen />} />
+        <Route path="/auth/callback" element={<AuthCallbackScreen />} />
+
         {/* Phone verification route */}
         <Route path="/phone-verification" element={<VerificationRoute><PhoneVerificationScreen /></VerificationRoute>} />
         
