@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabaseClient';
+import { authAPI } from '../api/auth';
 import toast from 'react-hot-toast';
 import { BRAND } from '../constants/branding';
 import { LoadingScreen } from '../components/ui/Loader';
@@ -40,6 +41,16 @@ export function AuthCallbackScreen() {
         if (!session) {
           throw new Error('Failed to create session after verification');
         }
+
+        // CRITICAL: Ensure profile exists after email verification
+        // This is needed because with email verification ON, the profile might not have been created during signup
+        const user = session.user;
+        const name = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
+        const phone = user.user_metadata?.phone || '';
+
+        console.log('[AuthCallback] Ensuring profile exists for verified user:', user.id);
+        await authAPI.ensureProfile(user.id, user.email, name, phone);
+        console.log('[AuthCallback] Profile ensured successfully');
 
         // Email verified successfully!
         setStatus('success');

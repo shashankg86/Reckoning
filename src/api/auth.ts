@@ -85,9 +85,13 @@ export const authAPI = {
         throw error;
       }
 
-      // Immediately create profile after successful signup
-      if (data.user) {
+      // Only create profile if session exists (email verification is OFF)
+      // If email verification is ON, profile will be created after email is verified
+      if (data.user && data.session) {
+        console.log('[signUpWithEmail] Email verification OFF - creating profile immediately');
         await this.ensureProfile(data.user.id, email, name, phone);
+      } else if (data.user && !data.session) {
+        console.log('[signUpWithEmail] Email verification ON - profile will be created after verification');
       }
 
       return {
