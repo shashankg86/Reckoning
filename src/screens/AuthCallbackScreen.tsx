@@ -48,9 +48,22 @@ export function AuthCallbackScreen() {
         const name = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
         const phone = user.user_metadata?.phone || '';
 
-        console.log('[AuthCallback] Ensuring profile exists for verified user:', user.id);
-        await authAPI.ensureProfile(user.id, user.email, name, phone);
-        console.log('[AuthCallback] Profile ensured successfully');
+        console.log('[AuthCallback] User metadata:', user.user_metadata);
+        console.log('[AuthCallback] Creating profile for verified user:', {
+          userId: user.id,
+          email: user.email,
+          name: name,
+          phone: phone
+        });
+
+        try {
+          await authAPI.ensureProfile(user.id, user.email, name, phone);
+          console.log('[AuthCallback] Profile created successfully');
+        } catch (profileError: any) {
+          console.error('[AuthCallback] FAILED to create profile:', profileError);
+          // Show more helpful error to user
+          throw new Error(`Profile creation failed: ${profileError.message}. Please contact support with your email.`);
+        }
 
         // Email verified successfully!
         setStatus('success');

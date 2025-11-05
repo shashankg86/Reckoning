@@ -38,6 +38,8 @@ export const authAPI = {
         last_login_at: new Date().toISOString(),
       };
 
+      console.log('[ensureProfile] Creating/updating profile:', { userId, email, name, phone });
+
       const { data, error } = await supabase
         .from('profiles')
         .upsert(profileData, { onConflict: 'id' })
@@ -45,14 +47,22 @@ export const authAPI = {
         .single();
 
       if (error) {
-        console.error('Error ensuring profile:', error);
-        return null;
+        console.error('[ensureProfile] Database error:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        // THROW error instead of returning null
+        throw new Error(`Failed to create profile: ${error.message}`);
       }
 
+      console.log('[ensureProfile] Profile created/updated successfully:', data.id);
       return data;
-    } catch (error) {
-      console.error('Error in ensureProfile:', error);
-      return null;
+    } catch (error: any) {
+      console.error('[ensureProfile] Exception caught:', error);
+      // Re-throw so calling code knows it failed
+      throw error;
     }
   },
 
