@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
 import { BRAND } from '../constants/branding';
+import { LoadingScreen } from '../components/ui/Loader';
 
 type VerificationStatus = 'verifying' | 'success' | 'error';
 
@@ -68,6 +69,11 @@ export function AuthCallbackScreen() {
     handleEmailVerification();
   }, [navigate]);
 
+  // Show loading screen while verifying
+  if (status === 'verifying') {
+    return <LoadingScreen />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -81,32 +87,19 @@ export function AuthCallbackScreen() {
         {/* Card */}
         <div className="mt-8 bg-white dark:bg-gray-800 py-8 px-4 shadow-xl sm:rounded-lg sm:px-10">
           <div className="flex flex-col items-center">
-            {/* Status Icon */}
-            {status === 'verifying' && (
-              <>
-                <Loader2 className="h-16 w-16 text-orange-600 dark:text-orange-400 animate-spin mb-4" />
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  {t('auth.verifying') || 'Verifying Email...'}
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
-                  {t('auth.pleaseWait') || 'Please wait while we verify your email address.'}
-                </p>
-              </>
-            )}
-
             {status === 'success' && (
               <>
                 <div className="rounded-full bg-green-100 dark:bg-green-900/50 p-3 mb-4">
-                  <CheckCircle className="h-16 w-16 text-green-600 dark:text-green-400" />
+                  <CheckCircleIcon className="h-16 w-16 text-green-600 dark:text-green-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  {t('auth.emailVerified') || 'Email Verified!'}
+                  {t('auth.emailVerified')}
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
-                  {t('auth.verificationSuccess') || 'Your email has been successfully verified.'}
+                  {t('auth.verificationSuccess')}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                  {t('auth.redirectingToLogin') || 'Redirecting to login...'}
+                  {t('auth.redirectingToLogin')}
                 </p>
               </>
             )}
@@ -114,22 +107,22 @@ export function AuthCallbackScreen() {
             {status === 'error' && (
               <>
                 <div className="rounded-full bg-red-100 dark:bg-red-900/50 p-3 mb-4">
-                  <AlertCircle className="h-16 w-16 text-red-600 dark:text-red-400" />
+                  <ExclamationCircleIcon className="h-16 w-16 text-red-600 dark:text-red-400" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                  {t('auth.verificationFailed') || 'Verification Failed'}
+                  {t('auth.verificationFailed')}
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-4">
-                  {errorMessage || t('auth.verificationError') || 'Failed to verify your email.'}
+                  {errorMessage || t('auth.verificationError')}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                  {t('auth.redirectingToLogin') || 'Redirecting to login...'}
+                  {t('auth.redirectingToLogin')}
                 </p>
                 <button
                   onClick={() => navigate('/login', { replace: true })}
                   className="mt-4 text-sm text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 font-medium"
                 >
-                  {t('auth.goToLogin') || 'Go to Login Now'}
+                  {t('auth.goToLogin')}
                 </button>
               </>
             )}

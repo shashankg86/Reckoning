@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Mail, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { EnvelopeIcon, ArrowPathIcon, CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
@@ -74,41 +74,41 @@ export function EmailVerificationScreen() {
           {/* Icon */}
           <div className="flex justify-center mb-6">
             <div className="rounded-full bg-orange-100 dark:bg-orange-900/50 p-3">
-              <Mail className="h-12 w-12 text-orange-600 dark:text-orange-400" />
+              <EnvelopeIcon className="h-12 w-12 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
 
           {/* Title */}
           <h2 className="text-center text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            {t('auth.verifyEmail') || 'Verify Your Email'}
+            {t('auth.verifyEmail')}
           </h2>
 
           {/* Description */}
           <div className="text-center space-y-3 mb-6">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {t('auth.verificationEmailSent') || 'We\'ve sent a verification email to:'}
+              {t('auth.verificationEmailSent')}
             </p>
             <p className="text-sm font-semibold text-gray-900 dark:text-white break-all px-4">
               {email}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {t('auth.clickLinkToVerify') || 'Please click the link in the email to verify your account.'}
+              {t('auth.clickLinkToVerify')}
             </p>
           </div>
 
           {/* Instructions */}
           <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 mb-6">
             <div className="flex items-start">
-              <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 mr-2 mt-0.5 flex-shrink-0" />
+              <ExclamationCircleIcon className="h-5 w-5 text-orange-600 dark:text-orange-400 mr-2 mt-0.5 flex-shrink-0" />
               <div className="text-sm text-orange-800 dark:text-orange-300 space-y-2">
                 <p className="font-medium">
-                  {t('auth.verificationSteps') || 'Next steps:'}
+                  {t('auth.verificationSteps')}
                 </p>
                 <ol className="list-decimal list-inside space-y-1 ml-2">
-                  <li>{t('auth.checkInbox') || 'Check your email inbox'}</li>
-                  <li>{t('auth.checkSpam') || 'Check spam/junk folder if not found'}</li>
-                  <li>{t('auth.clickVerificationLink') || 'Click the verification link'}</li>
-                  <li>{t('auth.returnToLogin') || 'Return here and login'}</li>
+                  <li>{t('auth.checkInbox')}</li>
+                  <li>{t('auth.checkSpam')}</li>
+                  <li>{t('auth.clickVerificationLink')}</li>
+                  <li>{t('auth.returnToLogin')}</li>
                 </ol>
               </div>
             </div>
@@ -123,18 +123,18 @@ export function EmailVerificationScreen() {
             >
               {isResending ? (
                 <>
-                  <RefreshCw className="animate-spin h-4 w-4 mr-2" />
-                  {t('auth.sending') || 'Sending...'}
+                  <ArrowPathIcon className="animate-spin h-4 w-4 mr-2" />
+                  {t('auth.sending')}
                 </>
               ) : resendCooldown > 0 ? (
                 <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  {t('auth.resendIn') || 'Resend in'} {resendCooldown}s
+                  <ArrowPathIcon className="h-4 w-4 mr-2" />
+                  {t('auth.resendIn')} {resendCooldown}s
                 </>
               ) : (
                 <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  {t('auth.resendEmail') || 'Resend Verification Email'}
+                  <ArrowPathIcon className="h-4 w-4 mr-2" />
+                  {t('auth.resendEmail')}
                 </>
               )}
             </button>
@@ -144,14 +144,14 @@ export function EmailVerificationScreen() {
               onClick={handleBackToLogin}
               className="w-full flex justify-center items-center py-2.5 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors"
             >
-              <CheckCircle className="h-4 w-4 mr-2" />
-              {t('auth.alreadyVerified') || 'Already Verified? Login'}
+              <CheckCircleIcon className="h-4 w-4 mr-2" />
+              {t('auth.alreadyVerified')}
             </button>
           </div>
 
           {/* Help Text */}
           <p className="mt-6 text-center text-xs text-gray-500 dark:text-gray-400">
-            {t('auth.verificationEmailHelp') || 'Email not received? Check your spam folder or contact support.'}
+            {t('auth.verificationEmailHelp')}
           </p>
         </div>
       </div>
