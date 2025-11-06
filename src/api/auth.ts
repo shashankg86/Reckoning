@@ -85,10 +85,7 @@ export const authAPI = {
             name,
             phone,
           },
-          // Note: emailRedirectTo requires URL to be whitelisted in Supabase Dashboard
-          // Go to: Authentication → URL Configuration → Add redirect URL
-          // Uncomment after adding http://localhost:5173/auth/callback to whitelist
-          // emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
