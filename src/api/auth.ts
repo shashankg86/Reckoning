@@ -85,6 +85,7 @@ export const authAPI = {
             name,
             phone,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
