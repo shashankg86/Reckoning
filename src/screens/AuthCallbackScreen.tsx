@@ -17,23 +17,35 @@ export function AuthCallbackScreen() {
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
+    // Parse URL parameters SYNCHRONOUSLY before any async operations
+    const queryParams = new URLSearchParams(window.location.search);
+    const code = queryParams.get('code');
+    const error = queryParams.get('error');
+    const errorCode = queryParams.get('error_code');
+
+    // CRITICAL: Check sessionStorage SYNCHRONOUSLY before starting async flow
+    const processedKey = `pkce_processed_${code}`;
+    if (code && sessionStorage.getItem(processedKey)) {
+      console.log('[AuthCallback] Code already processed, skipping exchange');
+      return; // Exit immediately, don't even start async flow
+    }
+
+    // Mark as processing IMMEDIATELY (synchronously) before any async operations
+    if (code) {
+      sessionStorage.setItem(processedKey, 'true');
+      console.log('[AuthCallback] Marked code as processing');
+    }
+
     let isMounted = true;
 
     const handleEmailVerification = async () => {
       try {
-        // Parse URL parameters once
-        const queryParams = new URLSearchParams(window.location.search);
-        const code = queryParams.get('code');
-        const error = queryParams.get('error');
-        const errorCode = queryParams.get('error_code');
-        const errorDescription = queryParams.get('error_description');
-
         // Check for errors first
         if (error) {
           if (errorCode === 'otp_expired') {
             throw new Error('Verification link has expired. Please request a new one.');
           }
-          throw new Error(errorDescription || error || 'Email verification failed');
+          throw new Error(queryParams.get('error_description') || error || 'Email verification failed');
         }
 
         // Check if code exists
@@ -45,20 +57,6 @@ export function AuthCallbackScreen() {
           if (!accessToken) {
             throw new Error('No verification code found. Please try clicking the link again.');
           }
-          // If we have access token in hash, session should already exist
-          // Just get it and proceed
-        }
-
-        // Prevent duplicate exchanges - check if this code was already processed
-        const processedKey = `pkce_processed_${code}`;
-        if (code && sessionStorage.getItem(processedKey)) {
-          console.log('[AuthCallback] Code already processed, fetching existing session');
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            // Session exists, proceed with profile creation
-            await createProfileAndRedirect(session);
-            return;
-          }
         }
 
         let session = null;
@@ -66,9 +64,6 @@ export function AuthCallbackScreen() {
         // Exchange PKCE code for session
         if (code) {
           console.log('[AuthCallback] Exchanging PKCE code for session');
-
-          // Mark as processed BEFORE the call
-          sessionStorage.setItem(processedKey, 'true');
 
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
