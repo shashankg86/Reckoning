@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
@@ -15,9 +15,16 @@ export function AuthCallbackScreen() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<VerificationStatus>('verifying');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const hasExchangedCode = useRef(false);
 
   useEffect(() => {
     const handleEmailVerification = async () => {
+      // Prevent multiple exchanges (React Strict Mode runs effects twice)
+      if (hasExchangedCode.current) {
+        console.log('[AuthCallback] Code already exchanged, skipping');
+        return;
+      }
+
       try {
         // Check for errors in query params first
         const queryParams = new URLSearchParams(window.location.search);
@@ -56,6 +63,10 @@ export function AuthCallbackScreen() {
         // Handle PKCE flow (code exchange)
         if (code) {
           console.log('[AuthCallback] PKCE flow detected - exchanging code for session');
+
+          // Mark as exchanging to prevent duplicate calls
+          hasExchangedCode.current = true;
+
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
           if (exchangeError) {
