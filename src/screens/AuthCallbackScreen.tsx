@@ -33,13 +33,17 @@ export function AuthCallbackScreen() {
           throw new Error(errorDescription || error || 'Email verification failed');
         }
 
-        // Get tokens from hash params (Supabase auth callback)
+        // Check for PKCE code in query params (modern Supabase flow)
+        const code = queryParams.get('code');
+
+        // Get tokens from hash params (legacy Supabase auth callback)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         const type = hashParams.get('type');
 
         console.log('[AuthCallback] URL params:', {
+          hasCode: !!code,
           hasAccessToken: !!accessToken,
           hasRefreshToken: !!refreshToken,
           type,
@@ -47,15 +51,32 @@ export function AuthCallbackScreen() {
           errorCode
         });
 
-        // Check if we have tokens
-        if (!accessToken && !refreshToken) {
-          throw new Error('No verification token found. Please try clicking the link again.');
+        let session = null;
+
+        // Handle PKCE flow (code exchange)
+        if (code) {
+          console.log('[AuthCallback] PKCE flow detected - exchanging code for session');
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+          if (exchangeError) {
+            console.error('[AuthCallback] Code exchange failed:', exchangeError);
+            throw new Error(`Failed to verify email: ${exchangeError.message}`);
+          }
+
+          session = data.session;
+          console.log('[AuthCallback] Code exchange successful, session created');
         }
+        // Handle legacy token flow (direct tokens in hash)
+        else if (accessToken || refreshToken) {
+          console.log('[AuthCallback] Legacy token flow detected');
+          const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
 
-        // Get the current session (Supabase auto-exchanges the token)
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (sessionError) throw sessionError;
+          if (sessionError) throw sessionError;
+          session = existingSession;
+        }
+        else {
+          throw new Error('No verification code or tokens found. Please try clicking the link again.');
+        }
 
         if (!session) {
           throw new Error('Failed to create session after verification');
