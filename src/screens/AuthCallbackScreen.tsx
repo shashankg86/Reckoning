@@ -19,18 +19,37 @@ export function AuthCallbackScreen() {
   useEffect(() => {
     const handleEmailVerification = async () => {
       try {
-        // Get the token from URL hash
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const type = hashParams.get('type');
+        // Check for errors in query params first
+        const queryParams = new URLSearchParams(window.location.search);
+        const error = queryParams.get('error');
+        const errorCode = queryParams.get('error_code');
+        const errorDescription = queryParams.get('error_description');
 
-        // Check if this is an email confirmation
-        if (type !== 'signup' && type !== 'email') {
-          throw new Error('Invalid verification type');
+        if (error) {
+          // Handle specific error cases
+          if (errorCode === 'otp_expired') {
+            throw new Error('Verification link has expired. Please request a new one.');
+          }
+          throw new Error(errorDescription || error || 'Email verification failed');
         }
 
-        if (!accessToken) {
-          throw new Error('No verification token found');
+        // Get tokens from hash params (Supabase auth callback)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
+
+        console.log('[AuthCallback] URL params:', {
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+          type,
+          error,
+          errorCode
+        });
+
+        // Check if we have tokens
+        if (!accessToken && !refreshToken) {
+          throw new Error('No verification token found. Please try clicking the link again.');
         }
 
         // Get the current session (Supabase auto-exchanges the token)
@@ -80,12 +99,12 @@ export function AuthCallbackScreen() {
         }, 1500);
 
       } catch (error: any) {
-        console.error('Email verification error:', error);
+        console.error('[AuthCallback] Email verification error:', error);
         setStatus('error');
         setErrorMessage(error.message || 'Failed to verify email');
         toast.error(error.message || 'Email verification failed');
 
-        // Redirect to signup after 3 seconds on error
+        // Redirect to signup page where they can try again
         setTimeout(() => {
           navigate('/signup', { replace: true });
         }, 3000);
