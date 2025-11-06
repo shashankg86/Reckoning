@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
@@ -15,136 +15,148 @@ export function AuthCallbackScreen() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<VerificationStatus>('verifying');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const hasExchangedCode = useRef(false);
 
   useEffect(() => {
-    const handleEmailVerification = async () => {
-      // Prevent multiple exchanges (React Strict Mode runs effects twice)
-      if (hasExchangedCode.current) {
-        console.log('[AuthCallback] Code already exchanged, skipping');
-        return;
-      }
+    let isMounted = true;
 
+    const handleEmailVerification = async () => {
       try {
-        // Check for errors in query params first
+        // Parse URL parameters once
         const queryParams = new URLSearchParams(window.location.search);
+        const code = queryParams.get('code');
         const error = queryParams.get('error');
         const errorCode = queryParams.get('error_code');
         const errorDescription = queryParams.get('error_description');
 
+        // Check for errors first
         if (error) {
-          // Handle specific error cases
           if (errorCode === 'otp_expired') {
             throw new Error('Verification link has expired. Please request a new one.');
           }
           throw new Error(errorDescription || error || 'Email verification failed');
         }
 
-        // Check for PKCE code in query params (modern Supabase flow)
-        const code = queryParams.get('code');
+        // Check if code exists
+        if (!code) {
+          // Check hash params as fallback
+          const hashParams = new URLSearchParams(window.location.hash.substring(1));
+          const accessToken = hashParams.get('access_token');
 
-        // Get tokens from hash params (legacy Supabase auth callback)
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = hashParams.get('access_token');
-        const refreshToken = hashParams.get('refresh_token');
-        const type = hashParams.get('type');
+          if (!accessToken) {
+            throw new Error('No verification code found. Please try clicking the link again.');
+          }
+          // If we have access token in hash, session should already exist
+          // Just get it and proceed
+        }
 
-        console.log('[AuthCallback] URL params:', {
-          hasCode: !!code,
-          hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken,
-          type,
-          error,
-          errorCode
-        });
+        // Prevent duplicate exchanges - check if this code was already processed
+        const processedKey = `pkce_processed_${code}`;
+        if (code && sessionStorage.getItem(processedKey)) {
+          console.log('[AuthCallback] Code already processed, fetching existing session');
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            // Session exists, proceed with profile creation
+            await createProfileAndRedirect(session);
+            return;
+          }
+        }
 
         let session = null;
 
-        // Handle PKCE flow (code exchange)
+        // Exchange PKCE code for session
         if (code) {
-          console.log('[AuthCallback] PKCE flow detected - exchanging code for session');
+          console.log('[AuthCallback] Exchanging PKCE code for session');
 
-          // Mark as exchanging to prevent duplicate calls
-          hasExchangedCode.current = true;
+          // Mark as processed BEFORE the call
+          sessionStorage.setItem(processedKey, 'true');
 
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
           if (exchangeError) {
+            // Clear the flag if exchange failed
+            sessionStorage.removeItem(processedKey);
             console.error('[AuthCallback] Code exchange failed:', exchangeError);
             throw new Error(`Failed to verify email: ${exchangeError.message}`);
           }
 
-          session = data.session;
-          console.log('[AuthCallback] Code exchange successful, session created');
-        }
-        // Handle legacy token flow (direct tokens in hash)
-        else if (accessToken || refreshToken) {
-          console.log('[AuthCallback] Legacy token flow detected');
-          const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
+          if (!isMounted) return;
 
+          session = data.session;
+          console.log('[AuthCallback] Code exchange successful');
+        } else {
+          // Fallback: get existing session
+          const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
           if (sessionError) throw sessionError;
           session = existingSession;
-        }
-        else {
-          throw new Error('No verification code or tokens found. Please try clicking the link again.');
         }
 
         if (!session) {
           throw new Error('Failed to create session after verification');
         }
 
-        // CRITICAL: Ensure profile exists after email verification
-        const user = session.user;
+        if (!isMounted) return;
 
-        // Verify email is confirmed
-        if (!user.email_confirmed_at) {
-          throw new Error('Email not verified');
-        }
-
-        const name = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
-        const phone = user.user_metadata?.phone || '';
-
-        console.log('[AuthCallback] User metadata:', user.user_metadata);
-        console.log('[AuthCallback] Creating profile for verified user:', {
-          userId: user.id,
-          email: user.email,
-          name: name,
-          phone: phone,
-          emailVerified: true
-        });
-
-        try {
-          await authAPI.ensureProfile(user.id, user.email, name, phone);
-          console.log('[AuthCallback] Profile created successfully');
-        } catch (profileError: any) {
-          console.error('[AuthCallback] FAILED to create profile:', profileError);
-          throw new Error(`Profile creation failed: ${profileError.message}. Please contact support.`);
-        }
-
-        // Email verified successfully!
-        setStatus('success');
-        toast.success('Email verified! Redirecting to onboarding...');
-
-        // Redirect directly to onboarding since user is already authenticated
-        setTimeout(() => {
-          navigate('/onboarding', { replace: true });
-        }, 1500);
+        await createProfileAndRedirect(session);
 
       } catch (error: any) {
+        if (!isMounted) return;
+
         console.error('[AuthCallback] Email verification error:', error);
         setStatus('error');
         setErrorMessage(error.message || 'Failed to verify email');
         toast.error(error.message || 'Email verification failed');
 
-        // Redirect to signup page where they can try again
         setTimeout(() => {
-          navigate('/signup', { replace: true });
+          if (isMounted) {
+            navigate('/signup', { replace: true });
+          }
         }, 3000);
       }
     };
 
+    const createProfileAndRedirect = async (session: any) => {
+      const user = session.user;
+
+      // Verify email is confirmed
+      if (!user.email_confirmed_at) {
+        throw new Error('Email not verified');
+      }
+
+      const name = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
+      const phone = user.user_metadata?.phone || '';
+
+      console.log('[AuthCallback] Creating profile for verified user:', {
+        userId: user.id,
+        email: user.email,
+        emailVerified: true
+      });
+
+      try {
+        await authAPI.ensureProfile(user.id, user.email, name, phone);
+        console.log('[AuthCallback] Profile created successfully');
+      } catch (profileError: any) {
+        console.error('[AuthCallback] Profile creation failed:', profileError);
+        throw new Error(`Profile creation failed: ${profileError.message}. Please contact support.`);
+      }
+
+      if (!isMounted) return;
+
+      setStatus('success');
+      toast.success('Email verified! Redirecting to onboarding...');
+
+      setTimeout(() => {
+        if (isMounted) {
+          navigate('/onboarding', { replace: true });
+        }
+      }, 1500);
+    };
+
     handleEmailVerification();
-  }, [navigate]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate, t]);
 
   // Show loading screen while verifying
   if (status === 'verifying') {
