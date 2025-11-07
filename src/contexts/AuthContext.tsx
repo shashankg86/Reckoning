@@ -4,6 +4,7 @@ import { authAPI } from '../api/auth';
 import { storesAPI } from '../api/stores';
 import { onboardingAPI } from '../api/onboardingProgress';
 import toast from 'react-hot-toast';
+import i18n from '../lib/i18n';
 import type { User, Store } from '../types';
 
 interface AuthState {
@@ -101,6 +102,74 @@ async function probeOnboarded(userId: string): Promise<boolean> {
   }
 }
 
+// Probe onboarded status with timeout protection
+async function probeOnboardedWithTimeout(userId: string, timeoutMs: number = 3000): Promise<boolean> {
+  try {
+    const probePromise = probeOnboarded(userId);
+    const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs));
+    return await Promise.race([probePromise, timeoutPromise]);
+  } catch (err) {
+    console.error('[AuthContext] Onboarding probe failed:', err);
+    return false;
+  }
+}
+
+// Validate Google OAuth for duplicate accounts
+async function validateGoogleOAuth(uid: string, email: string | null | undefined): Promise<{ isValid: boolean; errorMsg?: string }> {
+  if (!email) return { isValid: true };
+
+  try {
+    const emailExists = await authAPI.checkEmailExists(email);
+    if (!emailExists) return { isValid: true };
+
+    // Check if existing profile belongs to different user
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id, auth_provider')
+      .eq('email', email.toLowerCase())
+      .maybeSingle();
+
+    if (existingProfile && existingProfile.id !== uid) {
+      const providerName = existingProfile.auth_provider === 'email' ? 'email/password' : existingProfile.auth_provider;
+      return {
+        isValid: false,
+        errorMsg: `This email is already registered with ${providerName}. Please sign in using ${providerName} instead.`
+      };
+    }
+
+    return { isValid: true };
+  } catch (err) {
+    console.error('[AuthContext] OAuth validation error:', err);
+    return { isValid: true }; // Allow on validation error
+  }
+}
+
+// Ensure OAuth profile exists
+async function ensureOAuthProfile(session: any): Promise<boolean> {
+  try {
+    const uid = session.user.id;
+    const email = session.user.email;
+
+    // Validate for duplicates
+    const validation = await validateGoogleOAuth(uid, email);
+    if (!validation.isValid) {
+      console.error('OAuth validation failed:', validation.errorMsg);
+      await authAPI.logout();
+      toast.error(validation.errorMsg!); // Error message already user-friendly from validateGoogleOAuth
+      return false;
+    }
+
+    // Create profile
+    const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
+    const phone = session.user.user_metadata?.phone || '';
+    await authAPI.ensureProfile(uid, email, name, phone);
+    return true;
+  } catch (err) {
+    console.error('[AuthContext] Failed to ensure OAuth profile:', err);
+    return false;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const lastUserIdRef = useRef<string | null>(null);
@@ -115,52 +184,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     lastProfileLoadAtRef.current = now;
 
-    const startsAt = Date.now();
-    let attempt = 0;
-    const maxMs = 40_000;
-
-    while (Date.now() - startsAt < maxMs) {
-      attempt++;
-
+    try {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
 
-      if (!error && profile) {
-        const stores = await storesAPI.getUserStores();
-        const userStore = stores && stores.length > 0 ? stores[0] : undefined;
-        const user: User = {
-          uid: profile.id,
-          email: profile.email,
-          name: profile.name,
-          phone: profile.phone,
-          photoURL: profile.photo_url,
-          isOnboarded: !!userStore,
-          store: userStore,
-          createdAt: new Date(profile.created_at),
-          lastLoginAt: new Date(profile.last_login_at),
-        } as any;
-        dispatch({ type: 'SET_USER', payload: user });
+      if (error) {
+        console.error('[AuthContext] Error loading profile:', error);
+        dispatch({ type: 'SET_LOADING', payload: false });
         return;
       }
 
-      const delay = Math.min(300 * 2 ** attempt, 3000);
-      await new Promise((r) => setTimeout(r, delay));
-    }
+      if (!profile) {
+        // Profile doesn't exist - this shouldn't happen if signup worked properly
+        console.error('[AuthContext] Profile not found for authenticated user:', userId);
+        toast.error(i18n.t('auth.messages.profileNotFound'));
+        await authAPI.logout();
+        dispatch({ type: 'LOGOUT' });
+        return;
+      }
 
-    // CRITICAL: If profile not found after retries, logout user
-    console.error('Profile not found after retries for user:', userId);
-    toast.error('Account profile not found. Please sign up first.');
+      // Load user stores
+      const stores = await storesAPI.getUserStores();
+      const userStore = stores && stores.length > 0 ? stores[0] : undefined;
 
-    try {
-      await authAPI.logout();
+      const user: User = {
+        uid: profile.id,
+        email: profile.email,
+        name: profile.name,
+        phone: profile.phone,
+        photoURL: profile.photo_url,
+        isOnboarded: !!userStore,
+        store: userStore,
+        createdAt: new Date(profile.created_at),
+        lastLoginAt: new Date(profile.last_login_at),
+      } as any;
+
+      dispatch({ type: 'SET_USER', payload: user });
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error('[AuthContext] Error in loadUserProfile:', err);
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
-
-    dispatch({ type: 'LOGOUT' });
   };
 
   useEffect(() => {
@@ -174,171 +240,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const uid = session.user.id;
+        const email = session.user.email ?? null;
         lastUserIdRef.current = uid;
 
-        // Set provisional auth
-        dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session.user.email ?? null } });
+        dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
-        // Ensure profile exists for OAuth users (Google, etc.)
+        // Handle OAuth profile creation and validation
         if (session.user.app_metadata.provider === 'google') {
-          try {
-            const userEmail = session.user.email;
-
-            // CRITICAL: Check if email already exists with a different user ID (duplicate account prevention)
-            if (userEmail) {
-              const emailExists = await authAPI.checkEmailExists(userEmail);
-              if (emailExists) {
-                // Check if the existing profile belongs to a different user
-                const { data: existingProfile } = await supabase
-                  .from('profiles')
-                  .select('id, auth_provider')
-                  .eq('email', userEmail.toLowerCase())
-                  .maybeSingle();
-
-                if (existingProfile && existingProfile.id !== uid) {
-                  // Email belongs to a different account - DUPLICATE DETECTED!
-                  console.error(`Duplicate account: ${userEmail} already registered with ${existingProfile.auth_provider}`);
-
-                  // Logout the Google user immediately
-                  await authAPI.logout();
-                  lastUserIdRef.current = null;
-                  dispatch({ type: 'LOGOUT' });
-                  dispatch({ type: 'SET_LOADING', payload: false });
-
-                  // Show error message
-                  const providerName = existingProfile.auth_provider === 'email' ? 'email/password' : existingProfile.auth_provider;
-                  const errorMsg = `This email is already registered with ${providerName}. Please sign in using ${providerName} instead.`;
-                  dispatch({ type: 'SET_ERROR', payload: errorMsg });
-                  toast.error(errorMsg);
-
-                  return; // STOP - Do not continue initialization
-                }
-              }
-            }
-
-            // No duplicate found - proceed with profile creation
-            const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
-            const phone = session.user.user_metadata?.phone || '';
-            await authAPI.ensureProfile(uid, session.user.email, name, phone);
-          } catch (err) {
-            console.error('Failed to ensure OAuth profile:', err);
+          const success = await ensureOAuthProfile(session);
+          if (!success) {
+            lastUserIdRef.current = null;
+            dispatch({ type: 'LOGOUT' });
+            dispatch({ type: 'SET_LOADING', payload: false });
+            return;
           }
         }
 
-        // Fast membership probe for routing (with timeout protection)
-        let onboarded = false;
-        try {
-          const probePromise = probeOnboarded(uid);
-          const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
-          onboarded = await Promise.race([probePromise, timeoutPromise]);
-        } catch (err) {
-          console.error('Onboarding probe failed:', err);
-        }
-
-        // CRITICAL: Always clear loading state to prevent infinite loader
+        // Probe onboarding status with timeout protection
+        const onboarded = await probeOnboardedWithTimeout(uid);
         dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
-        // Load full profile in background (non-blocking)
-        loadUserProfile(uid, session.user.email ?? null, { force: true });
+        // Load full profile in background
+        loadUserProfile(uid, email, { force: true });
       } catch (err) {
-        console.error('Init error:', err);
+        console.error('[AuthContext] Init error:', err);
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
 
-    // Safety timeout: Force clear loading after 5 seconds to prevent infinite loader
-    const safetyTimeout = setTimeout(() => {
-      console.warn('Safety timeout: Forcing loading state to false');
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }, 5000);
-
-    init().finally(() => {
-      clearTimeout(safetyTimeout);
-    });
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const uid = session?.user?.id ?? null;
+      const email = session?.user?.email ?? null;
 
-      if (event === 'SIGNED_IN' && uid) {
-        if (lastUserIdRef.current !== uid) {
-          // For email/password users: Skip handling here - the login() function handles validation
-          // This prevents race condition where SIGNED_IN fires before login() completes
-          if (session!.user!.app_metadata.provider === 'email') {
+      if (event === 'SIGNED_IN' && uid && lastUserIdRef.current !== uid) {
+        // Skip email/password users - login() handles them
+        if (session!.user!.app_metadata.provider === 'email') return;
+
+        lastUserIdRef.current = uid;
+        dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
+
+        // Handle OAuth profile creation
+        if (session!.user!.app_metadata.provider === 'google') {
+          const success = await ensureOAuthProfile(session!);
+          if (!success) {
+            lastUserIdRef.current = null;
+            dispatch({ type: 'LOGOUT' });
             return;
           }
-
-          lastUserIdRef.current = uid;
-          dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session!.user!.email ?? null } });
-
-          // Ensure profile exists for OAuth users
-          if (session!.user!.app_metadata.provider === 'google') {
-            try {
-              const userEmail = session!.user!.email;
-
-              // Check if email already exists with a different user ID
-              if (userEmail) {
-                const emailExists = await authAPI.checkEmailExists(userEmail);
-                if (emailExists) {
-                  // Check if the existing profile belongs to a different user
-                  const { data: existingProfile } = await supabase
-                    .from('profiles')
-                    .select('id, auth_provider')
-                    .eq('email', userEmail.toLowerCase())
-                    .maybeSingle();
-
-                  if (existingProfile && existingProfile.id !== uid) {
-                    // Email belongs to a different account
-                    console.error(`Duplicate account: ${userEmail} already registered with ${existingProfile.auth_provider}`);
-
-                    // Logout the user immediately
-                    await authAPI.logout();
-                    lastUserIdRef.current = null;
-                    dispatch({ type: 'LOGOUT' });
-
-                    // Show error message
-                    const providerName = existingProfile.auth_provider === 'email' ? 'email/password' : existingProfile.auth_provider;
-                    const errorMsg = `This email is already registered with ${providerName}. Please sign in using ${providerName} instead.`;
-                    dispatch({ type: 'SET_ERROR', payload: errorMsg });
-                    toast.error(errorMsg);
-
-                    return;
-                  }
-                }
-              }
-
-              // No duplicate found - proceed with profile creation
-              const name = session!.user!.user_metadata?.full_name || session!.user!.email?.split('@')[0];
-              const phone = session!.user!.user_metadata?.phone || '';
-              await authAPI.ensureProfile(uid, session!.user!.email, name, phone);
-            } catch (err) {
-              console.error('Failed to ensure OAuth profile on SIGNED_IN:', err);
-            }
-          }
-
-          // Fast membership probe (with timeout protection)
-          let onboarded = false;
-          try {
-            const probePromise = probeOnboarded(uid);
-            const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
-            onboarded = await Promise.race([probePromise, timeoutPromise]);
-          } catch (err) {
-            console.error('Onboarding probe failed on SIGNED_IN:', err);
-          }
-
-          dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
-
-          loadUserProfile(uid, session!.user!.email ?? null, { force: true });
         }
-        return;
-      }
 
-      if (event === 'TOKEN_REFRESHED') {
-        return;
+        // Probe onboarding and load profile
+        const onboarded = await probeOnboardedWithTimeout(uid);
+        dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
+        loadUserProfile(uid, email, { force: true });
       }
 
       if (event === 'USER_UPDATED' && uid) {
-        loadUserProfile(uid, session!.user!.email ?? null, { force: true });
-        return;
+        loadUserProfile(uid, email, { force: true });
       }
 
       if (event === 'SIGNED_OUT') {
@@ -361,29 +321,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
 
-      // Fast membership probe with timeout
-      let onboarded = false;
-      try {
-        const probePromise = probeOnboarded(user.id);
-        const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000));
-        onboarded = await Promise.race([probePromise, timeoutPromise]);
-      } catch (err) {
-        console.error('Onboarding probe failed during login:', err);
-      }
-
+      // Probe onboarding status
+      const onboarded = await probeOnboardedWithTimeout(user.id);
       dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
-      // Simple success toast (no API calls, no complexity)
-      toast.success('Login successful!');
+      toast.success(i18n.t('auth.messages.loginSuccess'));
 
-      // Load profile in background without blocking
+      // Load profile in background
       loadUserProfile(user.id, user.email ?? null, { force: true });
 
       return true;
     } catch (error: any) {
-      console.error('Login error:', error);
-      dispatch({ type: 'SET_ERROR', payload: error.message || 'Login failed. Please try again.' });
-      toast.error(error.message || 'Login failed. Please try again.');
+      console.error('[AuthContext] Login error:', error);
+      const errorMsg = error.message || i18n.t('auth.messages.loginFailed');
+      dispatch({ type: 'SET_ERROR', payload: errorMsg });
+      toast.error(errorMsg);
       return false;
     }
   };
@@ -406,9 +358,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
       dispatch({ type: 'SET_ONBOARDED', payload: false });
       loadUserProfile(user.id, user.email ?? null, { force: true });
-      toast.success('Account created successfully! Welcome!');
+      toast.success(i18n.t('auth.messages.accountCreated'));
     } catch (error: any) {
-      const errorMessage = error.message || 'Registration failed. Please try again.';
+      console.error('[AuthContext] Registration error:', error);
+      const errorMessage = error.message || i18n.t('auth.messages.loginFailed');
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error; // Re-throw so SignupScreen can handle it
     }
@@ -420,9 +373,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       lastUserIdRef.current = null;
       lastProfileLoadAtRef.current = 0;
       dispatch({ type: 'LOGOUT' });
-      toast.success('Logged out successfully');
-    } catch {
-      dispatch({ type: 'SET_ERROR', payload: 'Logout failed. Please try again.' });
+      toast.success(i18n.t('auth.messages.logoutSuccess'));
+    } catch (error) {
+      console.error('[AuthContext] Logout error:', error);
+      dispatch({ type: 'SET_ERROR', payload: i18n.t('auth.messages.loginFailed') });
     }
   };
 
@@ -430,9 +384,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'CLEAR_ERROR' });
       await authAPI.resetPassword(email);
-      toast.success('Password reset email sent!');
+      toast.success(i18n.t('auth.messages.passwordResetSent'));
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message || 'Failed to send reset email. Please try again.' });
+      console.error('[AuthContext] Reset password error:', error);
+      dispatch({ type: 'SET_ERROR', payload: error.message || i18n.t('auth.messages.loginFailed') });
     }
   };
 
@@ -457,9 +412,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Background refresh
       loadUserProfile(state.user.uid, state.user.email ?? null, { force: true });
 
-      toast.success('Store setup completed!');
-    } catch {
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to complete setup. Please try again.' });
+      toast.success(i18n.t('auth.messages.setupComplete'));
+    } catch (error) {
+      console.error('[AuthContext] Complete onboarding error:', error);
+      dispatch({ type: 'SET_ERROR', payload: i18n.t('auth.messages.accountError') });
       throw new Error('onboarding_failed');
     }
   };
@@ -469,9 +425,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!state.user || !state.user.store) throw new Error('No authenticated user or store');
       await storesAPI.updateStore((state.user.store as any).id, updates);
       await loadUserProfile(state.user.uid, state.user.email ?? null, { force: true });
-      toast.success('Settings updated successfully!');
-    } catch {
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to update settings. Please try again.' });
+      toast.success(i18n.t('auth.messages.settingsUpdated'));
+    } catch (error) {
+      console.error('[AuthContext] Update store settings error:', error);
+      dispatch({ type: 'SET_ERROR', payload: i18n.t('auth.messages.accountError') });
     }
   };
 

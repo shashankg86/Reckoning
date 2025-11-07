@@ -69,7 +69,19 @@
     "orContinueWith": "Or continue with",
     "continueWithGoogle": "Continue with Google",
     "devMode": "🔧 Dev Mode",
-    "sms": "SMS"
+    "sms": "SMS",
+    "messages": {
+      "loginSuccess": "Login successful",
+      "loginFailed": "Login failed. Please try again",
+      "accountCreated": "Account created successfully",
+      "logoutSuccess": "Logged out successfully",
+      "passwordResetSent": "Password reset email sent",
+      "profileNotFound": "Account not found. Please sign up",
+      "accountError": "Unable to access account. Please try again",
+      "setupComplete": "Store setup completed",
+      "settingsUpdated": "Settings updated successfully",
+      "sessionExpired": "Session expired. Please sign in again"
+    }
   },
   "onboarding": {
     "welcome": "Welcome to Universal POS",
