@@ -147,7 +147,7 @@ export function AuthCallbackScreen() {
     return () => {
       isMounted = false;
     };
-  }, [navigate, t]);
+  }, []); // Empty deps - run once on mount to handle auth callback
 
   if (status === 'verifying') {
     return <LoadingScreen />;
