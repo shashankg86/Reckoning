@@ -4,6 +4,7 @@ import { authAPI } from '../api/auth';
 import { storesAPI } from '../api/stores';
 import { onboardingAPI } from '../api/onboardingProgress';
 import toast from 'react-hot-toast';
+import i18n from '../lib/i18n';
 import type { User, Store } from '../types';
 
 interface AuthState {
@@ -108,7 +109,7 @@ async function probeOnboardedWithTimeout(userId: string, timeoutMs: number = 300
     const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs));
     return await Promise.race([probePromise, timeoutPromise]);
   } catch (err) {
-    console.error('Onboarding probe failed:', err);
+    console.error('[AuthContext] Onboarding probe failed:', err);
     return false;
   }
 }
@@ -138,7 +139,7 @@ async function validateGoogleOAuth(uid: string, email: string | null | undefined
 
     return { isValid: true };
   } catch (err) {
-    console.error('OAuth validation error:', err);
+    console.error('[AuthContext] OAuth validation error:', err);
     return { isValid: true }; // Allow on validation error
   }
 }
@@ -152,8 +153,9 @@ async function ensureOAuthProfile(session: any): Promise<boolean> {
     // Validate for duplicates
     const validation = await validateGoogleOAuth(uid, email);
     if (!validation.isValid) {
+      console.error('OAuth validation failed:', validation.errorMsg);
       await authAPI.logout();
-      toast.error(validation.errorMsg!);
+      toast.error(validation.errorMsg!); // Error message already user-friendly from validateGoogleOAuth
       return false;
     }
 
@@ -163,7 +165,7 @@ async function ensureOAuthProfile(session: any): Promise<boolean> {
     await authAPI.ensureProfile(uid, email, name, phone);
     return true;
   } catch (err) {
-    console.error('Failed to ensure OAuth profile:', err);
+    console.error('[AuthContext] Failed to ensure OAuth profile:', err);
     return false;
   }
 }
@@ -190,15 +192,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .maybeSingle();
 
       if (error) {
-        console.error('Error loading profile:', error);
+        console.error('[AuthContext] Error loading profile:', error);
         dispatch({ type: 'SET_LOADING', payload: false });
         return;
       }
 
       if (!profile) {
         // Profile doesn't exist - this shouldn't happen if signup worked properly
-        console.error('Profile not found for user:', userId);
-        toast.error('Account profile not found. Please sign up first.');
+        console.error('[AuthContext] Profile not found for authenticated user:', userId);
+        toast.error(i18n.t('auth.messages.profileNotFound'));
         await authAPI.logout();
         dispatch({ type: 'LOGOUT' });
         return;
@@ -222,7 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       dispatch({ type: 'SET_USER', payload: user });
     } catch (err) {
-      console.error('Error in loadUserProfile:', err);
+      console.error('[AuthContext] Error in loadUserProfile:', err);
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
@@ -261,7 +263,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Load full profile in background
         loadUserProfile(uid, email, { force: true });
       } catch (err) {
-        console.error('Init error:', err);
+        console.error('[AuthContext] Init error:', err);
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
@@ -323,16 +325,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const onboarded = await probeOnboardedWithTimeout(user.id);
       dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
-      toast.success('Login successful!');
+      toast.success(i18n.t('auth.messages.loginSuccess'));
 
       // Load profile in background
       loadUserProfile(user.id, user.email ?? null, { force: true });
 
       return true;
     } catch (error: any) {
-      console.error('Login error:', error);
-      dispatch({ type: 'SET_ERROR', payload: error.message || 'Login failed. Please try again.' });
-      toast.error(error.message || 'Login failed. Please try again.');
+      console.error('[AuthContext] Login error:', error);
+      const errorMsg = error.message || i18n.t('auth.messages.loginFailed');
+      dispatch({ type: 'SET_ERROR', payload: errorMsg });
+      toast.error(errorMsg);
       return false;
     }
   };
@@ -355,9 +358,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
       dispatch({ type: 'SET_ONBOARDED', payload: false });
       loadUserProfile(user.id, user.email ?? null, { force: true });
-      toast.success('Account created successfully! Welcome!');
+      toast.success(i18n.t('auth.messages.accountCreated'));
     } catch (error: any) {
-      const errorMessage = error.message || 'Registration failed. Please try again.';
+      console.error('[AuthContext] Registration error:', error);
+      const errorMessage = error.message || i18n.t('auth.messages.loginFailed');
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       throw error; // Re-throw so SignupScreen can handle it
     }
@@ -369,9 +373,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       lastUserIdRef.current = null;
       lastProfileLoadAtRef.current = 0;
       dispatch({ type: 'LOGOUT' });
-      toast.success('Logged out successfully');
-    } catch {
-      dispatch({ type: 'SET_ERROR', payload: 'Logout failed. Please try again.' });
+      toast.success(i18n.t('auth.messages.logoutSuccess'));
+    } catch (error) {
+      console.error('[AuthContext] Logout error:', error);
+      dispatch({ type: 'SET_ERROR', payload: i18n.t('auth.messages.loginFailed') });
     }
   };
 
@@ -379,9 +384,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'CLEAR_ERROR' });
       await authAPI.resetPassword(email);
-      toast.success('Password reset email sent!');
+      toast.success(i18n.t('auth.messages.passwordResetSent'));
     } catch (error: any) {
-      dispatch({ type: 'SET_ERROR', payload: error.message || 'Failed to send reset email. Please try again.' });
+      console.error('[AuthContext] Reset password error:', error);
+      dispatch({ type: 'SET_ERROR', payload: error.message || i18n.t('auth.messages.loginFailed') });
     }
   };
 
@@ -406,9 +412,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Background refresh
       loadUserProfile(state.user.uid, state.user.email ?? null, { force: true });
 
-      toast.success('Store setup completed!');
-    } catch {
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to complete setup. Please try again.' });
+      toast.success(i18n.t('auth.messages.setupComplete'));
+    } catch (error) {
+      console.error('[AuthContext] Complete onboarding error:', error);
+      dispatch({ type: 'SET_ERROR', payload: i18n.t('auth.messages.accountError') });
       throw new Error('onboarding_failed');
     }
   };
@@ -418,9 +425,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!state.user || !state.user.store) throw new Error('No authenticated user or store');
       await storesAPI.updateStore((state.user.store as any).id, updates);
       await loadUserProfile(state.user.uid, state.user.email ?? null, { force: true });
-      toast.success('Settings updated successfully!');
-    } catch {
-      dispatch({ type: 'SET_ERROR', payload: 'Failed to update settings. Please try again.' });
+      toast.success(i18n.t('auth.messages.settingsUpdated'));
+    } catch (error) {
+      console.error('[AuthContext] Update store settings error:', error);
+      dispatch({ type: 'SET_ERROR', payload: i18n.t('auth.messages.accountError') });
     }
   };
 
