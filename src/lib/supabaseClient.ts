@@ -23,8 +23,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // Detect session from URL (OAuth redirects)
     detectSessionInUrl: true,
 
-    // Use implicit flow for email verification (PKCE causes issues with email links)
-    flowType: 'implicit',
+    // Use PKCE flow for enhanced OAuth security
+    flowType: 'pkce',
 
     // Custom storage key
     storageKey: 'sb-auth-token',
