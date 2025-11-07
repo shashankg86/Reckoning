@@ -10,6 +10,9 @@ import { LoadingScreen } from '../components/ui/Loader';
 
 type VerificationStatus = 'verifying' | 'success' | 'error';
 
+// Module-level abort signal for concurrent safety
+let abortController: AbortController | null = null;
+
 export function AuthCallbackScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -17,29 +20,30 @@ export function AuthCallbackScreen() {
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
+    if (abortController) abortController.abort();
+    abortController = new AbortController();
+    const signal = abortController.signal;
+
     const queryParams = new URLSearchParams(window.location.search);
     const code = queryParams.get('code');
     const error = queryParams.get('error');
     const completedKey = code ? `pkce_code_${code}_completed` : null;
     const processingKey = code ? `pkce_code_${code}_processing` : null;
 
-    // CRITICAL: Strictly set and clear flags to avoid race with context event listeners
     if (code) {
-      if (sessionStorage.getItem(completedKey!)) {
-        console.log('[AuthCallback] Code already completed, skipping');
-        return;
-      }
-      if (sessionStorage.getItem(processingKey!)) {
-        console.log('[AuthCallback] Code currently being processed, skipping');
-        return;
-      }
-      // Set BOTH flags as soon as possible
+      if (sessionStorage.getItem(completedKey!)) return;
+      if (sessionStorage.getItem(processingKey!)) return;
       sessionStorage.setItem(processingKey!, 'true');
       sessionStorage.setItem('email_verification_in_progress', 'true');
-      console.log('[AuthCallback] Set in-progress/processing flags at effect start');
     }
 
     let isMounted = true;
+
+    const safeSetState = <T extends (...args: any[]) => void>(fn: T) =>
+      (...args: Parameters<T>) => {
+        if (!isMounted || signal.aborted) return;
+        fn(...args);
+      };
 
     const handleAuthCallback = async () => {
       try {
@@ -50,14 +54,11 @@ export function AuthCallbackScreen() {
         }
 
         let session = null;
-
         if (code) {
-          // Check for existing session (remount after code exchange)
           const { data: { session: existingSession } } = await supabase.auth.getSession();
           if (existingSession) {
             session = existingSession;
           } else {
-            // PKCE exchange
             const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
             if (exchangeError) {
               sessionStorage.removeItem(processingKey!);
@@ -76,17 +77,19 @@ export function AuthCallbackScreen() {
           if (sessionError || !existingSession) throw new Error('No authentication code found and no active session');
           session = existingSession;
         }
-
-        if (!isMounted) return;
+        if (!isMounted || signal.aborted) return;
         await handleSuccessfulAuth(session);
       } catch (error: any) {
-        if (!isMounted) return;
+        if (!isMounted || signal.aborted) return;
         if (processingKey) sessionStorage.removeItem(processingKey);
         sessionStorage.removeItem('email_verification_in_progress');
-        setStatus('error');
-        setErrorMessage(error.message || 'Authentication failed');
+        safeSetState(setStatus)('error');
+        safeSetState(setErrorMessage)(error.message || 'Authentication failed');
         toast.error(error.message || 'Authentication failed');
-        setTimeout(() => { if (isMounted) navigate('/signup', { replace: true }); }, 3000);
+        setTimeout(() => {
+          if (!isMounted || signal.aborted) return;
+          navigate('/signup', { replace: true });
+        }, 3000);
       }
     };
 
@@ -101,13 +104,19 @@ export function AuthCallbackScreen() {
         sessionStorage.removeItem(processingKey!);
       }
       sessionStorage.removeItem('email_verification_in_progress');
-      setStatus('success');
+      safeSetState(setStatus)('success');
       toast.success('Email verified! Redirecting to onboarding...');
-      setTimeout(() => { if (isMounted) navigate('/onboarding', { replace: true }); }, 1500);
+      setTimeout(() => {
+        if (!isMounted || signal.aborted) return;
+        navigate('/onboarding', { replace: true });
+      }, 1500);
     };
 
     handleAuthCallback();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+      abortController?.abort();
+    };
   }, []);
 
   if (status === 'verifying') return <LoadingScreen />;
