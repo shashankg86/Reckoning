@@ -301,17 +301,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        console.log('[AuthContext] New SIGNED_IN event for user:', uid, 'Provider:', session!.user!.app_metadata.provider);
+
         lastUserIdRef.current = uid;
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
-        // Handle OAuth profile creation
+        // Handle profile creation for all providers
         if (session!.user!.app_metadata.provider === 'google') {
+          // Google OAuth
           const success = await ensureOAuthProfile(session!);
           if (!success) {
             lastUserIdRef.current = null;
             dispatch({ type: 'LOGOUT' });
             return;
           }
+        } else if (session!.user!.app_metadata.provider === 'email' && isEmailConfirmed) {
+          // Email provider with confirmed email (verification callback)
+          console.log('[AuthContext] Email verification complete, creating profile...');
+          const name = session!.user!.user_metadata?.name || email?.split('@')[0] || 'User';
+          const phone = session!.user!.user_metadata?.phone || '';
+
+          await authAPI.ensureProfile(uid, email, name, phone);
+          console.log('[AuthContext] Profile created for verified email user');
         }
 
         // Probe onboarding and load profile

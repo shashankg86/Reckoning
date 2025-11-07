@@ -2,12 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabaseClient';
-import { authAPI } from '../api/auth';
 import { LoadingScreen } from '../components/ui/Loader';
 import toast from 'react-hot-toast';
-
-// Flag to prevent multiple simultaneous exchanges
-let isExchanging = false;
 
 export function AuthCallbackScreen() {
   const { t } = useTranslation();
@@ -16,141 +12,71 @@ export function AuthCallbackScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      // Prevent multiple simultaneous calls
-      if (isExchanging) {
-        console.log('[AuthCallback] Already exchanging code, skipping...');
-        return;
-      }
+    /**
+     * Supabase automatically handles the PKCE code exchange via detectSessionInUrl config.
+     * We just need to:
+     * 1. Check for errors in URL params
+     * 2. Wait for onAuthStateChange to fire with SIGNED_IN event
+     * 3. AuthContext will handle profile creation and navigation
+     */
+    const handleAuthCallback = () => {
+      console.log('[AuthCallback] Callback page loaded, waiting for Supabase to handle code exchange...');
 
-      try {
-        isExchanging = true;
+      // Check for errors in URL
+      const errorParam = searchParams.get('error');
+      const errorDescription = searchParams.get('error_description');
 
-        // Get the code from URL params
-        const code = searchParams.get('code');
-        const errorParam = searchParams.get('error');
-        const errorDescription = searchParams.get('error_description');
+      if (errorParam) {
+        console.error('[AuthCallback] Error in URL:', errorParam, errorDescription);
+        setError(errorDescription || 'Authentication failed');
+        toast.error(errorDescription || 'Authentication failed');
 
-        if (errorParam) {
-          throw new Error(errorDescription || 'Authentication failed');
-        }
-
-        if (!code) {
-          throw new Error('No verification code found');
-        }
-
-        // Backup and restore code_verifier to handle multiple exchange attempts
-        // Supabase removes it from localStorage after first successful exchange
-        const BACKUP_KEY = 'pkce_code_verifier_backup';
-        const BACKUP_STORAGE_KEY = 'pkce_storage_key_backup';
-        let codeVerifierBackup: string | null = null;
-        let storageKeyBackup: string | null = null;
-
-        try {
-          // First check if we have a backup in sessionStorage
-          codeVerifierBackup = sessionStorage.getItem(BACKUP_KEY);
-          storageKeyBackup = sessionStorage.getItem(BACKUP_STORAGE_KEY);
-
-          if (codeVerifierBackup && storageKeyBackup) {
-            console.log('[AuthCallback] Found backup in sessionStorage, restoring to localStorage...');
-            localStorage.setItem(storageKeyBackup, codeVerifierBackup);
-          } else {
-            // No backup yet - find and backup code_verifier from localStorage
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i);
-              if (key && key.includes('code-verifier')) {
-                codeVerifierBackup = localStorage.getItem(key);
-                storageKeyBackup = key;
-
-                // Save to sessionStorage for persistence across multiple calls
-                if (codeVerifierBackup) {
-                  sessionStorage.setItem(BACKUP_KEY, codeVerifierBackup);
-                  sessionStorage.setItem(BACKUP_STORAGE_KEY, key);
-                  console.log('[AuthCallback] Backed up code_verifier to sessionStorage from key:', key);
-                }
-                break;
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('[AuthCallback] Could not backup/restore code_verifier:', e);
-        }
-
-        console.log('[AuthCallback] Exchanging code for session...');
-
-        // Exchange the code for a session
-        const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-
-        if (exchangeError) {
-          // If exchange failed and we have backup, try to restore it
-          if (codeVerifierBackup && storageKeyBackup) {
-            console.log('[AuthCallback] Exchange failed, restoring code_verifier to localStorage...');
-            try {
-              localStorage.setItem(storageKeyBackup, codeVerifierBackup);
-              console.log('[AuthCallback] Restored code_verifier to key:', storageKeyBackup);
-            } catch (e) {
-              console.warn('[AuthCallback] Could not restore code_verifier:', e);
-            }
-          }
-          throw exchangeError;
-        }
-
-        // Exchange successful - restore code_verifier for any subsequent calls
-        if (codeVerifierBackup && storageKeyBackup) {
-          try {
-            localStorage.setItem(storageKeyBackup, codeVerifierBackup);
-            console.log('[AuthCallback] Exchange successful, restored code_verifier for subsequent calls');
-          } catch (e) {
-            console.warn('[AuthCallback] Could not restore code_verifier after success:', e);
-          }
-        }
-
-        if (!data.session || !data.user) {
-          throw new Error('Failed to create session');
-        }
-
-        console.log('[AuthCallback] Code exchange successful!');
-
-        // Check if email is verified
-        if (!data.user.email_confirmed_at) {
-          throw new Error('Email not verified');
-        }
-
-        // Get user metadata
-        const name = data.user.user_metadata?.name || data.user.email?.split('@')[0] || 'User';
-        const phone = data.user.user_metadata?.phone || '';
-
-        // Create profile
-        await authAPI.ensureProfile(data.user.id, data.user.email, name, phone);
-
-        toast.success('Email verified successfully!');
-
-        // Clean up backup from sessionStorage - no longer needed
-        try {
-          sessionStorage.removeItem(BACKUP_KEY);
-          sessionStorage.removeItem(BACKUP_STORAGE_KEY);
-          console.log('[AuthCallback] Cleaned up code_verifier backup from sessionStorage');
-        } catch (e) {
-          console.warn('[AuthCallback] Could not clean up backup:', e);
-        }
-
-        // Redirect to onboarding
-        navigate('/get-started', { replace: true });
-      } catch (error: any) {
-        console.error('Auth callback error:', error);
-        setError(error.message || 'Failed to verify email');
-        toast.error(error.message || 'Failed to verify email');
-
-        // Redirect to login after a delay
+        // Redirect to login after delay
         setTimeout(() => {
           navigate('/login', { replace: true });
         }, 3000);
-      } finally {
-        isExchanging = false;
+        return;
       }
+
+      // Set up auth state listener to detect when verification completes
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        console.log('[AuthCallback] Auth event:', event, 'Email confirmed:', session?.user?.email_confirmed_at);
+
+        if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
+          console.log('[AuthCallback] Email verified! AuthContext will handle profile & navigation.');
+          toast.success('Email verified successfully!');
+
+          // AuthContext's onAuthStateChange will:
+          // 1. Create the profile
+          // 2. Set authenticated & onboarded state
+          // 3. Router will automatically redirect to /get-started or /dashboard
+
+          // Navigate to root - Router will redirect based on auth state
+          setTimeout(() => {
+            navigate('/', { replace: true });
+            subscription.unsubscribe();
+          }, 500);
+        }
+
+        if (event === 'SIGNED_IN' && !session?.user?.email_confirmed_at) {
+          console.error('[AuthCallback] User signed in but email not confirmed');
+          setError('Email not verified');
+          toast.error('Email verification failed');
+          setTimeout(() => {
+            navigate('/login', { replace: true });
+          }, 3000);
+          subscription.unsubscribe();
+        }
+      });
+
+      // Cleanup listener on unmount
+      return () => {
+        subscription.unsubscribe();
+      };
     };
 
-    handleAuthCallback();
+    const cleanup = handleAuthCallback();
+    return cleanup;
   }, [searchParams, navigate, t]);
 
   if (error) {
