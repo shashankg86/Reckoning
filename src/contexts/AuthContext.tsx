@@ -176,6 +176,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const uid = session.user.id;
         lastUserIdRef.current = uid;
 
+        // CRITICAL: Check if email verification is in progress
+        // If so, skip initialization - AuthCallbackScreen will handle profile creation
+        const verificationInProgress = sessionStorage.getItem('email_verification_in_progress');
+        if (verificationInProgress) {
+          console.log('[AuthContext.init] Email verification in progress, skipping initialization');
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+
         // Set provisional auth
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email: session.user.email ?? null } });
 
@@ -260,6 +269,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const uid = session?.user?.id ?? null;
 
       if (event === 'SIGNED_IN' && uid) {
+        // CRITICAL: Check if email verification is in progress
+        // If so, skip SIGNED_IN handler - AuthCallbackScreen will handle profile creation
+        const verificationInProgress = sessionStorage.getItem('email_verification_in_progress');
+        if (verificationInProgress) {
+          console.log('[AuthContext.onAuthStateChange] Email verification in progress, skipping SIGNED_IN handler');
+          return;
+        }
+
         if (lastUserIdRef.current !== uid) {
           // For email/password users: Skip handling here - the login() function handles validation
           // This prevents race condition where SIGNED_IN fires before login() completes

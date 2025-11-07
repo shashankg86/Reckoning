@@ -34,6 +34,8 @@ export function AuthCallbackScreen() {
 
       // Set flag IMMEDIATELY (synchronously) to block other effects
       sessionStorage.setItem(processedKey, 'true');
+      // Also set flag to tell AuthContext to ignore SIGNED_IN event
+      sessionStorage.setItem('email_verification_in_progress', 'true');
       console.log('[AuthCallback] Effect #1 - marked code as processing');
     }
 
@@ -60,14 +62,16 @@ export function AuthCallbackScreen() {
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
           if (exchangeError) {
-            // Clear the flag if exchange failed so user can retry
+            // Clear the flags if exchange failed so user can retry
             sessionStorage.removeItem(`pkce_code_${code}`);
+            sessionStorage.removeItem('email_verification_in_progress');
             console.error('[AuthCallback] Code exchange failed:', exchangeError);
             throw new Error(`Authentication failed: ${exchangeError.message}`);
           }
 
           if (!data?.session) {
             sessionStorage.removeItem(`pkce_code_${code}`);
+            sessionStorage.removeItem('email_verification_in_progress');
             throw new Error('Code exchange succeeded but no session returned');
           }
 
@@ -95,6 +99,11 @@ export function AuthCallbackScreen() {
         if (!isMounted) return;
 
         console.error('[AuthCallback] Error:', error);
+
+        // Clear the verification flag on error to allow retry
+        sessionStorage.removeItem('email_verification_in_progress');
+        console.log('[AuthCallback] Cleared email_verification_in_progress flag after error');
+
         setStatus('error');
         setErrorMessage(error.message || 'Authentication failed');
         toast.error(error.message || 'Authentication failed');
@@ -127,6 +136,10 @@ export function AuthCallbackScreen() {
       console.log('[AuthCallback] Creating/ensuring profile');
       await authAPI.ensureProfile(user.id, user.email, name, phone);
       console.log('[AuthCallback] Profile ready');
+
+      // Clear the verification flag now that profile is created
+      sessionStorage.removeItem('email_verification_in_progress');
+      console.log('[AuthCallback] Cleared email_verification_in_progress flag');
 
       if (!isMounted) return;
 
