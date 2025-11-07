@@ -58,8 +58,18 @@ export function AuthCallbackScreen() {
 
         // PKCE code exchange
         if (code) {
-          console.log('[AuthCallback] Exchanging PKCE code for session');
+          console.log('[AuthCallback] ===== STARTING PKCE CODE EXCHANGE =====');
+          console.log('[AuthCallback] Calling supabase.auth.exchangeCodeForSession...');
+
           const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+
+          console.log('[AuthCallback] ===== PKCE CODE EXCHANGE COMPLETED =====');
+          console.log('[AuthCallback] Exchange result:', {
+            hasData: !!data,
+            hasSession: !!data?.session,
+            hasError: !!exchangeError,
+            userId: data?.session?.user?.id
+          });
 
           if (exchangeError) {
             // Clear the flags if exchange failed so user can retry
@@ -76,7 +86,7 @@ export function AuthCallbackScreen() {
           }
 
           session = data.session;
-          console.log('[AuthCallback] Code exchange successful');
+          console.log('[AuthCallback] ===== CODE EXCHANGE SUCCESS - CONTINUING TO HANDLE AUTH =====');
         } else {
           // Fallback: check existing session (implicit flow or other scenarios)
           console.log('[AuthCallback] No code, checking existing session');
@@ -90,10 +100,17 @@ export function AuthCallbackScreen() {
           console.log('[AuthCallback] Using existing session');
         }
 
-        if (!isMounted) return;
+        console.log('[AuthCallback] ===== CHECKING IF COMPONENT STILL MOUNTED =====');
+        if (!isMounted) {
+          console.error('[AuthCallback] Component unmounted! Stopping execution.');
+          return;
+        }
+        console.log('[AuthCallback] Component still mounted, proceeding...');
 
         // Handle successful authentication
+        console.log('[AuthCallback] ===== CALLING handleSuccessfulAuth =====');
         await handleSuccessfulAuth(session);
+        console.log('[AuthCallback] ===== handleSuccessfulAuth COMPLETED =====');
 
       } catch (error: any) {
         if (!isMounted) return;
@@ -117,9 +134,10 @@ export function AuthCallbackScreen() {
     };
 
     const handleSuccessfulAuth = async (session: any) => {
+      console.log('[AuthCallback.handleSuccessfulAuth] ===== STARTING =====');
       const user = session.user;
 
-      console.log('[AuthCallback] User authenticated:', {
+      console.log('[AuthCallback.handleSuccessfulAuth] User authenticated:', {
         id: user.id,
         email: user.email,
         emailConfirmed: !!user.email_confirmed_at
@@ -127,30 +145,46 @@ export function AuthCallbackScreen() {
 
       // Verify email
       if (!user.email_confirmed_at) {
+        console.error('[AuthCallback.handleSuccessfulAuth] Email not confirmed!');
         throw new Error('Email not verified. Please check your email and verify your account.');
       }
+      console.log('[AuthCallback.handleSuccessfulAuth] Email confirmed ✓');
 
       const name = user.user_metadata?.name || user.email?.split('@')[0] || 'User';
       const phone = user.user_metadata?.phone || '';
 
-      console.log('[AuthCallback] Creating/ensuring profile');
+      console.log('[AuthCallback.handleSuccessfulAuth] ===== CALLING ensureProfile =====');
+      console.log('[AuthCallback.handleSuccessfulAuth] Profile data:', { userId: user.id, email: user.email, name, phone });
+
       await authAPI.ensureProfile(user.id, user.email, name, phone);
-      console.log('[AuthCallback] Profile ready');
+
+      console.log('[AuthCallback.handleSuccessfulAuth] ===== ensureProfile COMPLETED =====');
+      console.log('[AuthCallback.handleSuccessfulAuth] Profile created successfully ✓');
 
       // Clear the verification flag now that profile is created
       sessionStorage.removeItem('email_verification_in_progress');
-      console.log('[AuthCallback] Cleared email_verification_in_progress flag');
+      console.log('[AuthCallback.handleSuccessfulAuth] Cleared email_verification_in_progress flag ✓');
 
-      if (!isMounted) return;
+      if (!isMounted) {
+        console.error('[AuthCallback.handleSuccessfulAuth] Component unmounted before setting success state!');
+        return;
+      }
 
+      console.log('[AuthCallback.handleSuccessfulAuth] Setting status to success...');
       setStatus('success');
       toast.success('Email verified! Redirecting to onboarding...');
 
+      console.log('[AuthCallback.handleSuccessfulAuth] Scheduling navigation to /onboarding...');
       setTimeout(() => {
         if (isMounted) {
+          console.log('[AuthCallback.handleSuccessfulAuth] Navigating to /onboarding');
           navigate('/onboarding', { replace: true });
+        } else {
+          console.error('[AuthCallback.handleSuccessfulAuth] Component unmounted before navigation!');
         }
       }, 1500);
+
+      console.log('[AuthCallback.handleSuccessfulAuth] ===== COMPLETED =====');
     };
 
     handleAuthCallback();

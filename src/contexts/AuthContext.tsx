@@ -107,6 +107,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastProfileLoadAtRef = useRef<number>(0);
 
   const loadUserProfile = async (userId: string, email: string | null, opts?: { force?: boolean }) => {
+    // CRITICAL: Check if email verification is in progress
+    const verificationInProgress = sessionStorage.getItem('email_verification_in_progress');
+    if (verificationInProgress) {
+      console.log('[AuthContext.loadUserProfile] Email verification in progress, skipping profile load');
+      return;
+    }
+
     const now = Date.now();
     if (!opts?.force) {
       if (now - lastProfileLoadAtRef.current < 30_000 && lastUserIdRef.current === userId) {
@@ -267,15 +274,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const uid = session?.user?.id ?? null;
+      console.log(`[AuthContext.onAuthStateChange] ===== EVENT: ${event} =====`, { uid, hasSession: !!session });
 
       if (event === 'SIGNED_IN' && uid) {
         // CRITICAL: Check if email verification is in progress
         // If so, skip SIGNED_IN handler - AuthCallbackScreen will handle profile creation
         const verificationInProgress = sessionStorage.getItem('email_verification_in_progress');
         if (verificationInProgress) {
-          console.log('[AuthContext.onAuthStateChange] Email verification in progress, skipping SIGNED_IN handler');
+          console.log('[AuthContext.onAuthStateChange] Email verification in progress, skipping SIGNED_IN handler ✓');
           return;
         }
+        console.log('[AuthContext.onAuthStateChange] No verification flag, processing SIGNED_IN event...');
 
         if (lastUserIdRef.current !== uid) {
           // For email/password users: Skip handling here - the login() function handles validation
@@ -354,6 +363,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (event === 'USER_UPDATED' && uid) {
+        // Check if email verification is in progress
+        const verificationInProgress = sessionStorage.getItem('email_verification_in_progress');
+        if (verificationInProgress) {
+          console.log('[AuthContext.USER_UPDATED] Email verification in progress, skipping USER_UPDATED handler');
+          return;
+        }
         loadUserProfile(uid, session!.user!.email ?? null, { force: true });
         return;
       }
