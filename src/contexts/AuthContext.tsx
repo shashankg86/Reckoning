@@ -176,9 +176,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastProfileLoadAtRef = useRef<number>(0);
 
   const loadUserProfile = async (userId: string, email: string | null, opts?: { force?: boolean; skipLogoutOnMissing?: boolean }) => {
+    console.log('[AuthContext] loadUserProfile called for:', userId);
+
     const now = Date.now();
     if (!opts?.force) {
       if (now - lastProfileLoadAtRef.current < 30_000 && lastUserIdRef.current === userId) {
+        console.log('[AuthContext] Skipping profile load (recent load)');
         return;
       }
     }
@@ -213,9 +216,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      console.log('[AuthContext] Profile loaded:', profile.id);
+
       // Load user stores
       const stores = await storesAPI.getUserStores();
       const userStore = stores && stores.length > 0 ? stores[0] : undefined;
+
+      console.log('[AuthContext] Stores loaded, onboarded:', !!userStore);
 
       const user: User = {
         uid: profile.id,
@@ -230,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } as any;
 
       dispatch({ type: 'SET_USER', payload: user });
+      console.log('[AuthContext] User state updated, isLoading will be false');
     } catch (err) {
       console.error('[AuthContext] Error in loadUserProfile:', err);
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -325,8 +333,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const name = session!.user!.user_metadata?.name || email?.split('@')[0] || 'User';
           const phone = session!.user!.user_metadata?.phone || '';
 
-          await authAPI.ensureProfile(uid, email, name, phone);
-          console.log('[AuthContext] Email user profile created successfully');
+          try {
+            const profile = await authAPI.ensureProfile(uid, email, name, phone);
+
+            if (!profile) {
+              throw new Error('Profile creation returned null');
+            }
+
+            console.log('[AuthContext] Email user profile created successfully:', profile.id);
+          } catch (profileError) {
+            console.error('[AuthContext] Failed to create profile:', profileError);
+            toast.error('Failed to create user profile. Please try again.');
+            await authAPI.logout();
+            lastUserIdRef.current = null;
+            dispatch({ type: 'LOGOUT' });
+            return;
+          }
         }
 
         // Probe onboarding and load profile

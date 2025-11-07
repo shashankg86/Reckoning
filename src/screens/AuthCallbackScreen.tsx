@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../contexts/AuthContext';
 import { LoadingScreen } from '../components/ui/Loader';
 import toast from 'react-hot-toast';
 
@@ -10,79 +8,38 @@ export function AuthCallbackScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { state } = useAuth();
   const [error, setError] = useState<string | null>(null);
-  const [verificationComplete, setVerificationComplete] = useState(false);
 
   useEffect(() => {
     /**
-     * Supabase automatically handles the PKCE code exchange via detectSessionInUrl config.
-     * We just need to:
-     * 1. Check for errors in URL params
-     * 2. Wait for onAuthStateChange to fire with SIGNED_IN event
-     * 3. AuthContext will handle profile creation and navigation
+     * Supabase automatically handles PKCE code exchange via detectSessionInUrl config.
+     *
+     * Flow:
+     * 1. Supabase exchanges code automatically
+     * 2. onAuthStateChange fires SIGNED_IN in AuthContext
+     * 3. AuthContext creates profile
+     * 4. CallbackRoute (Router) detects isAuthenticated
+     * 5. CallbackRoute redirects to /get-started
+     *
+     * We just check for errors and show loading.
      */
-    const handleAuthCallback = () => {
-      console.log('[AuthCallback] Callback page loaded, waiting for Supabase to handle code exchange...');
+    console.log('[AuthCallback] Processing email verification callback...');
 
-      // Check for errors in URL
-      const errorParam = searchParams.get('error');
-      const errorDescription = searchParams.get('error_description');
+    // Check for errors in URL params
+    const errorParam = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
 
-      if (errorParam) {
-        console.error('[AuthCallback] Error in URL:', errorParam, errorDescription);
-        setError(errorDescription || 'Authentication failed');
-        toast.error(errorDescription || 'Authentication failed');
+    if (errorParam) {
+      console.error('[AuthCallback] Error in URL:', errorParam, errorDescription);
+      setError(errorDescription || 'Authentication failed');
+      toast.error(errorDescription || 'Authentication failed');
 
-        // Redirect to login after delay
-        setTimeout(() => {
-          navigate('/login', { replace: true });
-        }, 3000);
-        return;
-      }
-
-      // Set up auth state listener to detect when verification completes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-        console.log('[AuthCallback] Auth event:', event, 'Email confirmed:', session?.user?.email_confirmed_at);
-
-        if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
-          console.log('[AuthCallback] Email verified! Waiting for AuthContext to finish...');
-          toast.success('Email verified successfully!');
-
-          // Set flag to indicate verification is complete
-          // useEffect below will handle navigation once AuthContext finishes
-          setVerificationComplete(true);
-        }
-
-        if (event === 'SIGNED_IN' && !session?.user?.email_confirmed_at) {
-          console.error('[AuthCallback] User signed in but email not confirmed');
-          setError('Email not verified');
-          toast.error('Email verification failed');
-          setTimeout(() => {
-            navigate('/login', { replace: true });
-          }, 3000);
-          subscription.unsubscribe();
-        }
-      });
-
-      // Cleanup listener on unmount
-      return () => {
-        subscription.unsubscribe();
-      };
-    };
-
-    const cleanup = handleAuthCallback();
-    return cleanup;
-  }, [searchParams, navigate, t]);
-
-  // Wait for AuthContext to finish before navigating
-  useEffect(() => {
-    if (verificationComplete && state.isAuthenticated && !state.isLoading) {
-      console.log('[AuthCallback] AuthContext finished! Navigating to onboarding...');
-      // Navigate to get-started directly
-      navigate('/get-started', { replace: true });
+      // Redirect to login after delay
+      setTimeout(() => {
+        navigate('/login', { replace: true });
+      }, 3000);
     }
-  }, [verificationComplete, state.isAuthenticated, state.isLoading, navigate]);
+  }, [searchParams, navigate]);
 
   if (error) {
     return (

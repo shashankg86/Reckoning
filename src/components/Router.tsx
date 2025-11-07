@@ -31,7 +31,9 @@ export function Router() {
         {/* Verification routes */}
         <Route path="/phone-verification" element={<VerificationRoute><PhoneVerificationScreen /></VerificationRoute>} />
         <Route path="/email-verification" element={<VerificationRoute><EmailVerificationScreen /></VerificationRoute>} />
-        <Route path="/auth/callback" element={<AuthCallbackScreen />} />
+
+        {/* Auth callback - redirects to onboarding when authenticated */}
+        <Route path="/auth/callback" element={<CallbackRoute><AuthCallbackScreen /></CallbackRoute>} />
         
         {/* Onboarding route */}
         <Route path="/onboarding" element={<OnboardingRoute><OnboardingScreen /></OnboardingRoute>} />
@@ -105,19 +107,39 @@ function VerificationRoute({ children }: { children: React.ReactNode }) {
 
 function OnboardingRoute({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
-  
+
   if (state.isLoading) {
     return <LoadingScreen />;
   }
-  
+
   if (!state.isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   // Redirect to dashboard if already onboarded
   if (state.isOnboarded) {
     return <Navigate to="/dashboard" replace />;
   }
-  
+
+  return <>{children}</>;
+}
+
+function CallbackRoute({ children }: { children: React.ReactNode }) {
+  const { state } = useAuth();
+
+  // Show loading while processing
+  if (state.isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // Once authenticated, redirect based on onboarding status
+  if (state.isAuthenticated) {
+    if (state.isOnboarded) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return <Navigate to="/get-started" replace />;
+  }
+
+  // Not authenticated yet - show callback screen (loading)
   return <>{children}</>;
 }
