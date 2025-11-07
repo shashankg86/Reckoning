@@ -17,19 +17,35 @@ export function AuthCallbackScreen() {
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
+    // Parse URL params SYNCHRONOUSLY first
+    const queryParams = new URLSearchParams(window.location.search);
+    const code = queryParams.get('code');
+    const error = queryParams.get('error');
+
+    // CRITICAL: Check and set flag SYNCHRONOUSLY before any async operations
+    if (code) {
+      const processedKey = `pkce_code_${code}`;
+      const alreadyProcessed = sessionStorage.getItem(processedKey);
+
+      if (alreadyProcessed) {
+        console.log('[AuthCallback] Code already processed, effect #2 skipping');
+        return; // Exit immediately before any async operations
+      }
+
+      // Set flag IMMEDIATELY (synchronously) to block other effects
+      sessionStorage.setItem(processedKey, 'true');
+      console.log('[AuthCallback] Effect #1 - marked code as processing');
+    }
+
     let isMounted = true;
 
     const handleAuthCallback = async () => {
       try {
-        const queryParams = new URLSearchParams(window.location.search);
-        const code = queryParams.get('code');
-        const error = queryParams.get('error');
-        const errorCode = queryParams.get('error_code');
-
-        console.log('[AuthCallback] Starting, params:', { hasCode: !!code, error, errorCode });
+        console.log('[AuthCallback] Starting async flow');
 
         // Handle OAuth errors
         if (error) {
+          const errorCode = queryParams.get('error_code');
           if (errorCode === 'otp_expired') {
             throw new Error('Verification link has expired. Please request a new one.');
           }
@@ -40,40 +56,23 @@ export function AuthCallbackScreen() {
 
         // PKCE code exchange
         if (code) {
-          // CRITICAL: Check if this code was already exchanged
-          const processedKey = `pkce_code_${code}`;
-          const alreadyProcessed = sessionStorage.getItem(processedKey);
+          console.log('[AuthCallback] Exchanging PKCE code for session');
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-          if (alreadyProcessed) {
-            console.log('[AuthCallback] Code already exchanged, fetching existing session');
-            const { data: { session: existingSession } } = await supabase.auth.getSession();
-            if (existingSession) {
-              session = existingSession;
-            } else {
-              throw new Error('Code was already used but no session found. Please sign up again.');
-            }
-          } else {
-            // Mark as processing BEFORE the exchange to prevent duplicate calls
-            sessionStorage.setItem(processedKey, 'true');
-
-            console.log('[AuthCallback] Exchanging PKCE code for session');
-            const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-
-            if (exchangeError) {
-              // Clear the flag if exchange failed so user can retry
-              sessionStorage.removeItem(processedKey);
-              console.error('[AuthCallback] Code exchange failed:', exchangeError);
-              throw new Error(`Authentication failed: ${exchangeError.message}`);
-            }
-
-            if (!data?.session) {
-              sessionStorage.removeItem(processedKey);
-              throw new Error('Code exchange succeeded but no session returned');
-            }
-
-            session = data.session;
-            console.log('[AuthCallback] Code exchange successful');
+          if (exchangeError) {
+            // Clear the flag if exchange failed so user can retry
+            sessionStorage.removeItem(`pkce_code_${code}`);
+            console.error('[AuthCallback] Code exchange failed:', exchangeError);
+            throw new Error(`Authentication failed: ${exchangeError.message}`);
           }
+
+          if (!data?.session) {
+            sessionStorage.removeItem(`pkce_code_${code}`);
+            throw new Error('Code exchange succeeded but no session returned');
+          }
+
+          session = data.session;
+          console.log('[AuthCallback] Code exchange successful');
         } else {
           // Fallback: check existing session (implicit flow or other scenarios)
           console.log('[AuthCallback] No code, checking existing session');
