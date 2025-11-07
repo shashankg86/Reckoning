@@ -175,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastUserIdRef = useRef<string | null>(null);
   const lastProfileLoadAtRef = useRef<number>(0);
 
-  const loadUserProfile = async (userId: string, email: string | null, opts?: { force?: boolean }) => {
+  const loadUserProfile = async (userId: string, email: string | null, opts?: { force?: boolean; skipLogoutOnMissing?: boolean }) => {
     const now = Date.now();
     if (!opts?.force) {
       if (now - lastProfileLoadAtRef.current < 30_000 && lastUserIdRef.current === userId) {
@@ -198,11 +198,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!profile) {
-        // Profile doesn't exist - this shouldn't happen if signup worked properly
-        console.error('[AuthContext] Profile not found for authenticated user:', userId);
-        toast.error(i18n.t('auth.messages.profileNotFound'));
-        await authAPI.logout();
-        dispatch({ type: 'LOGOUT' });
+        // Profile doesn't exist - could be unverified email user
+        console.warn('[AuthContext] Profile not found for authenticated user:', userId);
+
+        // Only logout if explicitly requested (not for unverified email users)
+        if (!opts?.skipLogoutOnMissing) {
+          toast.error(i18n.t('auth.messages.profileNotFound'));
+          await authAPI.logout();
+          dispatch({ type: 'LOGOUT' });
+        } else {
+          // Keep loading state false but don't logout
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
         return;
       }
 
@@ -241,8 +248,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const uid = session.user.id;
         const email = session.user.email ?? null;
-        lastUserIdRef.current = uid;
+        const isEmailProvider = session.user.app_metadata.provider === 'email';
+        const isEmailConfirmed = !!session.user.email_confirmed_at;
 
+        // If email provider with unconfirmed email, don't set authenticated state
+        if (isEmailProvider && !isEmailConfirmed) {
+          console.log('[AuthContext] Init: Unverified email user detected, not authenticating');
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+
+        lastUserIdRef.current = uid;
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
         // Handle OAuth profile creation and validation
@@ -275,8 +291,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const email = session?.user?.email ?? null;
 
       if (event === 'SIGNED_IN' && uid && lastUserIdRef.current !== uid) {
-        // Skip email/password users - login() handles them
-        if (session!.user!.app_metadata.provider === 'email') return;
+        const isEmailProvider = session!.user!.app_metadata.provider === 'email';
+        const isEmailConfirmed = !!session!.user!.email_confirmed_at;
+
+        // Skip email/password users ONLY if coming from login() (not email verification)
+        // Allow through if email just got confirmed (verification callback)
+        if (isEmailProvider && !isEmailConfirmed) {
+          console.log('[AuthContext] Skipping unverified email user - handled by login()');
+          return;
+        }
 
         lastUserIdRef.current = uid;
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
@@ -352,13 +375,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, name: string, phone?: string) => {
     try {
       dispatch({ type: 'CLEAR_ERROR' });
-      const { user } = await authAPI.signUpWithEmail(email, password, name, phone || '');
+      const { user, session } = await authAPI.signUpWithEmail(email, password, name, phone || '');
       if (!user) throw new Error('Signup succeeded but user data not returned');
+
+      // Check if email confirmation is required
+      const requiresEmailConfirmation = !user.email_confirmed_at;
+
+      if (requiresEmailConfirmation) {
+        // Email verification required - don't set authenticated state yet
+        console.log('[AuthContext] Email verification required for:', email);
+        // Return early - user will verify email and callback will handle auth
+        return { user, session };
+      }
+
+      // Email already confirmed (or confirmation disabled) - proceed normally
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
       dispatch({ type: 'SET_ONBOARDED', payload: false });
-      loadUserProfile(user.id, user.email ?? null, { force: true });
+      loadUserProfile(user.id, user.email ?? null, { force: true, skipLogoutOnMissing: true });
       toast.success(i18n.t('auth.messages.accountCreated'));
+
+      return { user, session };
     } catch (error: any) {
       console.error('[AuthContext] Registration error:', error);
       const errorMessage = error.message || i18n.t('auth.messages.loginFailed');

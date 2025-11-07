@@ -5,7 +5,6 @@ import { ArrowLeftIcon, EnvelopeIcon, ArrowPathIcon } from '@heroicons/react/24/
 import { authAPI } from '../api/auth';
 import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
-import { BRAND } from '../constants/branding';
 
 interface LocationState {
   email: string;
@@ -44,37 +43,8 @@ export function EmailVerificationScreen() {
     }
   }, [countdown]);
 
-  // Listen for email verification
-  useEffect(() => {
-    // Subscribe to auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[EmailVerification] Auth event:', event);
-
-      if (event === 'SIGNED_IN' && session?.user) {
-        // Check if email is verified
-        if (session.user.email_confirmed_at) {
-          toast.success('Email verified successfully!');
-
-          // Ensure profile exists
-          if (locationState.name || locationState.phone) {
-            await authAPI.ensureProfile(
-              session.user.id,
-              session.user.email,
-              locationState.name,
-              locationState.phone
-            );
-          }
-
-          // Redirect to onboarding
-          navigate('/get-started', { replace: true });
-        }
-      }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, [navigate, locationState]);
+  // Note: AuthContext now handles auth state changes and profile loading
+  // No need for duplicate listener here
 
   const handleResend = async () => {
     if (!canResend || isResending) return;
@@ -96,21 +66,29 @@ export function EmailVerificationScreen() {
   const handleCheckVerification = async () => {
     try {
       setIsCheckingVerification(true);
-      const session = await authAPI.getSession();
 
-      if (session?.user?.email_confirmed_at) {
-        toast.success('Email verified successfully!');
+      // Refresh session to get latest auth state
+      const { data, error } = await supabase.auth.refreshSession();
 
-        // Ensure profile exists
+      if (error) {
+        throw error;
+      }
+
+      if (data.session?.user?.email_confirmed_at) {
+        // Email verified! Create profile if needed
         if (locationState.name || locationState.phone) {
           await authAPI.ensureProfile(
-            session.user.id,
-            session.user.email,
+            data.session.user.id,
+            data.session.user.email,
             locationState.name,
             locationState.phone
           );
         }
 
+        toast.success('Email verified successfully!');
+
+        // AuthContext will handle the auth state update via onAuthStateChange
+        // Just navigate to onboarding
         navigate('/get-started', { replace: true });
       } else {
         toast.error('Email not verified yet. Please check your inbox and click the verification link.');
