@@ -182,52 +182,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     lastProfileLoadAtRef.current = now;
 
-    const startsAt = Date.now();
-    let attempt = 0;
-    const maxMs = 40_000;
-
-    while (Date.now() - startsAt < maxMs) {
-      attempt++;
-
+    try {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
 
-      if (!error && profile) {
-        const stores = await storesAPI.getUserStores();
-        const userStore = stores && stores.length > 0 ? stores[0] : undefined;
-        const user: User = {
-          uid: profile.id,
-          email: profile.email,
-          name: profile.name,
-          phone: profile.phone,
-          photoURL: profile.photo_url,
-          isOnboarded: !!userStore,
-          store: userStore,
-          createdAt: new Date(profile.created_at),
-          lastLoginAt: new Date(profile.last_login_at),
-        } as any;
-        dispatch({ type: 'SET_USER', payload: user });
+      if (error) {
+        console.error('Error loading profile:', error);
+        dispatch({ type: 'SET_LOADING', payload: false });
         return;
       }
 
-      const delay = Math.min(300 * 2 ** attempt, 3000);
-      await new Promise((r) => setTimeout(r, delay));
-    }
+      if (!profile) {
+        // Profile doesn't exist - this shouldn't happen if signup worked properly
+        console.error('Profile not found for user:', userId);
+        toast.error('Account profile not found. Please sign up first.');
+        await authAPI.logout();
+        dispatch({ type: 'LOGOUT' });
+        return;
+      }
 
-    // CRITICAL: If profile not found after retries, logout user
-    console.error('Profile not found after retries for user:', userId);
-    toast.error('Account profile not found. Please sign up first.');
+      // Load user stores
+      const stores = await storesAPI.getUserStores();
+      const userStore = stores && stores.length > 0 ? stores[0] : undefined;
 
-    try {
-      await authAPI.logout();
+      const user: User = {
+        uid: profile.id,
+        email: profile.email,
+        name: profile.name,
+        phone: profile.phone,
+        photoURL: profile.photo_url,
+        isOnboarded: !!userStore,
+        store: userStore,
+        createdAt: new Date(profile.created_at),
+        lastLoginAt: new Date(profile.last_login_at),
+      } as any;
+
+      dispatch({ type: 'SET_USER', payload: user });
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error('Error in loadUserProfile:', err);
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
-
-    dispatch({ type: 'LOGOUT' });
   };
 
   useEffect(() => {
@@ -269,15 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Safety timeout: Force clear loading after 5 seconds
-    const safetyTimeout = setTimeout(() => {
-      console.warn('Safety timeout: Forcing loading state to false');
-      dispatch({ type: 'SET_LOADING', payload: false });
-    }, 5000);
-
-    init().finally(() => {
-      clearTimeout(safetyTimeout);
-    });
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const uid = session?.user?.id ?? null;
