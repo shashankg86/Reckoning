@@ -7,14 +7,12 @@ import { z } from 'zod';
 import { isPossiblePhoneNumber } from 'react-phone-number-input';
 import { useAuth } from '../contexts/AuthContext';
 import { authAPI } from '../api/auth';
-import { smsAPI } from '../api/sms';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { PhoneField } from '../components/form/PhoneField';
 import { EnvelopeIcon, LockClosedIcon, EyeIcon, EyeSlashIcon, UserIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { BRAND } from '../constants/branding';
-import { ensureMinimalProfile } from '../api/profileUtils';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name too long'),
@@ -55,18 +53,27 @@ export function SignupScreen() {
       }
       setIsCheckingEmail(false);
 
-      if (smsAPI.isConfigured()) {
-        navigate('/phone-verification', { state: { phone: data.phone, email: data.email, name: data.name, password: data.password, isSignup: true } });
-      } else {
-        const result = await authRegister(data.email, data.password, data.name, data.phone);
-        if (result.session?.user) {
-          await ensureMinimalProfile(result.session.user.id, data.email, data.name, data.phone);
-        }
+      // Create user with Supabase (will send verification email)
+      const result = await authAPI.signUpWithEmail(data.email, data.password, data.name, data.phone);
+
+      if (result.user) {
+        // Redirect to email verification screen
+        toast.success(t('auth.verificationEmailSent'));
+        navigate('/email-verification', {
+          state: {
+            email: data.email,
+            name: data.name,
+            phone: data.phone,
+            isSignup: true
+          },
+          replace: true
+        });
       }
     } catch (error: any) {
       if (error?.message?.includes('email')) {
         setError('email', { message: error.message });
       }
+      toast.error(error.message || t('auth.signupFailed'));
     } finally {
       setIsCheckingEmail(false);
     }
@@ -119,7 +126,7 @@ export function SignupScreen() {
           </div>
 
           <Button type="submit" disabled={isLoading} className="w-full">
-            {isCheckingEmail ? t('auth.checkingEmail') : isSubmitting ? (smsAPI.isConfigured() ? t('auth.preparingVerification') : t('auth.creatingAccount')) : (smsAPI.isConfigured() ? t('auth.continueToVerification') : t('auth.signup'))}
+            {isCheckingEmail ? t('auth.checkingEmail') : isSubmitting ? t('auth.creatingAccount') : t('auth.signup')}
           </Button>
 
           <div className="relative">

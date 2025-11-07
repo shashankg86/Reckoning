@@ -75,6 +75,7 @@ export const authAPI = {
             name,
             phone,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
@@ -85,10 +86,8 @@ export const authAPI = {
         throw error;
       }
 
-      // Immediately create profile after successful signup
-      if (data.user) {
-        await this.ensureProfile(data.user.id, email, name, phone);
-      }
+      // Only create profile after email is verified
+      // Profile will be created when user completes email verification
 
       return {
         user: data.user,
