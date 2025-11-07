@@ -6,6 +6,9 @@ import { authAPI } from '../api/auth';
 import { LoadingScreen } from '../components/ui/Loader';
 import toast from 'react-hot-toast';
 
+// Flag to prevent multiple simultaneous exchanges
+let isExchanging = false;
+
 export function AuthCallbackScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -14,7 +17,15 @@ export function AuthCallbackScreen() {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
+      // Prevent multiple simultaneous calls
+      if (isExchanging) {
+        console.log('[AuthCallback] Already exchanging code, skipping...');
+        return;
+      }
+
       try {
+        isExchanging = true;
+
         // Get the code from URL params
         const code = searchParams.get('code');
         const errorParam = searchParams.get('error');
@@ -28,16 +39,77 @@ export function AuthCallbackScreen() {
           throw new Error('No verification code found');
         }
 
+        // Backup and restore code_verifier to handle multiple exchange attempts
+        // Supabase removes it from localStorage after first successful exchange
+        const BACKUP_KEY = 'pkce_code_verifier_backup';
+        const BACKUP_STORAGE_KEY = 'pkce_storage_key_backup';
+        let codeVerifierBackup: string | null = null;
+        let storageKeyBackup: string | null = null;
+
+        try {
+          // First check if we have a backup in sessionStorage
+          codeVerifierBackup = sessionStorage.getItem(BACKUP_KEY);
+          storageKeyBackup = sessionStorage.getItem(BACKUP_STORAGE_KEY);
+
+          if (codeVerifierBackup && storageKeyBackup) {
+            console.log('[AuthCallback] Found backup in sessionStorage, restoring to localStorage...');
+            localStorage.setItem(storageKeyBackup, codeVerifierBackup);
+          } else {
+            // No backup yet - find and backup code_verifier from localStorage
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i);
+              if (key && key.includes('code-verifier')) {
+                codeVerifierBackup = localStorage.getItem(key);
+                storageKeyBackup = key;
+
+                // Save to sessionStorage for persistence across multiple calls
+                if (codeVerifierBackup) {
+                  sessionStorage.setItem(BACKUP_KEY, codeVerifierBackup);
+                  sessionStorage.setItem(BACKUP_STORAGE_KEY, key);
+                  console.log('[AuthCallback] Backed up code_verifier to sessionStorage from key:', key);
+                }
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[AuthCallback] Could not backup/restore code_verifier:', e);
+        }
+
+        console.log('[AuthCallback] Exchanging code for session...');
+
         // Exchange the code for a session
         const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
         if (exchangeError) {
+          // If exchange failed and we have backup, try to restore it
+          if (codeVerifierBackup && storageKeyBackup) {
+            console.log('[AuthCallback] Exchange failed, restoring code_verifier to localStorage...');
+            try {
+              localStorage.setItem(storageKeyBackup, codeVerifierBackup);
+              console.log('[AuthCallback] Restored code_verifier to key:', storageKeyBackup);
+            } catch (e) {
+              console.warn('[AuthCallback] Could not restore code_verifier:', e);
+            }
+          }
           throw exchangeError;
+        }
+
+        // Exchange successful - restore code_verifier for any subsequent calls
+        if (codeVerifierBackup && storageKeyBackup) {
+          try {
+            localStorage.setItem(storageKeyBackup, codeVerifierBackup);
+            console.log('[AuthCallback] Exchange successful, restored code_verifier for subsequent calls');
+          } catch (e) {
+            console.warn('[AuthCallback] Could not restore code_verifier after success:', e);
+          }
         }
 
         if (!data.session || !data.user) {
           throw new Error('Failed to create session');
         }
+
+        console.log('[AuthCallback] Code exchange successful!');
 
         // Check if email is verified
         if (!data.user.email_confirmed_at) {
@@ -53,6 +125,15 @@ export function AuthCallbackScreen() {
 
         toast.success('Email verified successfully!');
 
+        // Clean up backup from sessionStorage - no longer needed
+        try {
+          sessionStorage.removeItem(BACKUP_KEY);
+          sessionStorage.removeItem(BACKUP_STORAGE_KEY);
+          console.log('[AuthCallback] Cleaned up code_verifier backup from sessionStorage');
+        } catch (e) {
+          console.warn('[AuthCallback] Could not clean up backup:', e);
+        }
+
         // Redirect to onboarding
         navigate('/get-started', { replace: true });
       } catch (error: any) {
@@ -64,11 +145,13 @@ export function AuthCallbackScreen() {
         setTimeout(() => {
           navigate('/login', { replace: true });
         }, 3000);
+      } finally {
+        isExchanging = false;
       }
     };
 
     handleAuthCallback();
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, t]);
 
   if (error) {
     return (
