@@ -307,22 +307,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
         // Handle profile creation for all providers
+        // IMPORTANT: Profile is created HERE (after sign-in, BEFORE onboarding)
+        // This ensures consistent flow for all auth methods
         if (session!.user!.app_metadata.provider === 'google') {
-          // Google OAuth
+          // Google OAuth - create profile immediately after sign-in
+          console.log('[AuthContext] Google OAuth sign-in, creating profile before onboarding...');
           const success = await ensureOAuthProfile(session!);
           if (!success) {
             lastUserIdRef.current = null;
             dispatch({ type: 'LOGOUT' });
             return;
           }
+          console.log('[AuthContext] Google profile created successfully');
         } else if (session!.user!.app_metadata.provider === 'email' && isEmailConfirmed) {
-          // Email provider with confirmed email (verification callback)
-          console.log('[AuthContext] Email verification complete, creating profile...');
+          // Email verification - create profile immediately after verification
+          console.log('[AuthContext] Email verified, creating profile before onboarding...');
           const name = session!.user!.user_metadata?.name || email?.split('@')[0] || 'User';
           const phone = session!.user!.user_metadata?.phone || '';
 
           await authAPI.ensureProfile(uid, email, name, phone);
-          console.log('[AuthContext] Profile created for verified email user');
+          console.log('[AuthContext] Email user profile created successfully');
         }
 
         // Probe onboarding and load profile

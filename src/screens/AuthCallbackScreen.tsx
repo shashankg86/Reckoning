@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabaseClient';
+import { useAuth } from '../contexts/AuthContext';
 import { LoadingScreen } from '../components/ui/Loader';
 import toast from 'react-hot-toast';
 
@@ -9,7 +10,9 @@ export function AuthCallbackScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { state } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [verificationComplete, setVerificationComplete] = useState(false);
 
   useEffect(() => {
     /**
@@ -43,19 +46,12 @@ export function AuthCallbackScreen() {
         console.log('[AuthCallback] Auth event:', event, 'Email confirmed:', session?.user?.email_confirmed_at);
 
         if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
-          console.log('[AuthCallback] Email verified! AuthContext will handle profile & navigation.');
+          console.log('[AuthCallback] Email verified! Waiting for AuthContext to finish...');
           toast.success('Email verified successfully!');
 
-          // AuthContext's onAuthStateChange will:
-          // 1. Create the profile
-          // 2. Set authenticated & onboarded state
-          // 3. Router will automatically redirect to /get-started or /dashboard
-
-          // Navigate to root - Router will redirect based on auth state
-          setTimeout(() => {
-            navigate('/', { replace: true });
-            subscription.unsubscribe();
-          }, 500);
+          // Set flag to indicate verification is complete
+          // useEffect below will handle navigation once AuthContext finishes
+          setVerificationComplete(true);
         }
 
         if (event === 'SIGNED_IN' && !session?.user?.email_confirmed_at) {
@@ -78,6 +74,15 @@ export function AuthCallbackScreen() {
     const cleanup = handleAuthCallback();
     return cleanup;
   }, [searchParams, navigate, t]);
+
+  // Wait for AuthContext to finish before navigating
+  useEffect(() => {
+    if (verificationComplete && state.isAuthenticated && !state.isLoading) {
+      console.log('[AuthCallback] AuthContext finished! Navigating to onboarding...');
+      // Navigate to get-started directly
+      navigate('/get-started', { replace: true });
+    }
+  }, [verificationComplete, state.isAuthenticated, state.isLoading, navigate]);
 
   if (error) {
     return (
