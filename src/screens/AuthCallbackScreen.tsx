@@ -22,21 +22,29 @@ export function AuthCallbackScreen() {
     const code = queryParams.get('code');
     const error = queryParams.get('error');
 
-    // CRITICAL: Check and set flag SYNCHRONOUSLY before any async operations
+    // CRITICAL: Check and set flags SYNCHRONOUSLY before any async operations
     if (code) {
-      const processedKey = `pkce_code_${code}`;
-      const alreadyProcessed = sessionStorage.getItem(processedKey);
+      const processedKey = `pkce_code_${code}_completed`;
+      const processingKey = `pkce_code_${code}_processing`;
 
-      if (alreadyProcessed) {
-        console.log('[AuthCallback] Code already processed, effect #2 skipping');
-        return; // Exit immediately before any async operations
+      // Check if already fully completed
+      const alreadyCompleted = sessionStorage.getItem(processedKey);
+      if (alreadyCompleted) {
+        console.log('[AuthCallback] Code already completed, skipping');
+        return;
       }
 
-      // Set flag IMMEDIATELY (synchronously) to block other effects
-      sessionStorage.setItem(processedKey, 'true');
-      // Also set flag to tell AuthContext to ignore SIGNED_IN event
+      // Check if currently being processed by another effect
+      const currentlyProcessing = sessionStorage.getItem(processingKey);
+      if (currentlyProcessing) {
+        console.log('[AuthCallback] Code currently being processed by another effect, skipping');
+        return;
+      }
+
+      // Mark as currently processing
+      sessionStorage.setItem(processingKey, 'true');
       sessionStorage.setItem('email_verification_in_progress', 'true');
-      console.log('[AuthCallback] Effect #1 - marked code as processing');
+      console.log('[AuthCallback] Starting to process code');
     }
 
     let isMounted = true;
@@ -58,35 +66,44 @@ export function AuthCallbackScreen() {
 
         // PKCE code exchange
         if (code) {
-          console.log('[AuthCallback] ===== STARTING PKCE CODE EXCHANGE =====');
-          console.log('[AuthCallback] Calling supabase.auth.exchangeCodeForSession...');
+          // Check if we already have a session (component remounted after exchange)
+          console.log('[AuthCallback] Checking if session already exists from previous exchange...');
+          const { data: { session: existingSession } } = await supabase.auth.getSession();
 
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (existingSession) {
+            console.log('[AuthCallback] Session already exists (remount after exchange), using it');
+            session = existingSession;
+          } else {
+            console.log('[AuthCallback] ===== STARTING PKCE CODE EXCHANGE =====');
+            console.log('[AuthCallback] Calling supabase.auth.exchangeCodeForSession...');
 
-          console.log('[AuthCallback] ===== PKCE CODE EXCHANGE COMPLETED =====');
-          console.log('[AuthCallback] Exchange result:', {
-            hasData: !!data,
-            hasSession: !!data?.session,
-            hasError: !!exchangeError,
-            userId: data?.session?.user?.id
-          });
+            const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-          if (exchangeError) {
-            // Clear the flags if exchange failed so user can retry
-            sessionStorage.removeItem(`pkce_code_${code}`);
-            sessionStorage.removeItem('email_verification_in_progress');
-            console.error('[AuthCallback] Code exchange failed:', exchangeError);
-            throw new Error(`Authentication failed: ${exchangeError.message}`);
+            console.log('[AuthCallback] ===== PKCE CODE EXCHANGE COMPLETED =====');
+            console.log('[AuthCallback] Exchange result:', {
+              hasData: !!data,
+              hasSession: !!data?.session,
+              hasError: !!exchangeError,
+              userId: data?.session?.user?.id
+            });
+
+            if (exchangeError) {
+              // Clear processing flags if exchange failed so user can retry
+              sessionStorage.removeItem(`pkce_code_${code}_processing`);
+              sessionStorage.removeItem('email_verification_in_progress');
+              console.error('[AuthCallback] Code exchange failed:', exchangeError);
+              throw new Error(`Authentication failed: ${exchangeError.message}`);
+            }
+
+            if (!data?.session) {
+              sessionStorage.removeItem(`pkce_code_${code}_processing`);
+              sessionStorage.removeItem('email_verification_in_progress');
+              throw new Error('Code exchange succeeded but no session returned');
+            }
+
+            session = data.session;
+            console.log('[AuthCallback] ===== CODE EXCHANGE SUCCESS - CONTINUING TO HANDLE AUTH =====');
           }
-
-          if (!data?.session) {
-            sessionStorage.removeItem(`pkce_code_${code}`);
-            sessionStorage.removeItem('email_verification_in_progress');
-            throw new Error('Code exchange succeeded but no session returned');
-          }
-
-          session = data.session;
-          console.log('[AuthCallback] ===== CODE EXCHANGE SUCCESS - CONTINUING TO HANDLE AUTH =====');
         } else {
           // Fallback: check existing session (implicit flow or other scenarios)
           console.log('[AuthCallback] No code, checking existing session');
@@ -117,9 +134,12 @@ export function AuthCallbackScreen() {
 
         console.error('[AuthCallback] Error:', error);
 
-        // Clear the verification flag on error to allow retry
+        // Clear processing flags on error to allow retry (but don't mark as completed)
+        if (code) {
+          sessionStorage.removeItem(`pkce_code_${code}_processing`);
+        }
         sessionStorage.removeItem('email_verification_in_progress');
-        console.log('[AuthCallback] Cleared email_verification_in_progress flag after error');
+        console.log('[AuthCallback] Cleared processing flags after error (can retry)');
 
         setStatus('error');
         setErrorMessage(error.message || 'Authentication failed');
@@ -161,9 +181,13 @@ export function AuthCallbackScreen() {
       console.log('[AuthCallback.handleSuccessfulAuth] ===== ensureProfile COMPLETED =====');
       console.log('[AuthCallback.handleSuccessfulAuth] Profile created successfully ✓');
 
-      // Clear the verification flag now that profile is created
+      // Mark as completed and clear processing flags
+      if (code) {
+        sessionStorage.setItem(`pkce_code_${code}_completed`, 'true');
+        sessionStorage.removeItem(`pkce_code_${code}_processing`);
+      }
       sessionStorage.removeItem('email_verification_in_progress');
-      console.log('[AuthCallback.handleSuccessfulAuth] Cleared email_verification_in_progress flag ✓');
+      console.log('[AuthCallback.handleSuccessfulAuth] Marked as completed, cleared all flags ✓');
 
       if (!isMounted) {
         console.error('[AuthCallback.handleSuccessfulAuth] Component unmounted before setting success state!');
