@@ -102,6 +102,11 @@
     "verificationFailed": "Verification Failed",
     "redirectingToLogin": "Redirecting to login...",
     "signupFailed": "Signup failed. Please try again.",
+    "failedToResendVerificationEmail": "Failed to resend verification email",
+    "emailVerifiedSuccessfully": "Email verified successfully!",
+    "emailNotVerifiedYet": "Email not verified yet. Please check your inbox and click the verification link.",
+    "failedToCheckVerification": "Failed to check verification status",
+    "alreadyVerifiedGoToLogin": "Already verified? Go to login",
     "messages": {
       "loginSuccess": "Login successful",
       "loginFailed": "Login failed. Please try again",

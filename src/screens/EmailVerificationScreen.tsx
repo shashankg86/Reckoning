@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeftIcon, EnvelopeIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { EnvelopeIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { authAPI } from '../api/auth';
 import { supabase } from '../lib/supabaseClient';
 import toast from 'react-hot-toast';
@@ -51,13 +51,13 @@ export function EmailVerificationScreen() {
 
     try {
       setIsResending(true);
-      await authAPI.resetPassword(locationState.email);
-      toast.success('Verification email sent! Please check your inbox.');
+      await authAPI.resendVerificationEmail(locationState.email);
+      toast.success(t('auth.verificationEmailSent'));
       setCountdown(60);
       setCanResend(false);
     } catch (error: any) {
       console.error('Error resending verification email:', error);
-      toast.error(error.message || 'Failed to resend verification email');
+      toast.error(error.message || t('auth.failedToResendVerificationEmail'));
     } finally {
       setIsResending(false);
     }
@@ -85,24 +85,20 @@ export function EmailVerificationScreen() {
           );
         }
 
-        toast.success('Email verified successfully!');
+        toast.success(t('auth.emailVerifiedSuccessfully'));
 
         // AuthContext will handle the auth state update via onAuthStateChange
         // Just navigate to onboarding
         navigate('/get-started', { replace: true });
       } else {
-        toast.error('Email not verified yet. Please check your inbox and click the verification link.');
+        toast.error(t('auth.emailNotVerifiedYet'));
       }
     } catch (error: any) {
       console.error('Error checking verification:', error);
-      toast.error('Failed to check verification status');
+      toast.error(t('auth.failedToCheckVerification'));
     } finally {
       setIsCheckingVerification(false);
     }
-  };
-
-  const handleGoBack = () => {
-    navigate('/signup', { replace: true });
   };
 
   if (!locationState?.email) {
@@ -110,35 +106,7 @@ export function EmailVerificationScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800 flex flex-col">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-md mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleGoBack}
-              className="
-                p-2 rounded-lg text-gray-600 dark:text-gray-400
-                hover:bg-gray-100 dark:hover:bg-gray-700
-                transition-colors duration-200
-              "
-            >
-              <ArrowLeftIcon className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {t('auth.emailVerification')}
-              </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {t('auth.verifyToCompleteSignup')}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8">
           {/* Icon */}
           <div className="text-center mb-6">
@@ -189,7 +157,7 @@ export function EmailVerificationScreen() {
           </button>
 
           {/* Resend Section */}
-          <div className="text-center border-t border-gray-200 dark:border-gray-700 pt-4">
+          <div className="text-center border-t border-gray-200 dark:border-gray-700 pt-4 mb-4">
             <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
               {t('auth.didNotReceiveEmail')}
             </p>
@@ -214,19 +182,17 @@ export function EmailVerificationScreen() {
               </p>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Footer Info */}
-      <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-        <div className="max-w-md mx-auto px-4 py-4">
+          {/* Already Verified Link */}
           <div className="text-center">
-            <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-              {t('auth.emailVerificationFooter')}
-            </p>
+            <button
+              onClick={() => navigate('/login', { replace: true })}
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors duration-200"
+            >
+              {t('auth.alreadyVerifiedGoToLogin')}
+            </button>
           </div>
         </div>
-      </div>
     </div>
   );
 }
