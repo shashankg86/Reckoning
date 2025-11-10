@@ -29,22 +29,13 @@ export const authAPI = {
    * Critical for both email signup and OAuth flows
    */
   async ensureProfile(userId: string, email: string | null, name?: string, phone?: string) {
-    console.log('[ensureProfile] Starting profile creation/update for:', userId);
+    console.log('[ensureProfile] ===== FUNCTION CALLED =====');
+    console.log('[ensureProfile] userId:', userId);
+    console.log('[ensureProfile] email:', email);
+    console.log('[ensureProfile] name:', name);
+    console.log('[ensureProfile] phone:', phone);
 
     try {
-      // Check if session exists before making API call
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      console.log('[ensureProfile] Current session status:', {
-        hasSession: !!sessionData.session,
-        userId: sessionData.session?.user?.id,
-        sessionError: sessionError
-      });
-
-      if (!sessionData.session) {
-        console.error('[ensureProfile] No active session - cannot create profile');
-        throw new Error('No active session');
-      }
-
       const profileData = {
         id: userId,
         email: email?.toLowerCase() || null,
@@ -53,7 +44,8 @@ export const authAPI = {
         last_login_at: new Date().toISOString(),
       };
 
-      console.log('[ensureProfile] Calling Supabase upsert with data:', profileData);
+      console.log('[ensureProfile] Profile data prepared:', JSON.stringify(profileData, null, 2));
+      console.log('[ensureProfile] About to call supabase.from(profiles).upsert()...');
 
       const { data, error } = await supabase
         .from('profiles')
@@ -61,21 +53,26 @@ export const authAPI = {
         .select()
         .single();
 
-      console.log('[ensureProfile] Upsert completed:', {
-        success: !!data,
-        error: error,
-        profileId: data?.id
-      });
+      console.log('[ensureProfile] ===== UPSERT COMPLETED =====');
+      console.log('[ensureProfile] Success:', !!data);
+      console.log('[ensureProfile] Error:', error);
+      console.log('[ensureProfile] Returned data:', data);
 
       if (error) {
-        console.error('[ensureProfile] Supabase error details:', JSON.stringify(error, null, 2));
+        console.error('[ensureProfile] ===== ERROR DETAILS =====');
+        console.error('[ensureProfile] Error code:', error.code);
+        console.error('[ensureProfile] Error message:', error.message);
+        console.error('[ensureProfile] Error details:', JSON.stringify(error, null, 2));
         return null;
       }
 
-      console.log('[ensureProfile] Profile created/updated successfully');
+      console.log('[ensureProfile] ===== SUCCESS - RETURNING PROFILE =====');
       return data;
     } catch (error) {
-      console.error('[ensureProfile] Exception caught:', error);
+      console.error('[ensureProfile] ===== EXCEPTION CAUGHT =====');
+      console.error('[ensureProfile] Exception:', error);
+      console.error('[ensureProfile] Exception type:', typeof error);
+      console.error('[ensureProfile] Exception stack:', (error as Error).stack);
       return null;
     }
   },
