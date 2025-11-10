@@ -36,24 +36,17 @@ export const authAPI = {
     console.log('[ensureProfile] phone:', phone);
 
     try {
-      const profileData = {
-        id: userId,
-        email: email?.toLowerCase() || null,
-        name: name || email?.split('@')[0] || 'User',
-        phone: phone || '',
-        last_login_at: new Date().toISOString(),
-      };
+      console.log('[ensureProfile] Calling secure upsert_user_profile function...');
 
-      console.log('[ensureProfile] Profile data prepared:', JSON.stringify(profileData, null, 2));
-      console.log('[ensureProfile] About to call supabase.from(profiles).upsert()...');
+      // Use SECURITY DEFINER function to bypass RLS policy timing issues
+      const { data, error } = await supabase.rpc('upsert_user_profile', {
+        p_user_id: userId,
+        p_email: email,
+        p_name: name,
+        p_phone: phone
+      });
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .upsert(profileData, { onConflict: 'id' })
-        .select()
-        .single();
-
-      console.log('[ensureProfile] ===== UPSERT COMPLETED =====');
+      console.log('[ensureProfile] ===== RPC COMPLETED =====');
       console.log('[ensureProfile] Success:', !!data);
       console.log('[ensureProfile] Error:', error);
       console.log('[ensureProfile] Returned data:', data);
@@ -67,7 +60,8 @@ export const authAPI = {
       }
 
       console.log('[ensureProfile] ===== SUCCESS - RETURNING PROFILE =====');
-      return data;
+      // RPC returns jsonb, convert to profile object
+      return data as any;
     } catch (error) {
       console.error('[ensureProfile] ===== EXCEPTION CAUGHT =====');
       console.error('[ensureProfile] Exception:', error);
