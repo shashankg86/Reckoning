@@ -333,8 +333,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const name = session!.user!.user_metadata?.name || email?.split('@')[0] || 'User';
           const phone = session!.user!.user_metadata?.phone || '';
 
+          console.log('[AuthContext] About to call ensureProfile with params:', {
+            uid,
+            email,
+            name,
+            phone,
+            sessionExists: !!session,
+            userMetadata: session!.user!.user_metadata
+          });
+
           try {
+            console.log('[AuthContext] Calling authAPI.ensureProfile now...');
             const profile = await authAPI.ensureProfile(uid, email, name, phone);
+            console.log('[AuthContext] ensureProfile returned:', profile);
 
             if (!profile) {
               throw new Error('Profile creation returned null');
