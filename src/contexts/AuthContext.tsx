@@ -343,6 +343,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
 
           try {
+            // CRITICAL FIX: Wait for session to propagate to global supabase client
+            // Without this delay, auth.uid() returns NULL and RLS policies block the upsert
+            console.log('[AuthContext] Waiting 100ms for session to propagate to global client...');
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Verify session is available in global client
+            const { data: sessionCheck } = await supabase.auth.getSession();
+            console.log('[AuthContext] Session check after delay:', {
+              hasSession: !!sessionCheck.session,
+              sessionUserId: sessionCheck.session?.user?.id,
+              matchesEventUserId: sessionCheck.session?.user?.id === uid
+            });
+
+            if (!sessionCheck.session) {
+              throw new Error('Session not available in global client after delay');
+            }
+
             console.log('[AuthContext] Calling authAPI.ensureProfile now...');
             const profile = await authAPI.ensureProfile(uid, email, name, phone);
             console.log('[AuthContext] ensureProfile returned:', profile);
