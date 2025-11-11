@@ -149,23 +149,31 @@ async function ensureOAuthProfile(session: any): Promise<boolean> {
   try {
     const uid = session.user.id;
     const email = session.user.email;
+    const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User';
+    const phone = session.user.user_metadata?.phone || '';
 
     // Validate for duplicates
     const validation = await validateGoogleOAuth(uid, email);
     if (!validation.isValid) {
-      console.error('OAuth validation failed:', validation.errorMsg);
+      console.error('[AuthContext] OAuth validation failed:', validation.errorMsg);
       await authAPI.logout();
-      toast.error(validation.errorMsg!); // Error message already user-friendly from validateGoogleOAuth
+      toast.error(validation.errorMsg!);
       return false;
     }
 
-    // Create profile
-    const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
-    const phone = session.user.user_metadata?.phone || '';
-    await authAPI.ensureProfile(uid, email, name, phone);
+    // Create or update profile
+    const profile = await authAPI.ensureProfile(uid, email, name, phone);
+    if (!profile) {
+      console.error('[AuthContext] Failed to create/update profile');
+      toast.error('Failed to create user profile. Please try again.');
+      await authAPI.logout();
+      return false;
+    }
+
     return true;
   } catch (err) {
     console.error('[AuthContext] Failed to ensure OAuth profile:', err);
+    toast.error('Failed to setup account. Please try again.');
     return false;
   }
 }
@@ -230,9 +238,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Check if we're handling an OAuth callback
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasOAuthParams =
+      hashParams.has('access_token') ||
+      searchParams.has('code');
+    const hasOAuthError = hashParams.has('error') || searchParams.has('error');
+    const oAuthError = hashParams.get('error') || searchParams.get('error');
+    const oAuthErrorDescription = hashParams.get('error_description') || searchParams.get('error_description');
+
     const init = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Check for OAuth errors first
+        if (hasOAuthError) {
+          console.error('[AuthContext] OAuth error detected:', oAuthError, oAuthErrorDescription);
+          toast.error(`Authentication failed: ${oAuthErrorDescription || oAuthError || 'Unknown error'}`);
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+
+        // If OAuth callback, manually exchange code for session
+        if (hasOAuthParams) {
+          console.log('[AuthContext] OAuth callback detected');
+
+          // Wait a bit for Supabase to process the OAuth callback
+          await new Promise(resolve => setTimeout(resolve, 1500));
+
+          const { data: { session: oauthSession }, error: oauthError } = await supabase.auth.getSession();
+
+          if (oauthError) {
+            console.error('[AuthContext] OAuth session error:', oauthError);
+            toast.error('Failed to complete authentication. Please try again.');
+            dispatch({ type: 'SET_LOADING', payload: false });
+            return;
+          }
+
+          if (!oauthSession?.user) {
+            console.error('[AuthContext] OAuth callback - no session established');
+            toast.error('Authentication failed. Please try again.');
+            dispatch({ type: 'SET_LOADING', payload: false });
+            return;
+          }
+
+          // Successfully got session from OAuth
+          const uid = oauthSession.user.id;
+          const email = oauthSession.user.email ?? null;
+          const provider = oauthSession.user.app_metadata.provider;
+          lastUserIdRef.current = uid;
+
+          dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
+
+          // Handle Google OAuth - ensure profile exists
+          if (provider === 'google') {
+            const success = await ensureOAuthProfile(oauthSession);
+            if (!success) {
+              lastUserIdRef.current = null;
+              dispatch({ type: 'LOGOUT' });
+              dispatch({ type: 'SET_LOADING', payload: false });
+              return;
+            }
+          }
+
+          // Check onboarding status
+          const onboarded = await probeOnboardedWithTimeout(uid);
+          dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
+
+          // Load full profile
+          loadUserProfile(uid, email, { force: true });
+          return;
+        }
+
+        // Not OAuth callback - check for existing session (normal page load)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('[AuthContext] Error getting session:', sessionError);
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
 
         if (!session?.user) {
           dispatch({ type: 'SET_LOADING', payload: false });
@@ -241,12 +325,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const uid = session.user.id;
         const email = session.user.email ?? null;
+        const provider = session.user.app_metadata.provider;
         lastUserIdRef.current = uid;
 
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
-        // Handle OAuth profile creation and validation
-        if (session.user.app_metadata.provider === 'google') {
+        // Handle Google OAuth - ensure profile exists
+        if (provider === 'google') {
           const success = await ensureOAuthProfile(session);
           if (!success) {
             lastUserIdRef.current = null;
@@ -256,7 +341,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Probe onboarding status with timeout protection
+        // Check onboarding status
         const onboarded = await probeOnboardedWithTimeout(uid);
         dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
@@ -273,28 +358,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const uid = session?.user?.id ?? null;
       const email = session?.user?.email ?? null;
+      const provider = session?.user?.app_metadata?.provider;
 
-      if (event === 'SIGNED_IN' && uid && lastUserIdRef.current !== uid) {
-        // Skip email/password users - login() handles them
-        if (session!.user!.app_metadata.provider === 'email') return;
-
-        lastUserIdRef.current = uid;
-        dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
-
-        // Handle OAuth profile creation
-        if (session!.user!.app_metadata.provider === 'google') {
-          const success = await ensureOAuthProfile(session!);
-          if (!success) {
-            lastUserIdRef.current = null;
-            dispatch({ type: 'LOGOUT' });
-            return;
-          }
+      if (event === 'SIGNED_IN' && uid && session) {
+        // Skip if we already handled this user in init()
+        if (lastUserIdRef.current === uid) {
+          return;
         }
 
-        // Probe onboarding and load profile
-        const onboarded = await probeOnboardedWithTimeout(uid);
-        dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
-        loadUserProfile(uid, email, { force: true });
+        // Skip email/password users - login() handles them
+        if (provider === 'email') {
+          return;
+        }
+
+        console.log('[AuthContext] Unexpected OAuth sign-in event');
       }
 
       if (event === 'USER_UPDATED' && uid) {

@@ -21,14 +21,17 @@ export function Router() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* OAuth callback route - must be first to handle redirects */}
+        <Route path="/auth/callback" element={<OAuthCallbackRoute />} />
+
         {/* Auth routes */}
         <Route path="/login" element={<AuthRoute><LoginScreen /></AuthRoute>} />
         <Route path="/signup" element={<AuthRoute><SignupScreen /></AuthRoute>} />
         <Route path="/forgot-password" element={<AuthRoute><ForgotPasswordScreen /></AuthRoute>} />
-        
+
         {/* Phone verification route */}
         <Route path="/phone-verification" element={<VerificationRoute><PhoneVerificationScreen /></VerificationRoute>} />
-        
+
         {/* Onboarding route */}
         <Route path="/onboarding" element={<OnboardingRoute><OnboardingScreen /></OnboardingRoute>} />
         <Route path="/get-started" element={<OnboardingRoute><OnboardingScreen /></OnboardingRoute>} />
@@ -101,19 +104,39 @@ function VerificationRoute({ children }: { children: React.ReactNode }) {
 
 function OnboardingRoute({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
-  
+
   if (state.isLoading) {
     return <LoadingScreen />;
   }
-  
+
   if (!state.isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   // Redirect to dashboard if already onboarded
   if (state.isOnboarded) {
     return <Navigate to="/dashboard" replace />;
   }
-  
+
   return <>{children}</>;
+}
+
+function OAuthCallbackRoute() {
+  const { state } = useAuth();
+
+  // While processing OAuth, show loading
+  if (state.isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // After OAuth processed, redirect based on state
+  if (state.isAuthenticated) {
+    if (state.isOnboarded) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return <Navigate to="/get-started" replace />;
+  }
+
+  // If not authenticated (OAuth failed), go to login
+  return <Navigate to="/login" replace />;
 }
