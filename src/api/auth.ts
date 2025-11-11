@@ -26,7 +26,7 @@ export const authAPI = {
 
   /**
    * Ensure user profile exists (create or update)
-   * Critical for both email signup and OAuth flows
+   * Used for both email signup and OAuth flows
    */
   async ensureProfile(userId: string, email: string | null, name?: string, phone?: string) {
     try {
@@ -45,17 +45,21 @@ export const authAPI = {
         .single();
 
       if (error) {
-        console.error('Error ensuring profile:', error);
-        return null;
+        console.error('[authAPI] Error ensuring profile:', error);
+        throw error;
       }
 
+      console.log('[authAPI] Profile ensured successfully:', data.id);
       return data;
     } catch (error) {
-      console.error('Error in ensureProfile:', error);
-      return null;
+      console.error('[authAPI] Error in ensureProfile:', error);
+      throw error;
     }
   },
 
+  /**
+   * Sign up with email and password
+   */
   async signUpWithEmail(email: string, password: string, name: string, phone: string) {
     try {
       // Check if email already exists
@@ -95,11 +99,14 @@ export const authAPI = {
         session: data.session,
       };
     } catch (error: any) {
-      console.error('Sign up error:', error);
-      throw error; // Re-throw to preserve error details
+      console.error('[authAPI] Sign up error:', error);
+      throw error;
     }
   },
 
+  /**
+   * Login with email and password
+   */
   async loginWithEmail(email: string, password: string) {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -117,7 +124,7 @@ export const authAPI = {
         throw error;
       }
 
-      // CRITICAL: Check if user has a profile (must have signed up through app)
+      // Verify profile exists
       if (data.user) {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -126,18 +133,18 @@ export const authAPI = {
           .maybeSingle();
 
         if (profileError) {
-          console.error('Error checking profile during login:', profileError);
+          console.error('[authAPI] Error checking profile during login:', profileError);
           await supabase.auth.signOut();
           throw new Error('Failed to verify account. Please try again.');
         }
 
         if (!profile) {
-          // User exists in Supabase auth but not in profiles table = never signed up through app
+          // User exists in auth but not in profiles = never signed up properly
           await supabase.auth.signOut();
           throw new Error('No account found. Please sign up first.');
         }
 
-        // Profile exists - just update last login timestamp (DO NOT create)
+        // Update last login timestamp
         await supabase
           .from('profiles')
           .update({ last_login_at: new Date().toISOString() })
@@ -149,11 +156,14 @@ export const authAPI = {
         session: data.session,
       };
     } catch (error: any) {
-      console.error('Login error:', error);
-      throw error; // Re-throw to preserve error details
+      console.error('[authAPI] Login error:', error);
+      throw error;
     }
   },
 
+  /**
+   * Login with Google OAuth
+   */
   async loginWithGoogle() {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -170,21 +180,27 @@ export const authAPI = {
       if (error) throw error;
       return data;
     } catch (error: any) {
-      console.error('Google login error:', error);
+      console.error('[authAPI] Google login error:', error);
       throw new Error(error.message || 'Failed to login with Google');
     }
   },
 
+  /**
+   * Logout current user
+   */
   async logout() {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     } catch (error: any) {
-      console.error('Logout error:', error);
+      console.error('[authAPI] Logout error:', error);
       throw new Error(error.message || 'Failed to logout');
     }
   },
 
+  /**
+   * Get current authenticated user
+   */
   async getCurrentUser() {
     try {
       const {
@@ -194,11 +210,14 @@ export const authAPI = {
       if (error) throw error;
       return user;
     } catch (error: any) {
-      console.error('Get user error:', error);
+      console.error('[authAPI] Get user error:', error);
       return null;
     }
   },
 
+  /**
+   * Get current session
+   */
   async getSession() {
     try {
       const {
@@ -208,11 +227,14 @@ export const authAPI = {
       if (error) throw error;
       return session;
     } catch (error: any) {
-      console.error('Get session error:', error);
+      console.error('[authAPI] Get session error:', error);
       return null;
     }
   },
 
+  /**
+   * Send password reset email
+   */
   async resetPassword(email: string) {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -220,11 +242,14 @@ export const authAPI = {
       });
       if (error) throw error;
     } catch (error: any) {
-      console.error('Reset password error:', error);
+      console.error('[authAPI] Reset password error:', error);
       throw new Error(error.message || 'Failed to send reset email');
     }
   },
 
+  /**
+   * Update user password
+   */
   async updatePassword(newPassword: string) {
     try {
       const { error } = await supabase.auth.updateUser({
@@ -232,7 +257,7 @@ export const authAPI = {
       });
       if (error) throw error;
     } catch (error: any) {
-      console.error('Update password error:', error);
+      console.error('[authAPI] Update password error:', error);
       throw new Error(error.message || 'Failed to update password');
     }
   },
