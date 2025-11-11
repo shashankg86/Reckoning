@@ -59,9 +59,8 @@ export function SignupScreen() {
         navigate('/phone-verification', { state: { phone: data.phone, email: data.email, name: data.name, password: data.password, isSignup: true } });
       } else {
         await authRegister(data.email, data.password, data.name, data.phone);
-        // Email confirmation required - show success message
-        toast.success('Please check your email to verify your account.');
-        navigate('/login', { state: { email: data.email, emailSent: true } });
+        // Email confirmation required - redirect to verification pending screen
+        navigate('/verify-email', { state: { email: data.email } });
       }
     } catch (error: any) {
       if (error?.message?.includes('email')) {
