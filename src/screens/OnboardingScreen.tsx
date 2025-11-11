@@ -82,21 +82,25 @@ export function OnboardingScreen() {
     (async () => {
       const savedProgress = await onboardingAPI.get(state.user!.uid);
       if (savedProgress?.data) {
-        // Merge saved progress with user profile data
-        const mergedData: Partial<OnboardingFormData> = {
-          ...savedProgress.data,
-          email: defaultEmail, // Always use profile email
-          phone: savedProgress.data.phone || defaultPhone, // Prefer saved, fallback to profile
-        };
+        // Extract logoUrl separately since it's not a form field
+        const { logoUrl, ...savedFormData } = savedProgress.data;
 
         // Restore logo preview if exists
-        if (savedProgress.data.logoUrl) {
-          setLogoPreview(savedProgress.data.logoUrl);
+        if (logoUrl) {
+          setLogoPreview(logoUrl);
         }
 
+        // Merge saved form data with user profile data
+        const mergedData: Partial<OnboardingFormData> = {
+          ...savedFormData,
+          email: defaultEmail, // Always use profile email
+          phone: savedFormData.phone || defaultPhone, // Prefer saved, fallback to profile
+        };
+
+        // Reset form with saved data
         reset(mergedData);
 
-        // Store the loaded data as last saved
+        // Store the loaded data as last saved (including logoUrl)
         lastSavedDataRef.current = savedProgress.data;
       }
       progressLoadedRef.current = true;

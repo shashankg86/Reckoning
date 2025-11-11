@@ -15,6 +15,13 @@ export function LogoUpload({ value, onChange, error, disabled }: LogoUploadProps
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Sync preview with value prop when it changes (e.g., loaded from database)
+  React.useEffect(() => {
+    if (value !== undefined) {
+      setPreview(value || null);
+    }
+  }, [value]);
+
   const handleFileSelect = useCallback((file: File) => {
     // Validate file type
     if (!file.type.startsWith('image/')) {
