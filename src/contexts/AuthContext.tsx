@@ -114,59 +114,34 @@ async function probeOnboardedWithTimeout(userId: string, timeoutMs: number = 300
   }
 }
 
-// Validate Google OAuth for duplicate accounts
-async function validateGoogleOAuth(uid: string, email: string | null | undefined): Promise<{ isValid: boolean; errorMsg?: string }> {
-  if (!email) return { isValid: true };
+// Wait for profile to be created by database trigger
+async function waitForProfile(userId: string, maxAttempts: number = 10): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
 
-  try {
-    const emailExists = await authAPI.checkEmailExists(email);
-    if (!emailExists) return { isValid: true };
+      if (profile) {
+        console.log('[AuthContext] Profile found');
+        return true;
+      }
 
-    // Check if existing profile belongs to different user
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id, auth_provider')
-      .eq('email', email.toLowerCase())
-      .maybeSingle();
+      if (error) {
+        console.error('[AuthContext] Error checking profile:', error);
+      }
 
-    if (existingProfile && existingProfile.id !== uid) {
-      const providerName = existingProfile.auth_provider === 'email' ? 'email/password' : existingProfile.auth_provider;
-      return {
-        isValid: false,
-        errorMsg: `This email is already registered with ${providerName}. Please sign in using ${providerName} instead.`
-      };
+      // Wait 100ms before next attempt
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (err) {
+      console.error('[AuthContext] waitForProfile error:', err);
     }
-
-    return { isValid: true };
-  } catch (err) {
-    console.error('[AuthContext] OAuth validation error:', err);
-    return { isValid: true }; // Allow on validation error
   }
-}
 
-// Ensure OAuth profile exists
-async function ensureOAuthProfile(session: any): Promise<boolean> {
-  try {
-    const uid = session.user.id;
-    const email = session.user.email;
-
-    // Validate for duplicates
-    const validation = await validateGoogleOAuth(uid, email);
-    if (!validation.isValid) {
-      console.error('OAuth validation failed:', validation.errorMsg);
-      await authAPI.logout();
-      toast.error(validation.errorMsg!);
-      return false;
-    }
-
-    // Profile is already created by database trigger (create_profile_for_user)
-    // No need to manually create - just return success
-    console.log('[AuthContext] OAuth profile validated successfully');
-    return true;
-  } catch (err) {
-    console.error('[AuthContext] Failed to ensure OAuth profile:', err);
-    return false;
-  }
+  console.error('[AuthContext] Profile not found after', maxAttempts, 'attempts');
+  return false;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -268,22 +243,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastUserIdRef.current = uid;
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
-        // Handle OAuth profile creation and validation
-        if (session.user.app_metadata.provider === 'google') {
-          const success = await ensureOAuthProfile(session);
-          if (!success) {
-            lastUserIdRef.current = null;
-            dispatch({ type: 'LOGOUT' });
-            dispatch({ type: 'SET_LOADING', payload: false });
-            return;
-          }
+        // Wait for profile to be created by database trigger
+        console.log('[AuthContext] Init: Waiting for profile...');
+        const profileExists = await waitForProfile(uid);
+        if (!profileExists) {
+          console.error('[AuthContext] Init: Profile not found - logging out');
+          await authAPI.logout();
+          dispatch({ type: 'LOGOUT' });
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
         }
 
-        // Probe onboarding status with timeout protection
+        // Check if onboarding complete
         const onboarded = await probeOnboardedWithTimeout(uid);
         dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
-        // Load full profile in background
+        // Load full profile
         loadUserProfile(uid, email, { force: true });
       } catch (err) {
         console.error('[AuthContext] Init error:', err);
@@ -308,34 +283,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        console.log('[AuthContext] New SIGNED_IN event for user:', uid, 'Provider:', session!.user!.app_metadata.provider);
+        console.log('[AuthContext] SIGNED_IN event for:', uid, 'Provider:', session!.user!.app_metadata.provider);
 
         lastUserIdRef.current = uid;
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
-        // Handle profile creation for all providers
-        // IMPORTANT: Profile is created HERE (after sign-in, BEFORE onboarding)
-        // This ensures consistent flow for all auth methods
-        if (session!.user!.app_metadata.provider === 'google') {
-          // Google OAuth - create profile immediately after sign-in
-          console.log('[AuthContext] Google OAuth sign-in, creating profile before onboarding...');
-          const success = await ensureOAuthProfile(session!);
-          if (!success) {
-            lastUserIdRef.current = null;
-            dispatch({ type: 'LOGOUT' });
-            return;
-          }
-          console.log('[AuthContext] Google profile created successfully');
-        } else if (session!.user!.app_metadata.provider === 'email' && isEmailConfirmed) {
-          // Email verification complete
-          // Profile is already created by database trigger (create_profile_for_user)
-          // No need to manually create - just continue
-          console.log('[AuthContext] Email verified - profile already created by trigger');
+        // Wait for profile to be created by database trigger
+        console.log('[AuthContext] Waiting for profile to be created by trigger...');
+        const profileExists = await waitForProfile(uid);
+        if (!profileExists) {
+          console.error('[AuthContext] Profile not found - logging out');
+          await authAPI.logout();
+          lastUserIdRef.current = null;
+          dispatch({ type: 'LOGOUT' });
+          return;
         }
 
-        // Probe onboarding and load profile
+        console.log('[AuthContext] Profile exists, checking onboarding status...');
+
+        // Check if onboarding complete
         const onboarded = await probeOnboardedWithTimeout(uid);
         dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
+
+        // Load full profile
         loadUserProfile(uid, email, { force: true });
       }
 

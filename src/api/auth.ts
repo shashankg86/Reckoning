@@ -25,50 +25,15 @@ export const authAPI = {
   },
 
   /**
-   * Ensure user profile exists (create or update)
-   * Critical for both email signup and OAuth flows
+   * DEPRECATED: Profile creation is handled by database trigger
+   * This function is kept for backward compatibility but does nothing
    */
   async ensureProfile(userId: string, email: string | null, name?: string, phone?: string) {
-    console.log('[ensureProfile] ===== FUNCTION CALLED =====');
-    console.log('[ensureProfile] userId:', userId);
-    console.log('[ensureProfile] email:', email);
-    console.log('[ensureProfile] name:', name);
-    console.log('[ensureProfile] phone:', phone);
-
-    try {
-      console.log('[ensureProfile] Calling secure upsert_user_profile function...');
-
-      // Use SECURITY DEFINER function to bypass RLS policy timing issues
-      const { data, error } = await supabase.rpc('upsert_user_profile', {
-        p_user_id: userId,
-        p_email: email,
-        p_name: name,
-        p_phone: phone
-      });
-
-      console.log('[ensureProfile] ===== RPC COMPLETED =====');
-      console.log('[ensureProfile] Success:', !!data);
-      console.log('[ensureProfile] Error:', error);
-      console.log('[ensureProfile] Returned data:', data);
-
-      if (error) {
-        console.error('[ensureProfile] ===== ERROR DETAILS =====');
-        console.error('[ensureProfile] Error code:', error.code);
-        console.error('[ensureProfile] Error message:', error.message);
-        console.error('[ensureProfile] Error details:', JSON.stringify(error, null, 2));
-        return null;
-      }
-
-      console.log('[ensureProfile] ===== SUCCESS - RETURNING PROFILE =====');
-      // RPC returns jsonb, convert to profile object
-      return data as any;
-    } catch (error) {
-      console.error('[ensureProfile] ===== EXCEPTION CAUGHT =====');
-      console.error('[ensureProfile] Exception:', error);
-      console.error('[ensureProfile] Exception type:', typeof error);
-      console.error('[ensureProfile] Exception stack:', (error as Error).stack);
-      return null;
-    }
+    console.log('[ensureProfile] DEPRECATED: Profile creation handled by database trigger');
+    console.log('[ensureProfile] userId:', userId, 'email:', email);
+    // Profile is created automatically by create_profile_for_user() trigger
+    // No action needed
+    return null;
   },
 
   async signUpWithEmail(email: string, password: string, name: string, phone: string) {

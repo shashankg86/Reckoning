@@ -75,16 +75,7 @@ export function EmailVerificationScreen() {
       }
 
       if (data.session?.user?.email_confirmed_at) {
-        // Email verified! Create profile if needed
-        if (locationState.name || locationState.phone) {
-          await authAPI.ensureProfile(
-            data.session.user.id,
-            data.session.user.email,
-            locationState.name,
-            locationState.phone
-          );
-        }
-
+        // Email verified! Profile is created by database trigger
         toast.success(t('auth.emailVerifiedSuccessfully'));
 
         // AuthContext will handle the auth state update via onAuthStateChange
