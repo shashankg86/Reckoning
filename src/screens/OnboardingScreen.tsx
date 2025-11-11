@@ -52,6 +52,7 @@ export function OnboardingScreen() {
   const { state, completeOnboarding } = useAuth();
   const navigate = useNavigate();
   const progressLoadedRef = React.useRef(false);
+  const lastSavedDataRef = React.useRef<OnboardingData | null>(null);
 
   // Logo state
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -94,21 +95,67 @@ export function OnboardingScreen() {
         }
 
         reset(mergedData);
+
+        // Store the loaded data as last saved
+        lastSavedDataRef.current = savedProgress.data;
       }
       progressLoadedRef.current = true;
     })();
   }, [state.user, reset, defaultEmail, defaultPhone]);
 
-  // Save progress on blur/input events
-  const saveProgress = React.useCallback(() => {
+  // Helper function to check if data has changed
+  const hasDataChanged = React.useCallback((newData: OnboardingData): boolean => {
+    const lastSaved = lastSavedDataRef.current;
+
+    // If no previous save, always save
+    if (!lastSaved) return true;
+
+    // Compare all relevant fields
+    const fields: (keyof OnboardingData)[] = [
+      'name', 'type', 'address', 'city', 'state', 'country', 'pincode',
+      'phone', 'secondary_phone', 'email', 'gst_number', 'customCity',
+      'language', 'currency', 'theme', 'logoUrl'
+    ];
+
+    for (const field of fields) {
+      const oldValue = lastSaved[field];
+      const newValue = newData[field];
+
+      // Handle undefined vs empty string as equivalent
+      const normalizedOld = oldValue === undefined || oldValue === '' ? '' : oldValue;
+      const normalizedNew = newValue === undefined || newValue === '' ? '' : newValue;
+
+      if (normalizedOld !== normalizedNew) {
+        return true;
+      }
+    }
+
+    return false;
+  }, []);
+
+  // Save progress on blur/input events - only if data changed
+  const saveProgress = React.useCallback(async () => {
     if (!state.user || !progressLoadedRef.current) return;
+
     const currentValues = watch();
     const dataToSave: OnboardingData = {
       ...currentValues,
       logoUrl: logoPreview ?? undefined, // Save logo preview URL
     };
-    onboardingAPI.save(state.user.uid, 'basics', dataToSave).catch(() => {});
-  }, [state.user, watch, logoPreview]);
+
+    // Only save if data has actually changed
+    if (!hasDataChanged(dataToSave)) {
+      return;
+    }
+
+    try {
+      await onboardingAPI.save(state.user.uid, 'basics', dataToSave);
+      // Update last saved data reference on successful save
+      lastSavedDataRef.current = dataToSave;
+    } catch (error) {
+      // Silently fail - don't update lastSavedDataRef
+    }
+  }, [state.user, watch, logoPreview, hasDataChanged]);
 
   // Save on page unload/refresh
   React.useEffect(() => {
@@ -165,6 +212,9 @@ export function OnboardingScreen() {
         logoUrl: publicUrl,
       };
       await onboardingAPI.save(state.user.uid, 'basics', dataToSave);
+
+      // Update last saved data reference
+      lastSavedDataRef.current = dataToSave;
 
       toast.success(t('onboarding.logoUploaded') || 'Logo uploaded successfully!');
     } catch (error) {
