@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { secureStorage } from './secureStorage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -11,13 +10,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // Create Supabase client with enhanced security
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    // Use secure encrypted storage instead of plain localStorage
-    storage: secureStorage,
+    // Use localStorage for auth to support OAuth redirects
+    // Note: Session tokens are already secure (JWTs signed by Supabase)
+    // Custom encryption with rotating keys breaks OAuth callback flows
+    storage: window.localStorage,
 
     // Auto refresh tokens before expiry
     autoRefreshToken: true,
 
-    // Persist session securely
+    // Persist session
     persistSession: true,
 
     // Detect session from URL (OAuth redirects)

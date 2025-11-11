@@ -241,25 +241,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    let oauthTimeoutId: NodeJS.Timeout | null = null;
+
     // Check if we're handling an OAuth callback
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const searchParams = new URLSearchParams(window.location.search);
-    const isOAuthCallback =
+    const hasOAuthParams =
       hashParams.has('access_token') ||
-      searchParams.has('code') ||
-      hashParams.has('error');
+      searchParams.has('code');
+    const hasOAuthError = hashParams.has('error') || searchParams.has('error');
+    const oAuthError = hashParams.get('error') || searchParams.get('error');
+    const oAuthErrorDescription = hashParams.get('error_description') || searchParams.get('error_description');
 
     const init = async () => {
       try {
+        // Check for OAuth errors first
+        if (hasOAuthError) {
+          console.error('[AuthContext] OAuth error detected:', oAuthError, oAuthErrorDescription);
+          toast.error(`Authentication failed: ${oAuthErrorDescription || oAuthError || 'Unknown error'}`);
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+
         // If OAuth callback, don't check session - wait for onAuthStateChange SIGNED_IN event
-        if (isOAuthCallback) {
-          console.log('[AuthContext] Detected OAuth callback - waiting for SIGNED_IN event...');
+        if (hasOAuthParams) {
+          console.log('[AuthContext] OAuth callback detected:', {
+            hasAccessToken: hashParams.has('access_token'),
+            hasCode: searchParams.has('code'),
+            hash: window.location.hash,
+            search: window.location.search
+          });
+
+          // Set a timeout in case SIGNED_IN never fires
+          oauthTimeoutId = setTimeout(() => {
+            console.error('[AuthContext] OAuth timeout - SIGNED_IN event never fired');
+            toast.error('Authentication is taking too long. Please try again.');
+            dispatch({ type: 'SET_LOADING', payload: false });
+          }, 10000); // 10 second timeout
+
           // Keep loading=true, onAuthStateChange will handle the session
           return;
         }
 
         // Not OAuth callback - check for existing session (normal page load)
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[AuthContext] Normal page load - checking for existing session...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('[AuthContext] Error getting session:', sessionError);
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
 
         if (!session?.user) {
           console.log('[AuthContext] No existing session found');
@@ -278,7 +310,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // Handle Google OAuth - ensure profile exists
         if (provider === 'google') {
-          console.log('[AuthContext] Processing Google OAuth user...');
+          console.log('[AuthContext] Processing existing Google OAuth session...');
           const success = await ensureOAuthProfile(session);
           if (!success) {
             lastUserIdRef.current = null;
@@ -306,7 +338,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AuthContext] Auth state changed:', event, session?.user?.id);
+      console.log('[AuthContext] Auth state changed:', event, session?.user?.id, session?.user?.app_metadata?.provider);
+
+      // Clear OAuth timeout if event received
+      if (oauthTimeoutId && (event === 'SIGNED_IN' || event === 'SIGNED_OUT')) {
+        console.log('[AuthContext] Clearing OAuth timeout');
+        clearTimeout(oauthTimeoutId);
+        oauthTimeoutId = null;
+      }
 
       const uid = session?.user?.id ?? null;
       const email = session?.user?.email ?? null;
@@ -363,13 +402,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (event === 'SIGNED_OUT') {
         console.log('[AuthContext] SIGNED_OUT event');
+        if (oauthTimeoutId) {
+          clearTimeout(oauthTimeoutId);
+          oauthTimeoutId = null;
+        }
         lastUserIdRef.current = null;
         lastProfileLoadAtRef.current = 0;
         dispatch({ type: 'LOGOUT' });
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (oauthTimeoutId) {
+        clearTimeout(oauthTimeoutId);
+      }
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
