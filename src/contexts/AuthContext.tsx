@@ -152,8 +152,6 @@ async function ensureOAuthProfile(session: any): Promise<boolean> {
     const name = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User';
     const phone = session.user.user_metadata?.phone || '';
 
-    console.log('[AuthContext] Ensuring OAuth profile for:', { uid, email, name });
-
     // Validate for duplicates
     const validation = await validateGoogleOAuth(uid, email);
     if (!validation.isValid) {
@@ -172,7 +170,6 @@ async function ensureOAuthProfile(session: any): Promise<boolean> {
       return false;
     }
 
-    console.log('[AuthContext] OAuth profile ensured successfully');
     return true;
   } catch (err) {
     console.error('[AuthContext] Failed to ensure OAuth profile:', err);
@@ -263,18 +260,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // If OAuth callback, manually exchange code for session
         if (hasOAuthParams) {
-          console.log('[AuthContext] OAuth callback detected:', {
-            hasAccessToken: hashParams.has('access_token'),
-            hasCode: searchParams.has('code'),
-            hash: window.location.hash,
-            search: window.location.search
-          });
+          console.log('[AuthContext] OAuth callback detected');
 
           // Wait a bit for Supabase to process the OAuth callback
           await new Promise(resolve => setTimeout(resolve, 1500));
 
-          // Now try to get the session
-          console.log('[AuthContext] Getting session after OAuth callback...');
           const { data: { session: oauthSession }, error: oauthError } = await supabase.auth.getSession();
 
           if (oauthError) {
@@ -285,7 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           if (!oauthSession?.user) {
-            console.error('[AuthContext] OAuth callback - no session after wait');
+            console.error('[AuthContext] OAuth callback - no session established');
             toast.error('Authentication failed. Please try again.');
             dispatch({ type: 'SET_LOADING', payload: false });
             return;
@@ -297,13 +287,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const provider = oauthSession.user.app_metadata.provider;
           lastUserIdRef.current = uid;
 
-          console.log('[AuthContext] OAuth session established:', { uid, email, provider });
-
           dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
           // Handle Google OAuth - ensure profile exists
           if (provider === 'google') {
-            console.log('[AuthContext] Processing OAuth Google user...');
             const success = await ensureOAuthProfile(oauthSession);
             if (!success) {
               lastUserIdRef.current = null;
@@ -314,21 +301,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           // Check onboarding status
-          console.log('[AuthContext] Checking onboarding status for OAuth user...');
           const onboarded = await probeOnboardedWithTimeout(uid);
-          console.log('[AuthContext] Onboarding status:', onboarded);
-
           dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
           // Load full profile
           loadUserProfile(uid, email, { force: true });
-
-          console.log('[AuthContext] OAuth flow complete');
           return;
         }
 
         // Not OAuth callback - check for existing session (normal page load)
-        console.log('[AuthContext] Normal page load - checking for existing session...');
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
@@ -338,7 +319,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (!session?.user) {
-          console.log('[AuthContext] No existing session found');
           dispatch({ type: 'SET_LOADING', payload: false });
           return;
         }
@@ -348,13 +328,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const provider = session.user.app_metadata.provider;
         lastUserIdRef.current = uid;
 
-        console.log('[AuthContext] Existing session found:', { uid, email, provider });
-
         dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
         // Handle Google OAuth - ensure profile exists
         if (provider === 'google') {
-          console.log('[AuthContext] Processing existing Google OAuth session...');
           const success = await ensureOAuthProfile(session);
           if (!success) {
             lastUserIdRef.current = null;
@@ -365,10 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         // Check onboarding status
-        console.log('[AuthContext] Checking onboarding status...');
         const onboarded = await probeOnboardedWithTimeout(uid);
-        console.log('[AuthContext] Onboarding status:', onboarded);
-
         dispatch({ type: 'SET_ONBOARDED', payload: onboarded });
 
         // Load full profile in background
@@ -382,8 +356,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[AuthContext] Auth state changed:', event, session?.user?.id, session?.user?.app_metadata?.provider);
-
       const uid = session?.user?.id ?? null;
       const email = session?.user?.email ?? null;
       const provider = session?.user?.app_metadata?.provider;
@@ -391,27 +363,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === 'SIGNED_IN' && uid && session) {
         // Skip if we already handled this user in init()
         if (lastUserIdRef.current === uid) {
-          console.log('[AuthContext] SIGNED_IN event - already handled in init()');
           return;
         }
 
         // Skip email/password users - login() handles them
         if (provider === 'email') {
-          console.log('[AuthContext] SIGNED_IN event - email/password, skipping');
           return;
         }
 
-        // This shouldn't happen now since OAuth is handled in init()
-        console.log('[AuthContext] SIGNED_IN event - unexpected OAuth sign-in:', { uid, email, provider });
+        console.log('[AuthContext] Unexpected OAuth sign-in event');
       }
 
       if (event === 'USER_UPDATED' && uid) {
-        console.log('[AuthContext] USER_UPDATED event');
         loadUserProfile(uid, email, { force: true });
       }
 
       if (event === 'SIGNED_OUT') {
-        console.log('[AuthContext] SIGNED_OUT event');
         lastUserIdRef.current = null;
         lastProfileLoadAtRef.current = 0;
         dispatch({ type: 'LOGOUT' });

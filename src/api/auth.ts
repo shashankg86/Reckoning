@@ -49,7 +49,6 @@ export const authAPI = {
         return null;
       }
 
-      console.log('[authAPI] Profile ensured:', { id: data.id, email: data.email });
       return data;
     } catch (error) {
       console.error('[authAPI] Error in ensureProfile:', error);
