@@ -75,6 +75,7 @@ export const authAPI = {
             name,
             phone,
           },
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
         },
       });
 
@@ -85,10 +86,8 @@ export const authAPI = {
         throw error;
       }
 
-      // Immediately create profile after successful signup
-      if (data.user) {
-        await this.ensureProfile(data.user.id, email, name, phone);
-      }
+      // Note: Don't create profile here - it will be created after email confirmation
+      // The session will be null until email is confirmed
 
       return {
         user: data.user,
@@ -234,6 +233,22 @@ export const authAPI = {
     } catch (error: any) {
       console.error('Update password error:', error);
       throw new Error(error.message || 'Failed to update password');
+    }
+  },
+
+  async resendVerificationEmail(email: string) {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+        },
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Resend verification email error:', error);
+      throw new Error(error.message || 'Failed to resend verification email');
     }
   },
 };

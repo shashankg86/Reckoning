@@ -238,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    // Check if we're handling an OAuth callback
+    // Check if we're handling an OAuth or email confirmation callback
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const searchParams = new URLSearchParams(window.location.search);
     const hasOAuthParams =
@@ -247,6 +247,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const hasOAuthError = hashParams.has('error') || searchParams.has('error');
     const oAuthError = hashParams.get('error') || searchParams.get('error');
     const oAuthErrorDescription = hashParams.get('error_description') || searchParams.get('error_description');
+
+    // Check if this is an email confirmation callback
+    const isEmailConfirmation = window.location.pathname === '/auth/confirm';
 
     const init = async () => {
       try {
@@ -258,46 +261,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // If OAuth callback, manually exchange code for session
-        if (hasOAuthParams) {
-          console.log('[AuthContext] OAuth callback detected');
+        // If OAuth callback OR email confirmation callback, wait for session
+        if (hasOAuthParams || isEmailConfirmation) {
+          console.log(isEmailConfirmation ? '[AuthContext] Email confirmation callback detected' : '[AuthContext] OAuth callback detected');
 
           // Wait a bit for Supabase to process the OAuth callback
           await new Promise(resolve => setTimeout(resolve, 1500));
 
-          const { data: { session: oauthSession }, error: oauthError } = await supabase.auth.getSession();
+          const { data: { session: callbackSession }, error: callbackError } = await supabase.auth.getSession();
 
-          if (oauthError) {
-            console.error('[AuthContext] OAuth session error:', oauthError);
+          if (callbackError) {
+            console.error('[AuthContext] Callback session error:', callbackError);
             toast.error('Failed to complete authentication. Please try again.');
             dispatch({ type: 'SET_LOADING', payload: false });
             return;
           }
 
-          if (!oauthSession?.user) {
-            console.error('[AuthContext] OAuth callback - no session established');
+          if (!callbackSession?.user) {
+            console.error('[AuthContext] Callback - no session established');
             toast.error('Authentication failed. Please try again.');
             dispatch({ type: 'SET_LOADING', payload: false });
             return;
           }
 
-          // Successfully got session from OAuth
-          const uid = oauthSession.user.id;
-          const email = oauthSession.user.email ?? null;
-          const provider = oauthSession.user.app_metadata.provider;
+          // Successfully got session from OAuth or email confirmation
+          const uid = callbackSession.user.id;
+          const email = callbackSession.user.email ?? null;
+          const provider = callbackSession.user.app_metadata.provider;
           lastUserIdRef.current = uid;
 
           dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid, email } });
 
           // Handle Google OAuth - ensure profile exists
           if (provider === 'google') {
-            const success = await ensureOAuthProfile(oauthSession);
+            const success = await ensureOAuthProfile(callbackSession);
             if (!success) {
               lastUserIdRef.current = null;
               dispatch({ type: 'LOGOUT' });
               dispatch({ type: 'SET_LOADING', payload: false });
               return;
             }
+          }
+
+          // Handle email confirmation - create profile if needed
+          if (isEmailConfirmation && provider === 'email') {
+            const name = callbackSession.user.user_metadata?.name || email?.split('@')[0] || 'User';
+            const phone = callbackSession.user.user_metadata?.phone || '';
+            const profile = await authAPI.ensureProfile(uid, email, name, phone);
+            if (!profile) {
+              console.error('[AuthContext] Failed to create profile after email confirmation');
+              toast.error('Failed to create user profile. Please try again.');
+              await authAPI.logout();
+              lastUserIdRef.current = null;
+              dispatch({ type: 'LOGOUT' });
+              dispatch({ type: 'SET_LOADING', payload: false });
+              return;
+            }
+            toast.success('Email verified successfully!');
           }
 
           // Check onboarding status
@@ -429,13 +449,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, name: string, phone?: string) => {
     try {
       dispatch({ type: 'CLEAR_ERROR' });
-      const { user } = await authAPI.signUpWithEmail(email, password, name, phone || '');
+      const { user, session } = await authAPI.signUpWithEmail(email, password, name, phone || '');
+
       if (!user) throw new Error('Signup succeeded but user data not returned');
+
+      // If session is null, email confirmation is required
+      // User will need to verify email before they can login
+      if (!session) {
+        console.log('[AuthContext] Email confirmation required');
+        return { user, session: null };
+      }
+
+      // Session exists - email confirmation disabled or auto-confirmed
       lastUserIdRef.current = user.id;
       dispatch({ type: 'SET_AUTH_SESSION_PRESENT', payload: { uid: user.id, email: user.email ?? null } });
       dispatch({ type: 'SET_ONBOARDED', payload: false });
       loadUserProfile(user.id, user.email ?? null, { force: true });
       toast.success(i18n.t('auth.messages.accountCreated'));
+
+      return { user, session };
     } catch (error: any) {
       console.error('[AuthContext] Registration error:', error);
       const errorMessage = error.message || i18n.t('auth.messages.loginFailed');

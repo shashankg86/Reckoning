@@ -58,10 +58,9 @@ export function SignupScreen() {
       if (smsAPI.isConfigured()) {
         navigate('/phone-verification', { state: { phone: data.phone, email: data.email, name: data.name, password: data.password, isSignup: true } });
       } else {
-        const result = await authRegister(data.email, data.password, data.name, data.phone);
-        if (result.session?.user) {
-          await ensureMinimalProfile(result.session.user.id, data.email, data.name, data.phone);
-        }
+        await authRegister(data.email, data.password, data.name, data.phone);
+        // Email confirmation required - redirect to verification pending screen
+        navigate('/verify-email', { state: { email: data.email } });
       }
     } catch (error: any) {
       if (error?.message?.includes('email')) {

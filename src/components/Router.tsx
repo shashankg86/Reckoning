@@ -8,6 +8,7 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { SignupScreen } from '../screens/SignupScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { PhoneVerificationScreen } from '../screens/PhoneVerificationScreen';
+import { EmailVerificationPendingScreen } from '../screens/EmailVerificationPendingScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
 
 // App screens
@@ -24,10 +25,16 @@ export function Router() {
         {/* OAuth callback route - must be first to handle redirects */}
         <Route path="/auth/callback" element={<OAuthCallbackRoute />} />
 
+        {/* Email confirmation callback route */}
+        <Route path="/auth/confirm" element={<EmailConfirmCallbackRoute />} />
+
         {/* Auth routes */}
         <Route path="/login" element={<AuthRoute><LoginScreen /></AuthRoute>} />
         <Route path="/signup" element={<AuthRoute><SignupScreen /></AuthRoute>} />
         <Route path="/forgot-password" element={<AuthRoute><ForgotPasswordScreen /></AuthRoute>} />
+
+        {/* Email verification pending route */}
+        <Route path="/verify-email" element={<EmailVerificationPendingScreen />} />
 
         {/* Phone verification route */}
         <Route path="/phone-verification" element={<VerificationRoute><PhoneVerificationScreen /></VerificationRoute>} />
@@ -138,5 +145,25 @@ function OAuthCallbackRoute() {
   }
 
   // If not authenticated (OAuth failed), go to login
+  return <Navigate to="/login" replace />;
+}
+
+function EmailConfirmCallbackRoute() {
+  const { state } = useAuth();
+
+  // While processing email confirmation, show loading
+  if (state.isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // After email confirmed, redirect based on state
+  if (state.isAuthenticated) {
+    if (state.isOnboarded) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return <Navigate to="/get-started" replace />;
+  }
+
+  // If not authenticated (email confirmation failed), go to login
   return <Navigate to="/login" replace />;
 }
