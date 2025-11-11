@@ -117,29 +117,29 @@ export function OnboardingScreen() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveProgress]);
 
-  // Handle logo file change
-  const handleLogoChange = (file: File | null, previewUrl: string | null) => {
-    setLogoFile(file);
-    setLogoPreview(previewUrl);
-    saveProgress(); // Auto-save when logo changes
-  };
-
-  // Upload logo to Supabase storage
-  const uploadLogo = async (): Promise<string | null> => {
-    if (!logoFile || !state.user) return null;
+  // Handle logo file change - upload immediately to storage
+  const handleLogoChange = async (file: File | null, previewUrl: string | null) => {
+    if (!file || !state.user) {
+      // If removing logo, clear state and save
+      setLogoFile(null);
+      setLogoPreview(null);
+      saveProgress();
+      return;
+    }
 
     try {
       setIsUploadingLogo(true);
+      setLogoFile(file);
+      setLogoPreview(previewUrl); // Show preview immediately
 
-      // Generate unique filename
-      const fileExt = logoFile.name.split('.').pop();
+      // Upload to Supabase storage immediately
+      const fileExt = file.name.split('.').pop();
       const fileName = `${state.user.uid}-${Date.now()}.${fileExt}`;
       const filePath = `store-logos/${fileName}`;
 
-      // Upload to Supabase storage
       const { data, error } = await supabase.storage
         .from('store-assets')
-        .upload(filePath, logoFile, {
+        .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false,
         });
@@ -154,27 +154,33 @@ export function OnboardingScreen() {
         .from('store-assets')
         .getPublicUrl(filePath);
 
+      // Update preview to storage URL and save progress
+      setLogoPreview(publicUrl);
       setIsUploadingLogo(false);
-      return publicUrl;
+
+      // Save progress with the permanent URL
+      const currentValues = watch();
+      const dataToSave: OnboardingData = {
+        ...currentValues,
+        logoUrl: publicUrl,
+      };
+      await onboardingAPI.save(state.user.uid, 'basics', dataToSave);
+
+      toast.success(t('onboarding.logoUploaded') || 'Logo uploaded successfully!');
     } catch (error) {
       setIsUploadingLogo(false);
       console.error('Failed to upload logo:', error);
-      toast.error('Failed to upload logo. Please try again.');
-      return null;
+      toast.error(t('onboarding.logoUploadFailed') || 'Failed to upload logo. Please try again.');
+      // Revert to no logo on error
+      setLogoFile(null);
+      setLogoPreview(null);
     }
   };
 
   const onSubmit = async (data: OnboardingFormData) => {
     try {
-      let logoUrl = logoPreview; // Use existing preview if no new file
-
-      // Upload logo if a new file is selected
-      if (logoFile) {
-        const uploadedUrl = await uploadLogo();
-        if (uploadedUrl) {
-          logoUrl = uploadedUrl;
-        }
-      }
+      // Logo is already uploaded in handleLogoChange, just use the preview URL
+      const logoUrl = logoPreview;
 
       // Complete onboarding with logo URL
       const storeData: Store = {
