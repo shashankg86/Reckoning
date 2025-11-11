@@ -155,14 +155,13 @@ async function ensureOAuthProfile(session: any): Promise<boolean> {
     if (!validation.isValid) {
       console.error('OAuth validation failed:', validation.errorMsg);
       await authAPI.logout();
-      toast.error(validation.errorMsg!); // Error message already user-friendly from validateGoogleOAuth
+      toast.error(validation.errorMsg!);
       return false;
     }
 
-    // Create profile
-    const name = session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
-    const phone = session.user.user_metadata?.phone || '';
-    await authAPI.ensureProfile(uid, email, name, phone);
+    // Profile is already created by database trigger (create_profile_for_user)
+    // No need to manually create - just return success
+    console.log('[AuthContext] OAuth profile validated successfully');
     return true;
   } catch (err) {
     console.error('[AuthContext] Failed to ensure OAuth profile:', err);
@@ -328,39 +327,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           console.log('[AuthContext] Google profile created successfully');
         } else if (session!.user!.app_metadata.provider === 'email' && isEmailConfirmed) {
-          // Email verification - create profile immediately after verification
-          console.log('[AuthContext] Email verified, creating profile before onboarding...');
-          const name = session!.user!.user_metadata?.name || email?.split('@')[0] || 'User';
-          const phone = session!.user!.user_metadata?.phone || '';
-
-          console.log('[AuthContext] About to call ensureProfile with params:', {
-            uid,
-            email,
-            name,
-            phone,
-            sessionExists: !!session,
-            userMetadata: session!.user!.user_metadata
-          });
-
-          try {
-            // Use SECURITY DEFINER function to bypass RLS timing issues
-            console.log('[AuthContext] Calling authAPI.ensureProfile (uses secure RPC)...');
-            const profile = await authAPI.ensureProfile(uid, email, name, phone);
-            console.log('[AuthContext] ensureProfile returned:', profile);
-
-            if (!profile) {
-              throw new Error('Profile creation returned null');
-            }
-
-            console.log('[AuthContext] Email user profile created successfully:', profile.id);
-          } catch (profileError) {
-            console.error('[AuthContext] Failed to create profile:', profileError);
-            toast.error('Failed to create user profile. Please try again.');
-            await authAPI.logout();
-            lastUserIdRef.current = null;
-            dispatch({ type: 'LOGOUT' });
-            return;
-          }
+          // Email verification complete
+          // Profile is already created by database trigger (create_profile_for_user)
+          // No need to manually create - just continue
+          console.log('[AuthContext] Email verified - profile already created by trigger');
         }
 
         // Probe onboarding and load profile
