@@ -28,13 +28,18 @@ export const authAPI = {
    * Ensure user profile exists (create or update)
    * Critical for both email signup and OAuth flows
    */
-  async ensureProfile(userId: string, email: string | null, name?: string, phone?: string) {
+  async ensureProfile(userId: string, email: string | null, name?: string, phone?: string, provider?: string) {
     try {
+      // Get current user to determine provider if not specified
+      const { data: { user } } = await supabase.auth.getUser();
+      const authProvider = provider || user?.app_metadata?.provider || 'email';
+
       const profileData = {
         id: userId,
         email: email?.toLowerCase() || null,
         name: name || email?.split('@')[0] || 'User',
         phone: phone || '',
+        auth_provider: authProvider,
         last_login_at: new Date().toISOString(),
       };
 
@@ -45,13 +50,14 @@ export const authAPI = {
         .single();
 
       if (error) {
-        console.error('Error ensuring profile:', error);
+        console.error('[authAPI] Error ensuring profile:', error);
         return null;
       }
 
+      console.log('[authAPI] Profile ensured:', { id: data.id, email: data.email, provider: authProvider });
       return data;
     } catch (error) {
-      console.error('Error in ensureProfile:', error);
+      console.error('[authAPI] Error in ensureProfile:', error);
       return null;
     }
   },
