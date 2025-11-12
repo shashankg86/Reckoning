@@ -155,23 +155,37 @@
     "setupCompleted": "Menu setup completed successfully!",
     "helpText": "Need help? Contact support for assistance.",
     "chooseSetupMethod": "Choose How to Set Up Your Categories",
-    "setupMethodDescription": "Select the method that works best for you",
-    "templateMethod": "Use Template",
-    "templateMethodDescription": "Start with pre-built categories for your business type",
-    "ocrImportMethod": "Import from Photo",
-    "ocrImportMethodDescription": "Take a photo of your menu to extract categories",
-    "excelImportMethod": "Import from Excel/CSV",
-    "excelImportMethodDescription": "Upload a spreadsheet with your categories",
-    "bulkCreateMethod": "Bulk Create",
-    "bulkCreateMethodDescription": "Enter multiple categories quickly in a table",
-    "manualMethod": "Add Manually",
-    "manualMethodDescription": "Create categories one by one",
+    "chooseSetupMethodDescription": "Select the method that works best for you",
     "recommended": "Recommended",
+    "tip": "Tip",
+    "setupMethodTip": "Start with templates or bulk import to save time. You can always add more categories later from the Catalog screen.",
+    "methods": {
+      "template": {
+        "title": "Use Template",
+        "description": "Start with pre-built categories for your business type"
+      },
+      "ocrImport": {
+        "title": "Import from Photo",
+        "description": "Take a photo of your menu to extract categories"
+      },
+      "excelImport": {
+        "title": "Import from Excel/CSV",
+        "description": "Upload a spreadsheet with your categories"
+      },
+      "bulkCreate": {
+        "title": "Bulk Create",
+        "description": "Enter multiple categories quickly in a table"
+      },
+      "manual": {
+        "title": "Add Manually",
+        "description": "Create categories one by one"
+      }
+    },
     "bulkCreateCategories": "Bulk Create Categories",
     "bulkCreateDescription": "Enter multiple categories at once",
-    "addRow": "Add Row",
-    "removeRow": "Remove Row",
-    "validCategories": "{{count}} valid categories",
+    "addAnotherCategory": "Add Another Category",
+    "categoriesReady": "categories ready",
+    "createCategories": "Create {{count}} Categories",
     "importFromExcel": "Import Categories from Excel/CSV",
     "importFromExcelDescription": "Upload a file with your categories",
     "uploadFile": "Upload Your File",
@@ -353,6 +367,7 @@
     "delete": "Delete",
     "save": "Save",
     "saving": "Saving...",
+    "creating": "Creating...",
     "back": "Back",
     "complete": "Complete",
     "completing": "Completing...",
