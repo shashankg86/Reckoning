@@ -142,7 +142,7 @@ export function ItemFormModal({
             {/* Item Name */}
             <div className="md:col-span-2">
               <Input
-                label={t('catalog.itemName')}
+                label={`${t('catalog.itemName')} *`}
                 placeholder={t('catalog.enterItemName')}
                 error={errors.name?.message}
                 {...register('name')}
@@ -151,7 +151,7 @@ export function ItemFormModal({
 
             {/* Price */}
             <Input
-              label={t('catalog.price')}
+              label={`${t('catalog.price')} *`}
               type="number"
               step="0.01"
               min="0"
@@ -200,7 +200,7 @@ export function ItemFormModal({
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Description ({t('common.optional')})
+              Description *
             </label>
             <textarea
               {...register('description')}

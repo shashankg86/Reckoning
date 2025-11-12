@@ -154,7 +154,7 @@ export function ItemBulkCreateModal({
               <div>Category</div>
               <div>SKU</div>
               <div>Stock</div>
-              <div>Description</div>
+              <div>Description *</div>
               <div className="w-10"></div>
             </div>
 
