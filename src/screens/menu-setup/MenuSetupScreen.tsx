@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabaseClient';
 import { CategorySetupStep } from './CategorySetupStep';
+import { ItemsSetupStep } from './ItemsSetupStep';
 import { ReviewStep } from './ReviewStep';
 import type { MenuSetupStep } from '../../types/menu';
 
@@ -60,6 +61,8 @@ export function MenuSetupScreen() {
    */
   const handleNextStep = () => {
     if (currentStep === 'categories') {
+      setCurrentStep('items');
+    } else if (currentStep === 'items') {
       setCurrentStep('review');
     }
   };
@@ -68,8 +71,10 @@ export function MenuSetupScreen() {
    * Navigate to previous step
    */
   const handlePreviousStep = () => {
-    if (currentStep === 'review') {
+    if (currentStep === 'items') {
       setCurrentStep('categories');
+    } else if (currentStep === 'review') {
+      setCurrentStep('items');
     }
   };
 
@@ -79,7 +84,9 @@ export function MenuSetupScreen() {
   const getProgress = () => {
     switch (currentStep) {
       case 'categories':
-        return 50;
+        return 33;
+      case 'items':
+        return 66;
       case 'review':
         return 100;
       default:
@@ -112,6 +119,10 @@ export function MenuSetupScreen() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 sm:p-8">
           {currentStep === 'categories' && (
             <CategorySetupStep onNext={handleNextStep} />
+          )}
+
+          {currentStep === 'items' && (
+            <ItemsSetupStep onComplete={handleNextStep} />
           )}
 
           {currentStep === 'review' && (
