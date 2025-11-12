@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, XMarkIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 
 interface LogoUploadProps {
@@ -14,6 +14,13 @@ export function LogoUpload({ value, onChange, error, disabled }: LogoUploadProps
   const [preview, setPreview] = useState<string | null>(value || null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync preview with value prop when it changes (e.g., loaded from database)
+  React.useEffect(() => {
+    if (value !== undefined) {
+      setPreview(value || null);
+    }
+  }, [value]);
 
   const handleFileSelect = useCallback((file: File) => {
     // Validate file type
@@ -88,8 +95,23 @@ export function LogoUpload({ value, onChange, error, disabled }: LogoUploadProps
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">
-        {t('onboarding.storeLogo')} <span className="text-gray-400 text-xs ml-1">({t('common.optional')})</span>
+      <label className="block text-sm font-medium text-gray-700 flex items-center gap-2">
+        <span>
+          {t('onboarding.storeLogo')} <span className="text-gray-400 text-xs ml-1">({t('common.optional')})</span>
+        </span>
+
+        {/* Info icon with popover */}
+        <div className="relative group inline-block">
+          <InformationCircleIcon className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+
+          {/* Popover tooltip */}
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block z-10 w-64">
+            <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-lg">
+              <p>{t('onboarding.logoCanUpdateLater')}</p>
+              <div className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+            </div>
+          </div>
+        </div>
       </label>
 
       {preview ? (
