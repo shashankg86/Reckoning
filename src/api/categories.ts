@@ -69,11 +69,14 @@ export const categoriesAPI = {
             price,
             image_url,
             stock,
-            is_active
+            is_active,
+            description,
+            category_id
           )
         `)
         .eq('store_id', storeId)
         .eq('is_active', true)
+        .eq('items.is_active', true)
         .order('sort_order', { ascending: true });
 
       if (error) throw error;

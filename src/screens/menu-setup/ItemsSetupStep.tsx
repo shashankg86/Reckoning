@@ -24,10 +24,11 @@ import { ItemBulkCreateModal } from './components/ItemBulkCreateModal';
 import type { ItemData } from '../../api/items';
 
 interface ItemsSetupStepProps {
+  onBack: () => void;
   onComplete: () => void;
 }
 
-export function ItemsSetupStep({ onComplete }: ItemsSetupStepProps) {
+export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const { t } = useTranslation();
 
   const { items, loading, createItem, updateItem, deleteItem, bulkCreateItems, loadItems } =
@@ -352,8 +353,11 @@ export function ItemsSetupStep({ onComplete }: ItemsSetupStepProps) {
         </div>
       )}
 
-      {/* Continue Button */}
-      <div className="flex justify-end pt-4">
+      {/* Navigation */}
+      <div className="flex justify-between pt-4">
+        <Button variant="secondary" onClick={onBack} size="lg">
+          {t('common.back')}
+        </Button>
         <Button onClick={onComplete} size="lg">
           Continue to Review
         </Button>

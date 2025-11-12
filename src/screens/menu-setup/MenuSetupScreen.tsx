@@ -122,7 +122,7 @@ export function MenuSetupScreen() {
           )}
 
           {currentStep === 'items' && (
-            <ItemsSetupStep onComplete={handleNextStep} />
+            <ItemsSetupStep onBack={handlePreviousStep} onComplete={handleNextStep} />
           )}
 
           {currentStep === 'review' && (
