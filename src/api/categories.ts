@@ -178,6 +178,7 @@ export const categoriesAPI = {
           sort_order: nextSortOrder,
           parent_id: categoryData.parent_id || null,
           metadata: categoryData.metadata || {},
+          is_active: true,
           created_by: user.data.user.id,
         })
         .select()
@@ -188,6 +189,60 @@ export const categoriesAPI = {
     } catch (error: any) {
       console.error('Create category error:', error);
       throw new Error(error.message || 'Failed to create category');
+    }
+  },
+
+  /**
+   * Bulk create categories - ENTERPRISE APPROACH
+   * Single API call for multiple categories
+   */
+  async bulkCreateCategories(
+    storeId: string,
+    categoriesData: CreateCategoryData[]
+  ): Promise<Category[]> {
+    try {
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) throw new Error('Not authenticated');
+
+      // Get the current max sort order
+      const { data: existingCategories } = await supabase
+        .from('categories')
+        .select('sort_order')
+        .eq('store_id', storeId)
+        .order('sort_order', { ascending: false })
+        .limit(1);
+
+      let nextSortOrder = existingCategories && existingCategories.length > 0
+        ? existingCategories[0].sort_order + 1
+        : 0;
+
+      // Prepare all categories for insertion with proper sort_order
+      const categoriesToInsert = categoriesData.map((categoryData, index) => ({
+        store_id: storeId,
+        name: categoryData.name,
+        description: categoryData.description || null,
+        color: categoryData.color || '#FF6B35',
+        icon: categoryData.icon || 'square-3-stack-3d',
+        sort_order: categoryData.sort_order !== undefined
+          ? categoryData.sort_order
+          : nextSortOrder + index,
+        parent_id: categoryData.parent_id || null,
+        metadata: categoryData.metadata || {},
+        is_active: true,
+        created_by: user.data.user.id,
+      }));
+
+      // SINGLE API CALL - Insert all categories at once
+      const { data, error } = await supabase
+        .from('categories')
+        .insert(categoriesToInsert)
+        .select();
+
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error('Bulk create categories error:', error);
+      throw new Error(error.message || 'Failed to bulk create categories');
     }
   },
 

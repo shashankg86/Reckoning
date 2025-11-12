@@ -7,6 +7,7 @@
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
   PlusIcon,
   RectangleStackIcon,
@@ -17,6 +18,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
+import { useAuth } from '../../contexts/AuthContext';
 import { useCategories } from '../../hooks/useCategories';
 import { categoriesAPI } from '../../api/categories';
 import { CategoryCard } from './components/CategoryCard';
@@ -30,6 +32,7 @@ interface CategorySetupStepProps {
 
 export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const { t } = useTranslation();
+  const { state: authState } = useAuth();
   const {
     categories,
     loading,
@@ -69,8 +72,21 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   };
 
   const handleBulkCreate = async (categories: CreateCategoryData[]) => {
-    for (const category of categories) {
-      await createCategory(category);
+    // ENTERPRISE APPROACH: Single API call for all categories
+    const storeId = (authState.user as any)?.store?.id;
+    if (!storeId) {
+      toast.error('No store selected');
+      return;
+    }
+
+    try {
+      await categoriesAPI.bulkCreateCategories(storeId, categories);
+      toast.success(`Created ${categories.length} categories`);
+      // Reload categories list
+      await loadCategories(true);
+    } catch (error: any) {
+      console.error('Bulk create error:', error);
+      toast.error(error.message || 'Failed to create categories');
     }
   };
 

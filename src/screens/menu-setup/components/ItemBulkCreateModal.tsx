@@ -88,8 +88,12 @@ export function ItemBulkCreateModal({
   };
 
   const handleSubmit = async () => {
+    // VALIDATE: name, price > 0, and description are all required
     const validItems = items.filter(
-      (item) => item.name.trim().length > 0 && item.price >= 0
+      (item) =>
+        item.name.trim().length > 0 &&
+        item.price > 0 &&
+        (item.description || '').trim().length > 0
     );
 
     if (validItems.length === 0) {
@@ -111,7 +115,12 @@ export function ItemBulkCreateModal({
 
   if (!isOpen) return null;
 
-  const validCount = items.filter((item) => item.name.trim().length > 0 && item.price >= 0).length;
+  const validCount = items.filter(
+    (item) =>
+      item.name.trim().length > 0 &&
+      item.price > 0 &&
+      (item.description || '').trim().length > 0
+  ).length;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">

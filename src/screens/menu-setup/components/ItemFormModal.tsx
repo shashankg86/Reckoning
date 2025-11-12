@@ -17,9 +17,9 @@ import type { ItemData } from '../../../api/items';
 
 const itemSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200, 'Name too long'),
-  price: z.coerce.number().min(0, 'Price must be positive'),
+  price: z.coerce.number().min(0.01, 'Price must be greater than 0'),
   category_id: z.string().optional(),
-  description: z.string().max(500, 'Description too long').optional(),
+  description: z.string().min(1, 'Description is required').max(500, 'Description too long'),
   sku: z.string().max(50, 'SKU too long').optional(),
   stock: z.coerce.number().min(0, 'Stock must be positive').optional(),
   tags: z.string().optional(), // Comma-separated
