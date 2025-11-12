@@ -2,6 +2,7 @@
  * CategorySetupStep Component
  *
  * First step of menu setup wizard - Category creation and management
+ * Supports multiple setup methods: template, OCR, Excel, bulk create, manual
  */
 
 import React, { useState } from 'react';
@@ -13,7 +14,11 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useCategories } from '../../hooks/useCategories';
 import { CategoryCard } from './components/CategoryCard';
 import { CategoryFormModal } from './components/CategoryFormModal';
+import { CategorySetupMethodSelector } from './components/CategorySetupMethodSelector';
+import { CategoryBulkCreateModal } from './components/CategoryBulkCreateModal';
+import { CategoryExcelImportModal } from './components/CategoryExcelImportModal';
 import type { Category, CreateCategoryData, UpdateCategoryData } from '../../types/menu';
+import type { CategorySetupMethod } from './components/CategorySetupMethodSelector';
 
 interface CategorySetupStepProps {
   onNext: () => void;
@@ -30,7 +35,10 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     createDefaultCategories,
   } = useCategories({ autoLoad: true });
 
+  const [showMethodSelector, setShowMethodSelector] = useState(false);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [showBulkCreate, setShowBulkCreate] = useState(false);
+  const [showExcelImport, setShowExcelImport] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; category: Category | null }>({
     isOpen: false,
@@ -57,6 +65,43 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     await createDefaultCategories();
   };
 
+  const handleMethodSelect = (method: CategorySetupMethod) => {
+    setShowMethodSelector(false);
+
+    switch (method) {
+      case 'template':
+        handleCreateDefaults();
+        break;
+      case 'bulk-create':
+        setShowBulkCreate(true);
+        break;
+      case 'excel-import':
+        setShowExcelImport(true);
+        break;
+      case 'ocr-import':
+        // TODO: Implement OCR category import
+        alert('OCR category import coming soon!');
+        break;
+      case 'manual':
+        setShowCategoryForm(true);
+        break;
+    }
+  };
+
+  const handleBulkCreate = async (categories: CreateCategoryData[]) => {
+    // Create categories sequentially to maintain sort order
+    for (const category of categories) {
+      await createCategory(category);
+    }
+  };
+
+  const handleExcelImport = async (categories: CreateCategoryData[]) => {
+    // Create categories sequentially to maintain sort order
+    for (const category of categories) {
+      await createCategory(category);
+    }
+  };
+
   const canProceed = categories.length > 0;
 
   return (
@@ -71,58 +116,62 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         </p>
       </div>
 
-      {/* Quick Actions */}
-      <Card className="p-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button
-            onClick={() => setShowCategoryForm(true)}
-            className="flex-1"
-            disabled={loading}
-          >
-            <PlusIcon className="w-5 h-5 mr-2" />
-            {t('menuSetup.addCategory')}
-          </Button>
-
-          {categories.length === 0 && (
-            <Button
-              variant="secondary"
-              onClick={handleCreateDefaults}
-              className="flex-1"
-              disabled={loading}
-            >
-              <SparklesIcon className="w-5 h-5 mr-2" />
-              {t('menuSetup.useDefaultCategories')}
-            </Button>
-          )}
-        </div>
-      </Card>
-
-      {/* Categories List */}
+      {/* Setup Method Selector - Show only when no categories exist */}
       {categories.length === 0 ? (
-        <Card className="p-12 text-center">
-          <div className="mx-auto w-24 h-24 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mb-4">
-            <PlusIcon className="w-12 h-12 text-orange-500 dark:text-orange-400" />
-          </div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            {t('menuSetup.noCategoriesYet')}
-          </h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-            {t('menuSetup.noCategoriesDescription')}
-          </p>
-        </Card>
+        <CategorySetupMethodSelector onMethodSelect={handleMethodSelect} />
       ) : (
+        <>
+          {/* Quick Actions - Show after categories are created */}
+          <Card className="p-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button
+                onClick={() => setShowCategoryForm(true)}
+                className="flex-1"
+                disabled={loading}
+              >
+                <PlusIcon className="w-5 h-5 mr-2" />
+                {t('menuSetup.addCategory')}
+              </Button>
+
+              <Button
+                variant="secondary"
+                onClick={() => setShowMethodSelector(true)}
+                className="flex-1"
+                disabled={loading}
+              >
+                <SparklesIcon className="w-5 h-5 mr-2" />
+                {t('menuSetup.useSmartSetup')}
+              </Button>
+            </div>
+          </Card>
+
+          {/* Categories List */}
+        </>
+      )}
+
+      {categories.length > 0 && (
         <div className="space-y-3">
-          {categories.map((category) => (
-            <CategoryCard
-              key={category.id}
-              category={category}
-              onEdit={(cat) => {
-                setEditingCategory(cat);
-                setShowCategoryForm(true);
-              }}
-              onDelete={(cat) => setDeleteConfirm({ isOpen: true, category: cat })}
-            />
-          ))}
+          {categories
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map((category) => {
+              const parentCategory = category.parent_id
+                ? categories.find((c) => c.id === category.parent_id)
+                : null;
+
+              return (
+                <CategoryCard
+                  key={category.id}
+                  category={category}
+                  onEdit={(cat) => {
+                    setEditingCategory(cat);
+                    setShowCategoryForm(true);
+                  }}
+                  onDelete={(cat) => setDeleteConfirm({ isOpen: true, category: cat })}
+                  isSubcategory={!!category.parent_id}
+                  parentName={parentCategory?.name}
+                />
+              );
+            })}
         </div>
       )}
 
@@ -138,6 +187,25 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         </Button>
       </div>
 
+      {/* Method Selector Modal - For adding more categories */}
+      {showMethodSelector && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <CategorySetupMethodSelector onMethodSelect={handleMethodSelect} />
+              <div className="mt-4 flex justify-end">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowMethodSelector(false)}
+                >
+                  {t('common.cancel')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Category Form Modal */}
       <CategoryFormModal
         isOpen={showCategoryForm}
@@ -152,6 +220,21 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
             ? t('menuSetup.editCategory')
             : t('menuSetup.createCategory')
         }
+        availableParentCategories={categories}
+      />
+
+      {/* Bulk Create Modal */}
+      <CategoryBulkCreateModal
+        isOpen={showBulkCreate}
+        onClose={() => setShowBulkCreate(false)}
+        onSubmit={handleBulkCreate}
+      />
+
+      {/* Excel Import Modal */}
+      <CategoryExcelImportModal
+        isOpen={showExcelImport}
+        onClose={() => setShowExcelImport(false)}
+        onSubmit={handleExcelImport}
       />
 
       {/* Delete Confirmation */}

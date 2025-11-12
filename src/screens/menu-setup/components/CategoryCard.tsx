@@ -14,16 +14,27 @@ interface CategoryCardProps {
   onEdit: (category: Category) => void;
   onDelete: (category: Category) => void;
   isDragging?: boolean;
+  isSubcategory?: boolean;
+  parentName?: string;
 }
 
-export function CategoryCard({ category, onEdit, onDelete, isDragging }: CategoryCardProps) {
+export function CategoryCard({
+  category,
+  onEdit,
+  onDelete,
+  isDragging,
+  isSubcategory = false,
+  parentName,
+}: CategoryCardProps) {
   return (
     <div
       className={`bg-white dark:bg-gray-800 rounded-lg border-2 ${
         isDragging
           ? 'border-orange-500 shadow-lg'
           : 'border-gray-200 dark:border-gray-700'
-      } p-4 cursor-move transition-all hover:shadow-md`}
+      } p-4 cursor-move transition-all hover:shadow-md ${
+        isSubcategory ? 'ml-8' : ''
+      }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-3 flex-1">
@@ -37,9 +48,16 @@ export function CategoryCard({ category, onEdit, onDelete, isDragging }: Categor
 
           {/* Category info */}
           <div className="flex-1">
-            <h3 className="font-semibold text-gray-900 dark:text-white">
-              {category.name}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900 dark:text-white">
+                {category.name}
+              </h3>
+              {isSubcategory && parentName && (
+                <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                  Subcategory of {parentName}
+                </span>
+              )}
+            </div>
             {category.description && (
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {category.description}

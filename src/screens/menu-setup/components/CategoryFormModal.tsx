@@ -18,6 +18,7 @@ const categorySchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(50, 'Name too long'),
   description: z.string().max(200, 'Description too long').optional(),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Invalid color code').optional(),
+  parent_id: z.string().nullable().optional(),
 });
 
 type CategoryFormData = z.infer<typeof categorySchema>;
@@ -28,6 +29,7 @@ interface CategoryFormModalProps {
   onSubmit: (data: CreateCategoryData | UpdateCategoryData) => Promise<void>;
   category?: Category | null;
   title: string;
+  availableParentCategories?: Category[];
 }
 
 const PREDEFINED_COLORS = [
@@ -47,6 +49,7 @@ export function CategoryFormModal({
   onSubmit,
   category,
   title,
+  availableParentCategories = [],
 }: CategoryFormModalProps) {
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -64,8 +67,14 @@ export function CategoryFormModal({
       name: category?.name || '',
       description: category?.description || '',
       color: category?.color || '#FF6B35',
+      parent_id: category?.parent_id || null,
     },
   });
+
+  // Filter out current category from parent options (can't be its own parent)
+  const parentOptions = availableParentCategories.filter(
+    (cat) => cat.id !== category?.id
+  );
 
   const selectedColor = watch('color');
 
@@ -75,12 +84,14 @@ export function CategoryFormModal({
         name: category.name,
         description: category.description || '',
         color: category.color,
+        parent_id: category.parent_id || null,
       });
     } else {
       reset({
         name: '',
         description: '',
         color: '#FF6B35',
+        parent_id: null,
       });
     }
   }, [category, reset]);
@@ -123,6 +134,29 @@ export function CategoryFormModal({
             error={errors.name?.message}
             {...register('name')}
           />
+
+          {/* Parent Category (Subcategory Support) */}
+          {parentOptions.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('menuSetup.parentCategory')} {t('common.optional')}
+              </label>
+              <select
+                {...register('parent_id')}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <option value="">{t('menuSetup.noParentCategory')}</option>
+                {parentOptions.map((parent) => (
+                  <option key={parent.id} value={parent.id}>
+                    {parent.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {t('menuSetup.subcategoryHint')}
+              </p>
+            </div>
+          )}
 
           {/* Description */}
           <div>
