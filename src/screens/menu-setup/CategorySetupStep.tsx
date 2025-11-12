@@ -17,6 +17,8 @@ import { CategoryFormModal } from './components/CategoryFormModal';
 import { CategorySetupMethodSelector } from './components/CategorySetupMethodSelector';
 import { CategoryBulkCreateModal } from './components/CategoryBulkCreateModal';
 import { CategoryExcelImportModal } from './components/CategoryExcelImportModal';
+import { TemplatePreviewModal } from './components/TemplatePreviewModal';
+import { categoriesAPI } from '../../api/categories';
 import type { Category, CreateCategoryData, UpdateCategoryData } from '../../types/menu';
 import type { CategorySetupMethod } from './components/CategorySetupMethodSelector';
 
@@ -39,6 +41,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
   const [showExcelImport, setShowExcelImport] = useState(false);
+  const [showTemplatePreview, setShowTemplatePreview] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; category: Category | null }>({
     isOpen: false,
@@ -70,7 +73,8 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
 
     switch (method) {
       case 'template':
-        handleCreateDefaults();
+        // Show preview instead of auto-creating
+        setShowTemplatePreview(true);
         break;
       case 'bulk-create':
         setShowBulkCreate(true);
@@ -235,6 +239,14 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         isOpen={showExcelImport}
         onClose={() => setShowExcelImport(false)}
         onSubmit={handleExcelImport}
+      />
+
+      {/* Template Preview Modal */}
+      <TemplatePreviewModal
+        isOpen={showTemplatePreview}
+        onClose={() => setShowTemplatePreview(false)}
+        onConfirm={handleCreateDefaults}
+        getDefaultCategories={categoriesAPI.getDefaultCategoriesForType}
       />
 
       {/* Delete Confirmation */}
