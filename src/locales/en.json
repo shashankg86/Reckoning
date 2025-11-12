@@ -165,25 +165,6 @@
     "completeSetup": "Complete Setup",
     "setupCompleted": "Menu setup completed successfully!",
     "helpText": "Need help? Contact support for assistance.",
-        "description": "Start with pre-built categories for your business type"
-      },
-      "ocrImport": {
-        "title": "Import from Photo",
-        "description": "Take a photo of your menu to extract categories"
-      },
-      "excelImport": {
-        "title": "Import from Excel/CSV",
-        "description": "Upload a spreadsheet with your categories"
-      },
-      "bulkCreate": {
-        "title": "Bulk Create",
-        "description": "Enter multiple categories quickly in a table"
-      },
-      "manual": {
-        "title": "Add Manually",
-        "description": "Create categories one by one"
-      }
-    },
     "bulkCreateCategories": "Bulk Create Categories",
     "bulkCreateDescription": "Enter multiple categories at once",
     "addAnotherCategory": "Add Another Category",
