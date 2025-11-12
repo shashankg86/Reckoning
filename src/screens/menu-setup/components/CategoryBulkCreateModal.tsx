@@ -199,7 +199,7 @@ export function CategoryBulkCreateModal({
             >
               {isSubmitting
                 ? t('common.creating')
-                : t('menuSetup.createCategories', { count: validCount })}
+                : t('menuSetup.createMultipleCategories', { count: validCount })}
             </Button>
           </div>
         </div>

@@ -169,7 +169,7 @@
     "bulkCreateDescription": "Enter multiple categories at once",
     "addAnotherCategory": "Add Another Category",
     "categoriesReady": "categories ready",
-    "createCategories": "Create {{count}} Categories",
+    "createMultipleCategories": "Create {{count}} Categories",
     "creatingCategories": "Creating categories...",
     "previewDefaultCategories": "Preview Default Categories",
     "templatePreviewDescription": "These are the recommended categories for {{storeType}} businesses. You can edit or add more after creation.",

@@ -34,7 +34,7 @@ export const itemsAPI = {
           category:categories(id, name, color)
         `)
         .eq('store_id', storeId)
-        .order('display_order', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (filter?.is_active !== undefined) {
         query = query.eq('is_active', filter.is_active);
@@ -48,7 +48,7 @@ export const itemsAPI = {
 
       if (filter?.search) {
         query = query.or(
-          `name_en.ilike.%${filter.search}%,description_en.ilike.%${filter.search}%,sku.ilike.%${filter.search}%`
+          `name.ilike.%${filter.search}%,description.ilike.%${filter.search}%,sku.ilike.%${filter.search}%`
         );
       }
 
@@ -79,34 +79,20 @@ export const itemsAPI = {
       const user = await supabase.auth.getUser();
       if (!user.data.user) throw new Error('Not authenticated');
 
-      // Get the next display order
-      const { data: items } = await supabase
-        .from('items')
-        .select('display_order')
-        .eq('store_id', storeId)
-        .order('display_order', { ascending: false })
-        .limit(1);
-
-      const nextDisplayOrder =
-        items && items.length > 0 ? (items[0].display_order || 0) + 1 : 0;
-
       const { data, error } = await supabase
         .from('items')
         .insert({
           store_id: storeId,
-          name_en: item.name,
-          description_en: item.description || null,
+          name: item.name,
+          description: item.description || null,
           price: item.price,
-          category: item.category || null, // Legacy support
+          category: item.category || null,
           category_id: item.category_id || null,
           image_url: item.image_url || null,
           stock: item.stock || 0,
           sku: item.sku || null,
           low_stock_threshold: item.low_stock_threshold || null,
-          tags: item.tags || [],
-          metadata: item.metadata || {},
           is_active: item.is_active !== false,
-          display_order: nextDisplayOrder,
           created_by: user.data.user.id,
         })
         .select()
@@ -124,18 +110,16 @@ export const itemsAPI = {
     try {
       const updateData: any = {};
 
-      if (updates.name !== undefined) updateData.name_en = updates.name;
-      if (updates.description !== undefined) updateData.description_en = updates.description;
+      if (updates.name !== undefined) updateData.name = updates.name;
+      if (updates.description !== undefined) updateData.description = updates.description;
       if (updates.price !== undefined) updateData.price = updates.price;
-      if (updates.category !== undefined) updateData.category = updates.category; // Legacy
+      if (updates.category !== undefined) updateData.category = updates.category;
       if (updates.category_id !== undefined) updateData.category_id = updates.category_id;
       if (updates.image_url !== undefined) updateData.image_url = updates.image_url;
       if (updates.stock !== undefined) updateData.stock = updates.stock;
       if (updates.sku !== undefined) updateData.sku = updates.sku;
       if (updates.low_stock_threshold !== undefined)
         updateData.low_stock_threshold = updates.low_stock_threshold;
-      if (updates.tags !== undefined) updateData.tags = updates.tags;
-      if (updates.metadata !== undefined) updateData.metadata = updates.metadata;
       if (updates.is_active !== undefined) updateData.is_active = updates.is_active;
 
       const { data, error } = await supabase
@@ -169,32 +153,18 @@ export const itemsAPI = {
       const user = await supabase.auth.getUser();
       if (!user.data.user) throw new Error('Not authenticated');
 
-      // Get the next display order
-      const { data: existingItems } = await supabase
-        .from('items')
-        .select('display_order')
-        .eq('store_id', storeId)
-        .order('display_order', { ascending: false })
-        .limit(1);
-
-      let nextDisplayOrder =
-        existingItems && existingItems.length > 0 ? (existingItems[0].display_order || 0) + 1 : 0;
-
-      const itemsToInsert = items.map((item, index) => ({
+      const itemsToInsert = items.map((item) => ({
         store_id: storeId,
-        name_en: item.name,
-        description_en: item.description || null,
+        name: item.name,
+        description: item.description || null,
         price: item.price,
-        category: item.category || null, // Legacy support
+        category: item.category || null,
         category_id: item.category_id || null,
         image_url: item.image_url || null,
         stock: item.stock || 0,
         sku: item.sku || null,
         low_stock_threshold: item.low_stock_threshold || null,
-        tags: item.tags || [],
-        metadata: item.metadata || {},
         is_active: item.is_active !== false,
-        display_order: nextDisplayOrder + index,
         created_by: user.data.user.id,
       }));
 
@@ -218,7 +188,7 @@ export const itemsAPI = {
         `)
         .eq('store_id', storeId)
         .eq('is_active', true)
-        .or(`name_en.ilike.%${query}%,description_en.ilike.%${query}%,sku.ilike.%${query}%`)
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%,sku.ilike.%${query}%`)
         .limit(20);
 
       if (error) throw error;

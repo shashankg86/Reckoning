@@ -55,10 +55,8 @@ export function ItemsSetupStep({ onComplete }: ItemsSetupStepProps) {
   const filteredItems = items.filter((item) => {
     const matchesSearch =
       !searchQuery ||
-      (item.name_en || item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.description_en || item.description || '')
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
+      (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory =
@@ -299,11 +297,11 @@ export function ItemsSetupStep({ onComplete }: ItemsSetupStepProps) {
                       <Card className="flex-1 p-4 flex items-center justify-between hover:shadow-md transition-shadow">
                         <div className="flex-1">
                           <h4 className="font-semibold text-gray-900 dark:text-white">
-                            {item.name_en || item.name}
+                            {item.name}
                           </h4>
-                          {item.description_en || item.description ? (
+                          {item.description ? (
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                              {item.description_en || item.description}
+                              {item.description}
                             </p>
                           ) : null}
                           <div className="flex items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
@@ -391,7 +389,7 @@ export function ItemsSetupStep({ onComplete }: ItemsSetupStepProps) {
               Delete Item
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Are you sure you want to delete "{deleteConfirm.item.name_en || deleteConfirm.item.name}"?
+              Are you sure you want to delete "{deleteConfirm.item.name}"?
               This action cannot be undone.
             </p>
             <div className="flex gap-3">

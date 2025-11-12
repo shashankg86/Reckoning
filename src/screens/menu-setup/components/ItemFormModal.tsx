@@ -57,10 +57,10 @@ export function ItemFormModal({
   } = useForm<ItemFormData>({
     resolver: zodResolver(itemSchema),
     defaultValues: {
-      name: item?.name_en || item?.name || '',
+      name: item?.name || '',
       price: item?.price || 0,
       category_id: item?.category_id || defaultCategoryId || '',
-      description: item?.description_en || item?.description || '',
+      description: item?.description || '',
       sku: item?.sku || '',
       stock: item?.stock || 0,
       tags: item?.tags?.join(', ') || '',
@@ -70,10 +70,10 @@ export function ItemFormModal({
   React.useEffect(() => {
     if (item) {
       reset({
-        name: item.name_en || item.name,
+        name: item.name,
         price: item.price,
         category_id: item.category_id || '',
-        description: item.description_en || item.description || '',
+        description: item.description || '',
         sku: item.sku || '',
         stock: item.stock || 0,
         tags: item.tags?.join(', ') || '',
