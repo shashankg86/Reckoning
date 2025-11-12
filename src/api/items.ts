@@ -79,6 +79,20 @@ export const itemsAPI = {
       const user = await supabase.auth.getUser();
       if (!user.data.user) throw new Error('Not authenticated');
 
+      // Get category name if category_id is provided (category column is NOT NULL)
+      let categoryName = item.category || 'Uncategorized';
+      if (item.category_id && !item.category) {
+        const { data: categoryData } = await supabase
+          .from('categories')
+          .select('name')
+          .eq('id', item.category_id)
+          .single();
+
+        if (categoryData) {
+          categoryName = categoryData.name;
+        }
+      }
+
       const { data, error } = await supabase
         .from('items')
         .insert({
@@ -86,7 +100,7 @@ export const itemsAPI = {
           name: item.name,
           description: item.description || null,
           price: item.price,
-          category: item.category || null,
+          category: categoryName, // Required field - cannot be null
           category_id: item.category_id || null,
           image_url: item.image_url || null,
           stock: item.stock || 0,
@@ -153,20 +167,43 @@ export const itemsAPI = {
       const user = await supabase.auth.getUser();
       if (!user.data.user) throw new Error('Not authenticated');
 
-      const itemsToInsert = items.map((item) => ({
-        store_id: storeId,
-        name: item.name,
-        description: item.description || null,
-        price: item.price,
-        category: item.category || null,
-        category_id: item.category_id || null,
-        image_url: item.image_url || null,
-        stock: item.stock || 0,
-        sku: item.sku || null,
-        low_stock_threshold: item.low_stock_threshold || null,
-        is_active: item.is_active !== false,
-        created_by: user.data.user.id,
-      }));
+      // Get unique category IDs
+      const categoryIds = [...new Set(items.map((item) => item.category_id).filter(Boolean))];
+
+      // Fetch all category names at once
+      const categoryMap = new Map<string, string>();
+      if (categoryIds.length > 0) {
+        const { data: categories } = await supabase
+          .from('categories')
+          .select('id, name')
+          .in('id', categoryIds);
+
+        if (categories) {
+          categories.forEach((cat) => categoryMap.set(cat.id, cat.name));
+        }
+      }
+
+      const itemsToInsert = items.map((item) => {
+        let categoryName = item.category || 'Uncategorized';
+        if (item.category_id && categoryMap.has(item.category_id)) {
+          categoryName = categoryMap.get(item.category_id)!;
+        }
+
+        return {
+          store_id: storeId,
+          name: item.name,
+          description: item.description || null,
+          price: item.price,
+          category: categoryName, // Required field - cannot be null
+          category_id: item.category_id || null,
+          image_url: item.image_url || null,
+          stock: item.stock || 0,
+          sku: item.sku || null,
+          low_stock_threshold: item.low_stock_threshold || null,
+          is_active: item.is_active !== false,
+          created_by: user.data.user.id,
+        };
+      });
 
       const { data, error } = await supabase.from('items').insert(itemsToInsert).select();
 

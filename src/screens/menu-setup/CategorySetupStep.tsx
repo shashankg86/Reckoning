@@ -18,6 +18,7 @@ import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useCategories } from '../../hooks/useCategories';
+import { categoriesAPI } from '../../api/categories';
 import { CategoryCard } from './components/CategoryCard';
 import { CategoryFormModal } from './components/CategoryFormModal';
 import { CategoryBulkCreateModal } from './components/CategoryBulkCreateModal';
@@ -34,7 +35,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     loading,
     createCategory,
     updateCategory,
-    deleteCategory,
+    loadCategories,
   } = useCategories({ autoLoad: true });
 
   const [showCategoryForm, setShowCategoryForm] = useState(false);
@@ -60,8 +61,11 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
 
   const handleDeleteCategory = async () => {
     if (!deleteConfirm.category) return;
-    await deleteCategory(deleteConfirm.category.id);
+    // Permanently delete during setup (not soft delete)
+    await categoriesAPI.permanentlyDeleteCategory(deleteConfirm.category.id);
     setDeleteConfirm({ isOpen: false, category: null });
+    // Reload categories list
+    await loadCategories(true);
   };
 
   const handleBulkCreate = async (categories: CreateCategoryData[]) => {
@@ -71,11 +75,14 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   };
 
   const handleBulkDelete = async () => {
+    // Permanently delete during setup (not soft delete)
     for (const categoryId of selectedCategories) {
-      await deleteCategory(categoryId);
+      await categoriesAPI.permanentlyDeleteCategory(categoryId);
     }
     setSelectedCategories(new Set());
     setBulkDeleteConfirm(false);
+    // Reload categories list
+    await loadCategories(true);
   };
 
   const toggleCategorySelection = (categoryId: string) => {
