@@ -91,6 +91,31 @@ export interface CategoryStats {
 }
 
 /**
+ * CreateItemData for creating new menu items
+ */
+export interface CreateItemData {
+  name: string;
+  price: number;
+  category?: string;
+  category_id?: string;
+  description?: string;
+  image_url?: string;
+  stock?: number;
+  sku?: string;
+  tags?: string[];
+  is_active?: boolean;
+}
+
+/**
+ * CompleteMenuImport represents categories and items imported together
+ */
+export interface CompleteMenuImport {
+  categories: CreateCategoryData[];
+  items: CreateItemData[];
+  categoryItemsMap: Map<string, CreateItemData[]>;
+}
+
+/**
  * MenuSetupStep tracks which step of menu setup wizard user is on
  */
 export type MenuSetupStep = 'categories' | 'items' | 'review';

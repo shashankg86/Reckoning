@@ -202,7 +202,22 @@
     "previewCategories": "Preview Categories",
     "uploadDifferentFile": "Upload Different File",
     "importCategories": "Import {{count}} Categories",
-    "processingFile": "Processing file..."
+    "processingFile": "Processing file...",
+    "importCompleteMenu": "Import Complete Menu",
+    "importCompleteMenuDescription": "Upload Excel/CSV with both categories and items for instant menu creation",
+    "uploadCompleteMenuFile": "Upload Complete Menu File",
+    "downloadCompleteMenuTemplate": "Download Complete Menu Template",
+    "excelFormatInfo": "Excel Format Information",
+    "combinedFormat": "Combined Format (Recommended)",
+    "combinedFormatDescription": "Single sheet with all menu data - easier for most users",
+    "twoSheetFormat": "Two-Sheet Format (Advanced)",
+    "twoSheetFormatDescription": "Separate 'Categories' and 'Items' sheets for cleaner organization",
+    "menuDetected": "Menu Successfully Detected!",
+    "categoriesAndItemsCount": "{{categories}} categories with {{items}} items",
+    "previewMenu": "Preview Your Complete Menu",
+    "creatingMenu": "Creating menu...",
+    "categories": "categories",
+    "items": "items"
   },
   "navigation": {
     "dashboard": "Dashboard",
