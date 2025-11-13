@@ -14,6 +14,7 @@ export interface Category {
   description: string | null;
   color: string;
   icon: string;
+  image_url: string | null;
   sort_order: number;
   parent_id: string | null;
   metadata: Record<string, any>;
@@ -59,6 +60,7 @@ export interface CreateCategoryData {
   description?: string;
   color?: string;
   icon?: string;
+  image_url?: string | null;
   sort_order?: number;
   parent_id?: string | null;
   metadata?: Record<string, any>;
@@ -72,6 +74,7 @@ export interface UpdateCategoryData {
   description?: string | null;
   color?: string;
   icon?: string;
+  image_url?: string | null;
   sort_order?: number;
   parent_id?: string | null;
   metadata?: Record<string, any>;
