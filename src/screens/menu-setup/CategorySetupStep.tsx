@@ -2,10 +2,10 @@
  * CategorySetupStep Component
  *
  * Simplified manual category creation - Single + Bulk
- * Then proceeds to items setup
+ * Categories are saved ONLY when clicking "Continue to Items"
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
@@ -13,6 +13,7 @@ import {
   RectangleStackIcon,
   MagnifyingGlassIcon,
   TrashIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -30,75 +31,106 @@ interface CategorySetupStepProps {
   onNext: () => void;
 }
 
+// Local category with temp ID for unsaved categories
+interface LocalCategory extends Omit<Category, 'id'> {
+  id: string;
+  _isNew?: boolean; // Flag to indicate not yet saved to DB
+}
+
 export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const { t } = useTranslation();
   const { state: authState } = useAuth();
-  const {
-    categories,
-    loading,
-    createCategory,
-    updateCategory,
-    loadCategories,
-  } = useCategories({ autoLoad: true });
+  const storeId = (authState.user as any)?.store?.id;
 
+  // Load existing categories from DB
+  const { categories: existingCategories, loading: loadingExisting } = useCategories({ autoLoad: true });
+
+  // Local state for all categories (existing + new)
+  const [localCategories, setLocalCategories] = useState<LocalCategory[]>([]);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingCategory, setEditingCategory] = useState<LocalCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; category: Category | null }>({
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; category: LocalCategory | null }>({
     isOpen: false,
     category: null,
   });
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleCreateCategory = async (data: CreateCategoryData) => {
-    await createCategory(data);
+  // Sync existing categories from DB to local state
+  useEffect(() => {
+    if (existingCategories.length > 0) {
+      setLocalCategories(existingCategories);
+    }
+  }, [existingCategories]);
+
+  const handleCreateCategory = (data: CreateCategoryData) => {
+    // Create category in local state only (not DB yet)
+    const newCategory: LocalCategory = {
+      ...data,
+      id: `temp_${Date.now()}_${Math.random()}`, // Temporary ID
+      _isNew: true,
+      is_active: true,
+      store_id: storeId,
+      sort_order: localCategories.length,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setLocalCategories((prev) => [...prev, newCategory]);
+    toast.success(t('menuSetup.categoryAddedLocally'));
+    setShowCategoryForm(false);
   };
 
-  const handleUpdateCategory = async (data: UpdateCategoryData) => {
+  const handleUpdateCategory = (data: UpdateCategoryData) => {
     if (!editingCategory) return;
-    await updateCategory(editingCategory.id, data);
+
+    setLocalCategories((prev) =>
+      prev.map((cat) =>
+        cat.id === editingCategory.id
+          ? { ...cat, ...data, updated_at: new Date().toISOString() }
+          : cat
+      )
+    );
+
+    toast.success(t('menuSetup.categoryUpdated'));
     setEditingCategory(null);
+    setShowCategoryForm(false);
   };
 
-  const handleDeleteCategory = async () => {
+  const handleDeleteCategory = () => {
     if (!deleteConfirm.category) return;
-    // Permanently delete during setup (not soft delete)
-    await categoriesAPI.permanentlyDeleteCategory(deleteConfirm.category.id);
+
+    setLocalCategories((prev) => prev.filter((cat) => cat.id !== deleteConfirm.category!.id));
+    toast.success(t('menuSetup.categoryDeleted'));
     setDeleteConfirm({ isOpen: false, category: null });
-    // Reload categories list
-    await loadCategories(true);
   };
 
-  const handleBulkCreate = async (categories: CreateCategoryData[]) => {
-    // ENTERPRISE APPROACH: Single API call for all categories
-    const storeId = (authState.user as any)?.store?.id;
-    if (!storeId) {
-      toast.error('No store selected');
-      return;
-    }
+  const handleBulkCreate = (categories: CreateCategoryData[]) => {
+    // Add all categories to local state only
+    const newCategories: LocalCategory[] = categories.map((data, index) => ({
+      ...data,
+      id: `temp_${Date.now()}_${index}`,
+      _isNew: true,
+      is_active: true,
+      store_id: storeId,
+      sort_order: localCategories.length + index,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }));
 
-    try {
-      await categoriesAPI.bulkCreateCategories(storeId, categories);
-      toast.success(`Created ${categories.length} categories`);
-      // Reload categories list
-      await loadCategories(true);
-    } catch (error: any) {
-      console.error('Bulk create error:', error);
-      toast.error(error.message || 'Failed to create categories');
-    }
+    setLocalCategories((prev) => [...prev, ...newCategories]);
+    toast.success(`${t('menuSetup.added')} ${categories.length} ${t('menuSetup.categoriesLocally')}`);
+    setShowBulkCreate(false);
   };
 
-  const handleBulkDelete = async () => {
-    // Permanently delete during setup (not soft delete)
-    for (const categoryId of selectedCategories) {
-      await categoriesAPI.permanentlyDeleteCategory(categoryId);
-    }
+  const handleBulkDelete = () => {
+    setLocalCategories((prev) => prev.filter((cat) => !selectedCategories.has(cat.id)));
+    toast.success(`${t('menuSetup.deleted')} ${selectedCategories.size} ${t('menuSetup.categories')}`);
     setSelectedCategories(new Set());
     setBulkDeleteConfirm(false);
-    // Reload categories list
-    await loadCategories(true);
   };
 
   const toggleCategorySelection = (categoryId: string) => {
@@ -115,16 +147,63 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     if (selectedCategories.size === filteredCategories.length) {
       setSelectedCategories(new Set());
     } else {
-      setSelectedCategories(new Set(filteredCategories.map(c => c.id)));
+      setSelectedCategories(new Set(filteredCategories.map((c) => c.id)));
     }
   };
 
-  const filteredCategories = categories.filter(cat =>
-    cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (cat.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
+  const filteredCategories = localCategories.filter(
+    (cat) =>
+      cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (cat.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
-  const canProceed = categories.length > 0;
+  // Save all new categories to database and navigate
+  const handleContinueToItems = async () => {
+    if (localCategories.length === 0) {
+      toast.error(t('menuSetup.pleaseAddCategories'));
+      return;
+    }
+
+    // Filter only new categories that need to be saved
+    const categoriesToSave = localCategories.filter((cat) => cat._isNew);
+
+    if (categoriesToSave.length === 0) {
+      // All categories already saved, just navigate
+      onNext();
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      // Prepare data for bulk create
+      const categoriesData: CreateCategoryData[] = categoriesToSave.map((cat) => ({
+        name: cat.name,
+        description: cat.description,
+        color: cat.color,
+        icon: cat.icon,
+        sort_order: cat.sort_order,
+        parent_id: cat.parent_id,
+        metadata: cat.metadata,
+      }));
+
+      // Batch save all categories to database
+      await categoriesAPI.bulkCreateCategories(storeId, categoriesData);
+
+      toast.success(`${t('menuSetup.saved')} ${categoriesToSave.length} ${t('menuSetup.categories')}`);
+
+      // Navigate to next step
+      onNext();
+    } catch (error: any) {
+      console.error('Failed to save categories:', error);
+      toast.error(error.message || t('menuSetup.failedToSaveCategories'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const canProceed = localCategories.length > 0;
+  const newCategoriesCount = localCategories.filter((cat) => cat._isNew).length;
 
   return (
     <div className="space-y-6">
@@ -136,6 +215,11 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         <p className="text-gray-600 dark:text-gray-400 mt-2">
           {t('menuSetup.categoriesManualDescription')}
         </p>
+        {newCategoriesCount > 0 && (
+          <p className="text-sm text-orange-600 dark:text-orange-400 mt-2">
+            💡 {newCategoriesCount} {t('menuSetup.unsavedCategories')}
+          </p>
+        )}
       </div>
 
       {/* Action Bar */}
@@ -159,7 +243,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
           <div className="flex gap-2 w-full sm:w-auto">
             <Button
               onClick={() => setShowCategoryForm(true)}
-              disabled={loading}
+              disabled={loadingExisting || isSaving}
               className="flex-1 sm:flex-none"
             >
               <PlusIcon className="w-5 h-5 mr-2" />
@@ -169,7 +253,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
             <Button
               variant="secondary"
               onClick={() => setShowBulkCreate(true)}
-              disabled={loading}
+              disabled={loadingExisting || isSaving}
               className="flex-1 sm:flex-none"
             >
               <RectangleStackIcon className="w-5 h-5 mr-2" />
@@ -233,7 +317,9 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
             <div className="flex items-center px-4">
               <input
                 type="checkbox"
-                checked={selectedCategories.size === filteredCategories.length && filteredCategories.length > 0}
+                checked={
+                  selectedCategories.size === filteredCategories.length && filteredCategories.length > 0
+                }
                 onChange={toggleSelectAll}
                 className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
               />
@@ -249,7 +335,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
               .sort((a, b) => a.sort_order - b.sort_order)
               .map((category) => {
                 const parentCategory = category.parent_id
-                  ? categories.find((c) => c.id === category.parent_id)
+                  ? localCategories.find((c) => c.id === category.parent_id)
                   : null;
 
                 return (
@@ -260,17 +346,24 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
                       onChange={() => toggleCategorySelection(category.id)}
                       className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                     />
-                    <div className="flex-1">
+                    <div className="flex-1 relative">
                       <CategoryCard
-                        category={category}
+                        category={category as Category}
                         onEdit={(cat) => {
-                          setEditingCategory(cat);
+                          setEditingCategory(cat as LocalCategory);
                           setShowCategoryForm(true);
                         }}
-                        onDelete={(cat) => setDeleteConfirm({ isOpen: true, category: cat })}
+                        onDelete={(cat) =>
+                          setDeleteConfirm({ isOpen: true, category: cat as LocalCategory })
+                        }
                         isSubcategory={!!category.parent_id}
                         parentName={parentCategory?.name}
                       />
+                      {category._isNew && (
+                        <span className="absolute top-2 right-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+                          {t('menuSetup.unsaved')}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -282,12 +375,15 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       {/* Navigation */}
       <div className="flex justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
         <div></div>
-        <Button
-          onClick={onNext}
-          disabled={!canProceed || loading}
-          size="lg"
-        >
-          {t('menuSetup.continueToItems')}
+        <Button onClick={handleContinueToItems} disabled={!canProceed || isSaving} size="lg">
+          {isSaving ? (
+            <>
+              <ArrowPathIcon className="w-5 h-5 mr-2 animate-spin" />
+              {t('menuSetup.saving')}
+            </>
+          ) : (
+            t('menuSetup.continueToItems')
+          )}
         </Button>
       </div>
 
@@ -299,13 +395,11 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
           setEditingCategory(null);
         }}
         onSubmit={editingCategory ? handleUpdateCategory : handleCreateCategory}
-        category={editingCategory}
+        category={editingCategory as Category | null}
         title={
-          editingCategory
-            ? t('menuSetup.editCategory')
-            : t('menuSetup.createCategory')
+          editingCategory ? t('menuSetup.editCategory') : t('menuSetup.createCategory')
         }
-        availableParentCategories={categories}
+        availableParentCategories={localCategories as Category[]}
       />
 
       {/* Bulk Create Modal */}
