@@ -1,80 +1,173 @@
 /**
  * ItemsSetupStep Component
  *
- * Second step in menu setup wizard - add items to categories
- * Features: search, multi-select, bulk operations, category filtering
+ * ALL operations (create, update, delete) deferred until "Continue to Review"
+ * Optimized data fetching - single load, local filtering
  */
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
   PlusIcon,
   MagnifyingGlassIcon,
   RectangleStackIcon,
   TrashIcon,
   PencilIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { useAuth } from '../../contexts/AuthContext';
 import { useItems } from '../../hooks/useItems';
 import { useCategories } from '../../hooks/useCategories';
+import { itemsAPI } from '../../api/items';
 import { ItemFormModal } from './components/ItemFormModal';
 import { ItemBulkCreateModal } from './components/ItemBulkCreateModal';
 import type { ItemData } from '../../api/items';
+import type { Category } from '../../types/menu';
 
 interface ItemsSetupStepProps {
   onBack: () => void;
   onComplete: () => void;
 }
 
+// Local item with change tracking
+interface LocalItem extends ItemData {
+  id: string;
+  _isNew?: boolean;
+  _isModified?: boolean;
+  _isDeleted?: boolean;
+  _originalData?: any;
+}
+
 export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const { t } = useTranslation();
+  const { state: authState } = useAuth();
+  const storeId = (authState.user as any)?.store?.id;
 
-  const { items, loading, createItem, updateItem, deleteItem, bulkCreateItems, loadItems } =
-    useItems({ autoLoad: true });
+  // Load existing items and categories ONCE (optimized)
+  const { items: existingItems, loading: loadingItems } = useItems({ autoLoad: true });
+  const { categories, loading: loadingCategories } = useCategories({
+    autoLoad: true,
+    filter: { is_active: true }
+  });
 
-  const { categories } = useCategories({ autoLoad: true, filter: { is_active: true } });
-
+  // Local state for all items
+  const [localItems, setLocalItems] = useState<LocalItem[]>([]);
   const [showItemForm, setShowItemForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
-  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [editingItem, setEditingItem] = useState<LocalItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; item?: any }>({
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; item?: LocalItem }>({
     isOpen: false,
   });
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Reload items when switching category filter
+  // Sync existing items from DB to local state (only once)
   useEffect(() => {
-    loadItems();
-  }, [selectedCategoryFilter]);
-
-  // Filter items by search and category
-  const filteredItems = items.filter((item) => {
-    const matchesSearch =
-      !searchQuery ||
-      (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesCategory =
-      !selectedCategoryFilter || item.category_id === selectedCategoryFilter;
-
-    return matchesSearch && matchesCategory;
-  });
-
-  // Group items by category for better display
-  const itemsByCategory = filteredItems.reduce((acc, item) => {
-    const catId = item.category_id || 'uncategorized';
-    if (!acc[catId]) {
-      acc[catId] = [];
+    if (existingItems.length > 0 && localItems.length === 0) {
+      setLocalItems(
+        existingItems.map((item) => ({
+          ...item,
+          _originalData: item,
+        }))
+      );
     }
-    acc[catId].push(item);
-    return acc;
-  }, {} as Record<string, any[]>);
+  }, [existingItems]);
+
+  const handleCreateItem = (itemData: ItemData) => {
+    const newItem: LocalItem = {
+      ...itemData,
+      id: `temp_${Date.now()}_${Math.random()}`,
+      _isNew: true,
+    };
+
+    setLocalItems((prev) => [...prev, newItem]);
+    toast.success(t('menuSetup.itemAddedLocally'));
+    setShowItemForm(false);
+  };
+
+  const handleUpdateItem = (itemData: ItemData) => {
+    if (!editingItem) return;
+
+    setLocalItems((prev) =>
+      prev.map((item) => {
+        if (item.id === editingItem.id) {
+          if (item._isNew) {
+            return { ...item, ...itemData };
+          }
+          return {
+            ...item,
+            ...itemData,
+            _isModified: true,
+          };
+        }
+        return item;
+      })
+    );
+
+    toast.success(t('menuSetup.itemUpdated'));
+    setEditingItem(null);
+    setShowItemForm(false);
+  };
+
+  const handleDeleteItem = () => {
+    if (!deleteConfirm.item) return;
+
+    setLocalItems((prev) =>
+      prev
+        .map((item) => {
+          if (item.id === deleteConfirm.item!.id) {
+            if (item._isNew) {
+              return null;
+            }
+            return { ...item, _isDeleted: true };
+          }
+          return item;
+        })
+        .filter(Boolean) as LocalItem[]
+    );
+
+    toast.success(t('menuSetup.itemDeleted'));
+    setDeleteConfirm({ isOpen: false });
+  };
+
+  const handleBulkCreate = async (itemsData: ItemData[]) => {
+    const newItems: LocalItem[] = itemsData.map((data, index) => ({
+      ...data,
+      id: `temp_${Date.now()}_${index}`,
+      _isNew: true,
+    }));
+
+    setLocalItems((prev) => [...prev, ...newItems]);
+    toast.success(`${t('menuSetup.added')} ${itemsData.length} ${t('menuSetup.itemsLocally')}`);
+    setShowBulkCreate(false);
+  };
+
+  const handleBulkDelete = () => {
+    setLocalItems((prev) =>
+      prev
+        .map((item) => {
+          if (selectedItems.has(item.id)) {
+            if (item._isNew) {
+              return null;
+            }
+            return { ...item, _isDeleted: true };
+          }
+          return item;
+        })
+        .filter(Boolean) as LocalItem[]
+    );
+
+    toast.success(`${t('menuSetup.deleted')} ${selectedItems.size} ${t('menuSetup.items')}`);
+    setSelectedItems(new Set());
+    setBulkDeleteConfirm(false);
+  };
 
   const toggleItemSelection = (itemId: string) => {
     const newSelection = new Set(selectedItems);
@@ -94,42 +187,32 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     }
   };
 
-  const handleCreateItem = async (itemData: ItemData) => {
-    const newItem = await createItem(itemData);
-    if (newItem) {
-      setShowItemForm(false);
-      setEditingItem(null);
-    }
-  };
+  // Filter out deleted items
+  const activeItems = localItems.filter((item) => !item._isDeleted);
 
-  const handleUpdateItem = async (itemData: ItemData) => {
-    if (!editingItem) return;
-    const updated = await updateItem(editingItem.id, itemData);
-    if (updated) {
-      setShowItemForm(false);
-      setEditingItem(null);
-    }
-  };
+  // LOCAL FILTERING - No API calls!
+  const filteredItems = activeItems.filter((item) => {
+    const matchesSearch =
+      !searchQuery ||
+      (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
 
-  const handleDeleteItem = async (item: any) => {
-    await deleteItem(item.id);
-    setDeleteConfirm({ isOpen: false });
-  };
+    const matchesCategory =
+      !selectedCategoryFilter || item.category_id === selectedCategoryFilter;
 
-  const handleBulkDelete = async () => {
-    for (const itemId of selectedItems) {
-      await deleteItem(itemId);
-    }
-    setSelectedItems(new Set());
-    setBulkDeleteConfirm(false);
-  };
+    return matchesSearch && matchesCategory;
+  });
 
-  const handleBulkCreate = async (itemsData: ItemData[]) => {
-    const newItems = await bulkCreateItems(itemsData);
-    if (newItems) {
-      setShowBulkCreate(false);
+  // Group items by category
+  const itemsByCategory = filteredItems.reduce((acc, item) => {
+    const catId = item.category_id || 'uncategorized';
+    if (!acc[catId]) {
+      acc[catId] = [];
     }
-  };
+    acc[catId].push(item);
+    return acc;
+  }, {} as Record<string, LocalItem[]>);
 
   const getCategoryName = (categoryId: string | null | undefined) => {
     if (!categoryId) return 'Uncategorized';
@@ -143,15 +226,99 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     return category?.color || '#6B7280';
   };
 
+  // Sync all changes to database and navigate
+  const handleContinueToReview = async () => {
+    const toCreate = localItems.filter((item) => item._isNew && !item._isDeleted);
+    const toUpdate = localItems.filter((item) => item._isModified && !item._isDeleted && !item._isNew);
+    const toDelete = localItems.filter((item) => item._isDeleted && !item._isNew);
+
+    // If no changes, just navigate
+    if (toCreate.length === 0 && toUpdate.length === 0 && toDelete.length === 0) {
+      onComplete();
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      let operationCount = 0;
+
+      // 1. Delete items
+      if (toDelete.length > 0) {
+        for (const item of toDelete) {
+          await itemsAPI.deleteItem(item.id);
+          operationCount++;
+        }
+      }
+
+      // 2. Update items
+      if (toUpdate.length > 0) {
+        for (const item of toUpdate) {
+          const updateData: Partial<ItemData> = {
+            name: item.name,
+            price: item.price,
+            category_id: item.category_id,
+            description: item.description,
+            sku: item.sku,
+            stock: item.stock,
+            image_url: item.image_url,
+            is_active: item.is_active,
+          };
+          await itemsAPI.updateItem(item.id, updateData);
+          operationCount++;
+        }
+      }
+
+      // 3. Create new items (BATCH)
+      if (toCreate.length > 0) {
+        const itemsData: ItemData[] = toCreate.map((item) => ({
+          name: item.name,
+          price: item.price,
+          category_id: item.category_id,
+          description: item.description,
+          sku: item.sku,
+          stock: item.stock,
+          image_url: item.image_url,
+          is_active: item.is_active,
+        }));
+
+        await itemsAPI.bulkCreateItems(storeId, itemsData);
+        operationCount += toCreate.length;
+      }
+
+      toast.success(
+        `${t('menuSetup.saved')} ${operationCount} ${operationCount === 1 ? t('menuSetup.change') : t('menuSetup.changes')}`
+      );
+
+      // Navigate to next step
+      onComplete();
+    } catch (error: any) {
+      console.error('Failed to sync items:', error);
+      toast.error(error.message || t('menuSetup.failedToSaveItems'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const pendingChanges = localItems.filter(
+    (item) => item._isNew || item._isModified || item._isDeleted
+  ).length;
+
+  const loading = loadingItems || loadingCategories;
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Add Menu Items</h2>
-        <p className="mt-2 text-gray-600 dark:text-gray-400">
-          Add items to your categories. You can always add more items later from the Catalog
-          screen.
+        <p className="text-gray-600 dark:text-gray-400 mt-2">
+          Add items to your categories. Changes will be saved when you continue to review.
         </p>
+        {pendingChanges > 0 && (
+          <p className="text-sm text-orange-600 dark:text-orange-400 mt-2">
+            💡 {pendingChanges} {t('menuSetup.pendingChanges')}
+          </p>
+        )}
       </div>
 
       {/* Action Bar */}
@@ -224,7 +391,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                   setEditingItem(null);
                   setShowItemForm(true);
                 }}
-                disabled={loading}
+                disabled={loading || isSaving}
               >
                 <PlusIcon className="w-5 h-5 mr-2" />
                 Add Single
@@ -233,7 +400,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
               <Button
                 variant="secondary"
                 onClick={() => setShowBulkCreate(true)}
-                disabled={loading}
+                disabled={loading || isSaving}
               >
                 <RectangleStackIcon className="w-5 h-5 mr-2" />
                 Add Bulk
@@ -244,7 +411,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
       </Card>
 
       {/* Items List */}
-      {loading && items.length === 0 ? (
+      {loading && activeItems.length === 0 ? (
         <Card className="p-12">
           <div className="text-center text-gray-500 dark:text-gray-400">
             {t('common.loading')}
@@ -295,16 +462,34 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                         onChange={() => toggleItemSelection(item.id)}
                         className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                       />
-                      <Card className="flex-1 p-4 flex items-center justify-between hover:shadow-md transition-shadow">
+                      <Card className="flex-1 p-4 flex items-center justify-between hover:shadow-md transition-shadow relative">
                         <div className="flex-1">
-                          <h4 className="font-semibold text-gray-900 dark:text-white">
-                            {item.name}
-                          </h4>
-                          {item.description ? (
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-gray-900 dark:text-white">
+                              {item.name}
+                            </h4>
+                            {/* CATEGORY BADGE */}
+                            <span
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                              style={{
+                                backgroundColor: `${categoryColor}20`,
+                                color: categoryColor,
+                              }}
+                            >
+                              {categoryName}
+                            </span>
+                            {/* STATUS BADGE */}
+                            {(item._isNew || item._isModified) && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+                                {item._isNew ? t('menuSetup.new') : t('menuSetup.modified')}
+                              </span>
+                            )}
+                          </div>
+                          {item.description && (
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                               {item.description}
                             </p>
-                          ) : null}
+                          )}
                           <div className="flex items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
                             <span className="font-semibold text-orange-600 dark:text-orange-400">
                               {t('common.currency')}
@@ -313,18 +498,6 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                             {item.sku && <span>SKU: {item.sku}</span>}
                             {item.stock !== undefined && <span>Stock: {item.stock}</span>}
                           </div>
-                          {item.tags && item.tags.length > 0 && (
-                            <div className="flex gap-1 mt-2">
-                              {item.tags.map((tag: string, idx: number) => (
-                                <span
-                                  key={idx}
-                                  className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -355,11 +528,18 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
 
       {/* Navigation */}
       <div className="flex justify-between pt-4">
-        <Button variant="secondary" onClick={onBack} size="lg">
+        <Button variant="secondary" onClick={onBack} size="lg" disabled={isSaving}>
           {t('common.back')}
         </Button>
-        <Button onClick={onComplete} size="lg">
-          Continue to Review
+        <Button onClick={handleContinueToReview} size="lg" disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <ArrowPathIcon className="w-5 h-5 mr-2 animate-spin" />
+              {t('menuSetup.saving')}
+            </>
+          ) : (
+            'Continue to Review'
+          )}
         </Button>
       </div>
 
@@ -394,7 +574,6 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
               Are you sure you want to delete "{deleteConfirm.item.name}"?
-              This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <Button
@@ -405,7 +584,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                 Cancel
               </Button>
               <Button
-                onClick={() => handleDeleteItem(deleteConfirm.item)}
+                onClick={handleDeleteItem}
                 className="flex-1 bg-red-600 hover:bg-red-700"
               >
                 Delete
@@ -423,8 +602,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
               Delete Multiple Items
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Are you sure you want to delete {selectedItems.size} items? This action cannot be
-              undone.
+              Are you sure you want to delete {selectedItems.size} items?
             </p>
             <div className="flex gap-3">
               <Button
