@@ -88,11 +88,13 @@ export function ItemBulkCreateModal({
   };
 
   const handleSubmit = async () => {
-    // VALIDATE: name, price > 0, and description are all required
+    // VALIDATE: name, price > 0, category_id, and description are all required
     const validItems = items.filter(
       (item) =>
         item.name.trim().length > 0 &&
         item.price > 0 &&
+        item.category_id &&
+        item.category_id.trim().length > 0 &&
         (item.description || '').trim().length > 0
     );
 
@@ -119,6 +121,8 @@ export function ItemBulkCreateModal({
     (item) =>
       item.name.trim().length > 0 &&
       item.price > 0 &&
+      item.category_id &&
+      item.category_id.trim().length > 0 &&
       (item.description || '').trim().length > 0
   ).length;
 
@@ -151,7 +155,7 @@ export function ItemBulkCreateModal({
               <div className="w-8">#</div>
               <div>Name *</div>
               <div>Price *</div>
-              <div>Category</div>
+              <div>Category *</div>
               <div>SKU</div>
               <div>Stock</div>
               <div>Description *</div>

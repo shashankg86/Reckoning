@@ -1,12 +1,12 @@
 /**
  * ReviewStep Component
  *
- * Final step - Review and complete menu setup
+ * Final step - Review and complete menu setup with accordion UI
  */
 
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, ArrowPathIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { useCategories } from '../../hooks/useCategories';
@@ -24,6 +24,7 @@ export function ReviewStep({ onBack, onComplete }: ReviewStepProps) {
   });
 
   const [isCompleting, setIsCompleting] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const handleComplete = async () => {
     setIsCompleting(true);
@@ -34,6 +35,24 @@ export function ReviewStep({ onBack, onComplete }: ReviewStepProps) {
     } finally {
       setIsCompleting(false);
     }
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId);
+    } else {
+      newExpanded.add(categoryId);
+    }
+    setExpandedCategories(newExpanded);
+  };
+
+  const expandAll = () => {
+    setExpandedCategories(new Set(categoriesWithCounts.map((cat) => cat.id)));
+  };
+
+  const collapseAll = () => {
+    setExpandedCategories(new Set());
   };
 
   const totalItems = categoriesWithCounts.reduce((sum, cat) => sum + cat.item_count, 0);
@@ -80,91 +99,140 @@ export function ReviewStep({ onBack, onComplete }: ReviewStepProps) {
         </div>
       </Card>
 
-      {/* Categories and Items Preview */}
+      {/* Categories Accordion */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          {t('menuSetup.yourCategories')} & Items
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {t('menuSetup.yourCategories')} & Items
+          </h3>
+          {categoriesWithCounts.length > 0 && (
+            <div className="flex gap-2">
+              <button
+                onClick={expandAll}
+                className="text-sm text-orange-600 dark:text-orange-400 hover:underline"
+              >
+                Expand All
+              </button>
+              <span className="text-gray-400">|</span>
+              <button
+                onClick={collapseAll}
+                className="text-sm text-orange-600 dark:text-orange-400 hover:underline"
+              >
+                Collapse All
+              </button>
+            </div>
+          )}
+        </div>
 
-        <div className="space-y-6">
+        <div className="space-y-3">
           {loadingCategories ? (
             <div className="flex items-center justify-center py-8">
               <ArrowPathIcon className="w-6 h-6 text-gray-400 animate-spin" />
             </div>
+          ) : categoriesWithCounts.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No categories found
+            </div>
           ) : (
-            categoriesWithCounts.map((category) => (
-              <div key={category.id} className="space-y-3">
-                {/* Category Header */}
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
-                      style={{ backgroundColor: category.color }}
-                    >
-                      {category.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {category.name}
-                      </p>
-                      {category.description && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {category.description}
+            categoriesWithCounts.map((category) => {
+              const isExpanded = expandedCategories.has(category.id);
+              const hasItems = category.items && category.items.length > 0;
+
+              return (
+                <div
+                  key={category.id}
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+                >
+                  {/* Accordion Header */}
+                  <button
+                    onClick={() => toggleCategory(category.id)}
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0"
+                        style={{ backgroundColor: category.color }}
+                      >
+                        {category.name.charAt(0)}
+                      </div>
+                      <div className="text-left">
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {category.name}
                         </p>
+                        {category.description && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {category.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400 px-3 py-1 bg-white dark:bg-gray-800 rounded-full">
+                        {category.item_count} {category.item_count === 1 ? 'item' : 'items'}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronDownIcon className="w-5 h-5 text-gray-400" />
+                      ) : (
+                        <ChevronRightIcon className="w-5 h-5 text-gray-400" />
                       )}
                     </div>
-                  </div>
-                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {category.item_count} {t('common.items')}
-                  </span>
-                </div>
+                  </button>
 
-                {/* Items in Category */}
-                {category.items && category.items.length > 0 && (
-                  <div className="ml-6 space-y-2">
-                    {category.items.map((item: any) => (
-                      <div
-                        key={item.id}
-                        className="flex items-start justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600"
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-gray-900 dark:text-white">
-                              {item.name}
-                            </p>
-                            <span
-                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                              style={{
-                                backgroundColor: `${category.color}20`,
-                                color: category.color,
-                              }}
+                  {/* Accordion Content */}
+                  {isExpanded && (
+                    <div className="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+                      {hasItems ? (
+                        <div className="space-y-2">
+                          {category.items.map((item: any) => (
+                            <div
+                              key={item.id}
+                              className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                             >
-                              {category.name}
-                            </span>
-                          </div>
-                          {item.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                              {item.description}
-                            </p>
-                          )}
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-gray-900 dark:text-white">
+                                    {item.name}
+                                  </p>
+                                  <span
+                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                                    style={{
+                                      backgroundColor: `${category.color}20`,
+                                      color: category.color,
+                                    }}
+                                  >
+                                    {category.name}
+                                  </span>
+                                </div>
+                                {item.description && (
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    {item.description}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="ml-4 text-right flex-shrink-0">
+                                <p className="font-semibold text-orange-600 dark:text-orange-400">
+                                  {t('common.currency')}
+                                  {item.price.toFixed(2)}
+                                </p>
+                                {item.stock !== undefined && item.stock !== null && (
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Stock: {item.stock}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="ml-4 text-right">
-                          <p className="font-semibold text-orange-600 dark:text-orange-400">
-                            {t('common.currency')}
-                            {item.price.toFixed(2)}
-                          </p>
-                          {item.stock !== undefined && item.stock !== null && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              Stock: {item.stock}
-                            </p>
-                          )}
+                      ) : (
+                        <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
+                          No items in this category
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </Card>

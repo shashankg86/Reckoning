@@ -18,7 +18,7 @@ import type { ItemData } from '../../../api/items';
 const itemSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200, 'Name too long'),
   price: z.coerce.number().min(0.01, 'Price must be greater than 0'),
-  category_id: z.string().optional(),
+  category_id: z.string().min(1, 'Category is required'),
   description: z.string().min(1, 'Description is required').max(500, 'Description too long'),
   sku: z.string().max(50, 'SKU too long').optional(),
   stock: z.coerce.number().min(0, 'Stock must be positive').optional(),
@@ -163,19 +163,24 @@ export function ItemFormModal({
             {/* Category */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('catalog.category')} ({t('common.optional')})
+                {t('catalog.category')} *
               </label>
               <select
                 {...register('category_id')}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
-                <option value="">None</option>
+                <option value="">Select a category...</option>
                 {availableCategories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name}
                   </option>
                 ))}
               </select>
+              {errors.category_id && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {errors.category_id.message}
+                </p>
+              )}
             </div>
 
             {/* SKU */}
