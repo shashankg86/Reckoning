@@ -1,9 +1,3 @@
-/**
- * ReviewStep Component
- *
- * Final step - Review and complete menu setup with accordion UI
- */
-
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckCircleIcon, ArrowPathIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';

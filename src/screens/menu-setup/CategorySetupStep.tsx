@@ -1,10 +1,3 @@
-/**
- * CategorySetupStep Component
- *
- * Simplified manual category creation - Single + Bulk
- * ALL operations (create, update, delete) are saved ONLY when clicking "Continue to Items"
- */
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';

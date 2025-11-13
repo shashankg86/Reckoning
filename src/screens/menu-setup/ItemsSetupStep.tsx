@@ -1,10 +1,3 @@
-/**
- * ItemsSetupStep Component
- *
- * ALL operations (create, update, delete) deferred until "Continue to Review"
- * Optimized data fetching - single load, local filtering
- */
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
