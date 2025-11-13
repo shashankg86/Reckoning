@@ -2,7 +2,7 @@
  * CategorySetupStep Component
  *
  * Simplified manual category creation - Single + Bulk
- * Categories are saved ONLY when clicking "Continue to Items"
+ * ALL operations (create, update, delete) are saved ONLY when clicking "Continue to Items"
  */
 
 import React, { useState, useEffect } from 'react';
@@ -31,10 +31,13 @@ interface CategorySetupStepProps {
   onNext: () => void;
 }
 
-// Local category with temp ID for unsaved categories
+// Local category with change tracking
 interface LocalCategory extends Omit<Category, 'id'> {
   id: string;
   _isNew?: boolean; // Flag to indicate not yet saved to DB
+  _isModified?: boolean; // Flag to indicate edited (for existing DB records)
+  _isDeleted?: boolean; // Flag to indicate marked for deletion
+  _originalData?: Category; // Keep original data for updates
 }
 
 export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
@@ -59,10 +62,15 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync existing categories from DB to local state
+  // Sync existing categories from DB to local state (only once on mount)
   useEffect(() => {
-    if (existingCategories.length > 0) {
-      setLocalCategories(existingCategories);
+    if (existingCategories.length > 0 && localCategories.length === 0) {
+      setLocalCategories(
+        existingCategories.map((cat) => ({
+          ...cat,
+          _originalData: cat, // Store original for comparison
+        }))
+      );
     }
   }, [existingCategories]);
 
@@ -88,11 +96,22 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     if (!editingCategory) return;
 
     setLocalCategories((prev) =>
-      prev.map((cat) =>
-        cat.id === editingCategory.id
-          ? { ...cat, ...data, updated_at: new Date().toISOString() }
-          : cat
-      )
+      prev.map((cat) => {
+        if (cat.id === editingCategory.id) {
+          // If it's a new category, just update it
+          if (cat._isNew) {
+            return { ...cat, ...data, updated_at: new Date().toISOString() };
+          }
+          // If it's an existing category, mark as modified
+          return {
+            ...cat,
+            ...data,
+            _isModified: true,
+            updated_at: new Date().toISOString(),
+          };
+        }
+        return cat;
+      })
     );
 
     toast.success(t('menuSetup.categoryUpdated'));
@@ -103,7 +122,22 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const handleDeleteCategory = () => {
     if (!deleteConfirm.category) return;
 
-    setLocalCategories((prev) => prev.filter((cat) => cat.id !== deleteConfirm.category!.id));
+    setLocalCategories((prev) =>
+      prev
+        .map((cat) => {
+          if (cat.id === deleteConfirm.category!.id) {
+            // If it's a new category, just remove it entirely
+            if (cat._isNew) {
+              return null;
+            }
+            // If it's an existing category, mark as deleted
+            return { ...cat, _isDeleted: true };
+          }
+          return cat;
+        })
+        .filter(Boolean) as LocalCategory[]
+    );
+
     toast.success(t('menuSetup.categoryDeleted'));
     setDeleteConfirm({ isOpen: false, category: null });
   };
@@ -127,7 +161,22 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   };
 
   const handleBulkDelete = () => {
-    setLocalCategories((prev) => prev.filter((cat) => !selectedCategories.has(cat.id)));
+    setLocalCategories((prev) =>
+      prev
+        .map((cat) => {
+          if (selectedCategories.has(cat.id)) {
+            // If it's a new category, remove it entirely
+            if (cat._isNew) {
+              return null;
+            }
+            // If it's an existing category, mark as deleted
+            return { ...cat, _isDeleted: true };
+          }
+          return cat;
+        })
+        .filter(Boolean) as LocalCategory[]
+    );
+
     toast.success(`${t('menuSetup.deleted')} ${selectedCategories.size} ${t('menuSetup.categories')}`);
     setSelectedCategories(new Set());
     setBulkDeleteConfirm(false);
@@ -151,24 +200,29 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     }
   };
 
-  const filteredCategories = localCategories.filter(
+  // Filter out deleted categories from display
+  const activeCategories = localCategories.filter((cat) => !cat._isDeleted);
+
+  const filteredCategories = activeCategories.filter(
     (cat) =>
       cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (cat.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
-  // Save all new categories to database and navigate
+  // Sync all changes to database and navigate
   const handleContinueToItems = async () => {
-    if (localCategories.length === 0) {
+    if (activeCategories.length === 0) {
       toast.error(t('menuSetup.pleaseAddCategories'));
       return;
     }
 
-    // Filter only new categories that need to be saved
-    const categoriesToSave = localCategories.filter((cat) => cat._isNew);
+    // Separate categories by operation type
+    const toCreate = localCategories.filter((cat) => cat._isNew && !cat._isDeleted);
+    const toUpdate = localCategories.filter((cat) => cat._isModified && !cat._isDeleted && !cat._isNew);
+    const toDelete = localCategories.filter((cat) => cat._isDeleted && !cat._isNew);
 
-    if (categoriesToSave.length === 0) {
-      // All categories already saved, just navigate
+    // If no changes, just navigate
+    if (toCreate.length === 0 && toUpdate.length === 0 && toDelete.length === 0) {
       onNext();
       return;
     }
@@ -176,34 +230,67 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     setIsSaving(true);
 
     try {
-      // Prepare data for bulk create
-      const categoriesData: CreateCategoryData[] = categoriesToSave.map((cat) => ({
-        name: cat.name,
-        description: cat.description,
-        color: cat.color,
-        icon: cat.icon,
-        sort_order: cat.sort_order,
-        parent_id: cat.parent_id,
-        metadata: cat.metadata,
-      }));
+      let operationCount = 0;
 
-      // Batch save all categories to database
-      await categoriesAPI.bulkCreateCategories(storeId, categoriesData);
+      // 1. Delete categories first
+      if (toDelete.length > 0) {
+        for (const cat of toDelete) {
+          await categoriesAPI.permanentlyDeleteCategory(cat.id);
+          operationCount++;
+        }
+      }
 
-      toast.success(`${t('menuSetup.saved')} ${categoriesToSave.length} ${t('menuSetup.categories')}`);
+      // 2. Update modified categories
+      if (toUpdate.length > 0) {
+        for (const cat of toUpdate) {
+          const updateData: UpdateCategoryData = {
+            name: cat.name,
+            description: cat.description,
+            color: cat.color,
+            icon: cat.icon,
+            sort_order: cat.sort_order,
+            parent_id: cat.parent_id,
+            metadata: cat.metadata,
+          };
+          await categoriesAPI.updateCategory(cat.id, updateData);
+          operationCount++;
+        }
+      }
+
+      // 3. Create new categories
+      if (toCreate.length > 0) {
+        const categoriesData: CreateCategoryData[] = toCreate.map((cat) => ({
+          name: cat.name,
+          description: cat.description,
+          color: cat.color,
+          icon: cat.icon,
+          sort_order: cat.sort_order,
+          parent_id: cat.parent_id,
+          metadata: cat.metadata,
+        }));
+
+        await categoriesAPI.bulkCreateCategories(storeId, categoriesData);
+        operationCount += toCreate.length;
+      }
+
+      toast.success(
+        `${t('menuSetup.saved')} ${operationCount} ${operationCount === 1 ? t('menuSetup.change') : t('menuSetup.changes')}`
+      );
 
       // Navigate to next step
       onNext();
     } catch (error: any) {
-      console.error('Failed to save categories:', error);
+      console.error('Failed to sync categories:', error);
       toast.error(error.message || t('menuSetup.failedToSaveCategories'));
     } finally {
       setIsSaving(false);
     }
   };
 
-  const canProceed = localCategories.length > 0;
-  const newCategoriesCount = localCategories.filter((cat) => cat._isNew).length;
+  const canProceed = activeCategories.length > 0;
+  const pendingChanges = localCategories.filter(
+    (cat) => cat._isNew || cat._isModified || cat._isDeleted
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -215,9 +302,9 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         <p className="text-gray-600 dark:text-gray-400 mt-2">
           {t('menuSetup.categoriesManualDescription')}
         </p>
-        {newCategoriesCount > 0 && (
+        {pendingChanges > 0 && (
           <p className="text-sm text-orange-600 dark:text-orange-400 mt-2">
-            💡 {newCategoriesCount} {t('menuSetup.unsavedCategories')}
+            💡 {pendingChanges} {t('menuSetup.pendingChanges')}
           </p>
         )}
       </div>
@@ -335,7 +422,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
               .sort((a, b) => a.sort_order - b.sort_order)
               .map((category) => {
                 const parentCategory = category.parent_id
-                  ? localCategories.find((c) => c.id === category.parent_id)
+                  ? activeCategories.find((c) => c.id === category.parent_id)
                   : null;
 
                 return (
@@ -359,9 +446,9 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
                         isSubcategory={!!category.parent_id}
                         parentName={parentCategory?.name}
                       />
-                      {category._isNew && (
+                      {(category._isNew || category._isModified) && (
                         <span className="absolute top-2 right-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
-                          {t('menuSetup.unsaved')}
+                          {category._isNew ? t('menuSetup.new') : t('menuSetup.modified')}
                         </span>
                       )}
                     </div>
@@ -399,7 +486,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         title={
           editingCategory ? t('menuSetup.editCategory') : t('menuSetup.createCategory')
         }
-        availableParentCategories={localCategories as Category[]}
+        availableParentCategories={activeCategories as Category[]}
       />
 
       {/* Bulk Create Modal */}
