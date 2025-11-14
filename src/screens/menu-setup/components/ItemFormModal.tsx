@@ -12,6 +12,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
+import { ImageUpload } from '../../../components/ui/ImageUpload';
 import type { Category } from '../../../types/menu';
 import type { ItemData } from '../../../api/items';
 
@@ -30,7 +31,7 @@ type ItemFormData = z.infer<typeof itemSchema>;
 interface ItemFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: ItemData) => Promise<void>;
+  onSubmit: (data: ItemData, imageFile?: File | null) => Promise<void>;
   item?: any | null;
   title: string;
   availableCategories?: Category[];
@@ -48,6 +49,7 @@ export function ItemFormModal({
 }: ItemFormModalProps) {
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
 
   const {
     register,
@@ -78,6 +80,7 @@ export function ItemFormModal({
         stock: item.stock || 0,
         tags: item.tags?.join(', ') || '',
       });
+      setImageFile(null); // Reset image file when editing
     } else {
       reset({
         name: '',
@@ -88,6 +91,7 @@ export function ItemFormModal({
         stock: 0,
         tags: '',
       });
+      setImageFile(null);
     }
   }, [item, defaultCategoryId, reset]);
 
@@ -110,8 +114,9 @@ export function ItemFormModal({
         sku: data.sku,
         stock: data.stock || 0,
         tags,
-      });
+      }, imageFile);
       reset();
+      setImageFile(null);
       onClose();
     } catch (error) {
       console.error('Form submission error:', error);
@@ -232,6 +237,22 @@ export function ItemFormModal({
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Enter tags separated by commas
+            </p>
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {t('catalog.image')} ({t('common.optional')})
+            </label>
+            <ImageUpload
+              value={imageFile || item?.image_url}
+              onChange={setImageFile}
+              placeholder="Upload item image (optional)"
+              maxSizeMB={5}
+            />
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Recommended: High-quality product image
             </p>
           </div>
 

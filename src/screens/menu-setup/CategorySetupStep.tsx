@@ -15,6 +15,7 @@ import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCategories } from '../../hooks/useCategories';
 import { categoriesAPI } from '../../api/categories';
+import { ImageUploadService, STORAGE_BUCKETS } from '../../lib/imageUploadService';
 import { CategoryCard } from './components/CategoryCard';
 import { CategoryFormModal } from './components/CategoryFormModal';
 import { CategoryBulkCreateModal } from './components/CategoryBulkCreateModal';
@@ -31,6 +32,7 @@ interface LocalCategory extends Omit<Category, 'id'> {
   _isModified?: boolean; // Flag to indicate edited (for existing DB records)
   _isDeleted?: boolean; // Flag to indicate marked for deletion
   _originalData?: Category; // Keep original data for updates
+  _imageFile?: File | null; // Local image file before upload
 }
 
 export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
@@ -67,12 +69,13 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     }
   }, [existingCategories]);
 
-  const handleCreateCategory = (data: CreateCategoryData) => {
+  const handleCreateCategory = (data: CreateCategoryData, imageFile?: File | null) => {
     // Create category in local state only (not DB yet)
     const newCategory: LocalCategory = {
       ...data,
       id: `temp_${Date.now()}_${Math.random()}`, // Temporary ID
       _isNew: true,
+      _imageFile: imageFile || null,
       is_active: true,
       store_id: storeId,
       sort_order: localCategories.length,
@@ -85,7 +88,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     setShowCategoryForm(false);
   };
 
-  const handleUpdateCategory = (data: UpdateCategoryData) => {
+  const handleUpdateCategory = (data: UpdateCategoryData, imageFile?: File | null) => {
     if (!editingCategory) return;
 
     setLocalCategories((prev) =>
@@ -93,12 +96,18 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         if (cat.id === editingCategory.id) {
           // If it's a new category, just update it
           if (cat._isNew) {
-            return { ...cat, ...data, updated_at: new Date().toISOString() };
+            return {
+              ...cat,
+              ...data,
+              _imageFile: imageFile !== undefined ? imageFile : cat._imageFile,
+              updated_at: new Date().toISOString()
+            };
           }
           // If it's an existing category, mark as modified
           return {
             ...cat,
             ...data,
+            _imageFile: imageFile !== undefined ? imageFile : cat._imageFile,
             _isModified: true,
             updated_at: new Date().toISOString(),
           };
@@ -225,7 +234,41 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     try {
       let operationCount = 0;
 
-      // 1. Delete categories first
+      // STEP 1: Upload images for categories with _imageFile (DEFERRED UPLOAD)
+      const categoriesToUpload = [...toCreate, ...toUpdate].filter((cat) => cat._imageFile);
+
+      if (categoriesToUpload.length > 0) {
+        const uploadToast = toast.loading(`Uploading ${categoriesToUpload.length} image(s)...`);
+
+        try {
+          const files = categoriesToUpload.map((cat) => cat._imageFile!);
+          const uploadResult = await ImageUploadService.batchUploadImages(
+            files,
+            STORAGE_BUCKETS.CATEGORIES,
+            `store_${storeId}`,
+            (completed, total) => {
+              toast.loading(`Uploading images: ${completed}/${total}`, { id: uploadToast });
+            }
+          );
+
+          // Map uploaded URLs back to categories
+          uploadResult.successful.forEach((result, index) => {
+            const category = categoriesToUpload[index];
+            category.image_url = result.url || null;
+          });
+
+          toast.success(`Uploaded ${uploadResult.totalUploaded} image(s)`, { id: uploadToast });
+
+          if (uploadResult.totalFailed > 0) {
+            toast.error(`Failed to upload ${uploadResult.totalFailed} image(s)`);
+          }
+        } catch (error) {
+          toast.error('Image upload failed', { id: uploadToast });
+          console.error('Image upload error:', error);
+        }
+      }
+
+      // STEP 2: Delete categories
       if (toDelete.length > 0) {
         for (const cat of toDelete) {
           await categoriesAPI.permanentlyDeleteCategory(cat.id);
@@ -233,7 +276,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         }
       }
 
-      // 2. Update modified categories
+      // STEP 3: Update modified categories (now with image_url)
       if (toUpdate.length > 0) {
         for (const cat of toUpdate) {
           const updateData: UpdateCategoryData = {
@@ -241,6 +284,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
             description: cat.description,
             color: cat.color,
             icon: cat.icon,
+            image_url: cat.image_url,
             sort_order: cat.sort_order,
             parent_id: cat.parent_id,
             metadata: cat.metadata,
@@ -250,13 +294,14 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         }
       }
 
-      // 3. Create new categories
+      // STEP 4: Create new categories (now with image_url)
       if (toCreate.length > 0) {
         const categoriesData: CreateCategoryData[] = toCreate.map((cat) => ({
           name: cat.name,
           description: cat.description,
           color: cat.color,
           icon: cat.icon,
+          image_url: cat.image_url,
           sort_order: cat.sort_order,
           parent_id: cat.parent_id,
           metadata: cat.metadata,
@@ -418,6 +463,11 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
                   ? activeCategories.find((c) => c.id === category.parent_id)
                   : null;
 
+                // Create preview URL for local image file
+                const categoryWithPreview = category._imageFile
+                  ? { ...category, image_url: URL.createObjectURL(category._imageFile) }
+                  : category;
+
                 return (
                   <div key={category.id} className="flex items-center gap-3">
                     <input
@@ -428,13 +478,13 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
                     />
                     <div className="flex-1 relative">
                       <CategoryCard
-                        category={category as Category}
+                        category={categoryWithPreview as Category}
                         onEdit={(cat) => {
-                          setEditingCategory(cat as LocalCategory);
+                          setEditingCategory(category);
                           setShowCategoryForm(true);
                         }}
                         onDelete={(cat) =>
-                          setDeleteConfirm({ isOpen: true, category: cat as LocalCategory })
+                          setDeleteConfirm({ isOpen: true, category: category })
                         }
                         isSubcategory={!!category.parent_id}
                         parentName={parentCategory?.name}

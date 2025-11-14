@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircleIcon, ArrowPathIcon, ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, ArrowPathIcon, ChevronDownIcon, ChevronRightIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { useCategories } from '../../hooks/useCategories';
@@ -143,12 +143,20 @@ export function ReviewStep({ onBack, onComplete }: ReviewStepProps) {
                     className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                   >
                     <div className="flex items-center space-x-3">
-                      <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0"
-                        style={{ backgroundColor: category.color }}
-                      >
-                        {category.name.charAt(0)}
-                      </div>
+                      {category.image_url ? (
+                        <img
+                          src={category.image_url}
+                          alt={category.name}
+                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div
+                          className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0"
+                          style={{ backgroundColor: category.color }}
+                        >
+                          {category.name.charAt(0)}
+                        </div>
+                      )}
                       <div className="text-left">
                         <p className="font-medium text-gray-900 dark:text-white">
                           {category.name}
@@ -180,9 +188,22 @@ export function ReviewStep({ onBack, onComplete }: ReviewStepProps) {
                           {category.items.map((item: any) => (
                             <div
                               key={item.id}
-                              className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                              className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                             >
-                              <div className="flex-1">
+                              {/* Item image or placeholder */}
+                              {item.image_url ? (
+                                <img
+                                  src={item.image_url}
+                                  alt={item.name}
+                                  className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-16 h-16 rounded-lg bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+                                  <PhotoIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                                </div>
+                              )}
+
+                              <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <p className="font-medium text-gray-900 dark:text-white">
                                     {item.name}

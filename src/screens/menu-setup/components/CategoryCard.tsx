@@ -38,13 +38,21 @@ export function CategoryCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-3 flex-1">
-          {/* Color indicator */}
-          <div
-            className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg"
-            style={{ backgroundColor: category.color }}
-          >
-            {category.name.charAt(0)}
-          </div>
+          {/* Category image or color indicator */}
+          {category.image_url ? (
+            <img
+              src={category.image_url}
+              alt={category.name}
+              className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+            />
+          ) : (
+            <div
+              className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
+              style={{ backgroundColor: category.color }}
+            >
+              {category.name.charAt(0)}
+            </div>
+          )}
 
           {/* Category info */}
           <div className="flex-1">

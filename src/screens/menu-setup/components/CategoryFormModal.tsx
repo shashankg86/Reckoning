@@ -12,6 +12,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
+import { ImageUpload } from '../../../components/ui/ImageUpload';
 import type { Category, CreateCategoryData, UpdateCategoryData } from '../../../types/menu';
 
 const categorySchema = z.object({
@@ -26,7 +27,7 @@ type CategoryFormData = z.infer<typeof categorySchema>;
 interface CategoryFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateCategoryData | UpdateCategoryData) => Promise<void>;
+  onSubmit: (data: CreateCategoryData | UpdateCategoryData, imageFile?: File | null) => Promise<void>;
   category?: Category | null;
   title: string;
   availableParentCategories?: Category[];
@@ -53,6 +54,7 @@ export function CategoryFormModal({
 }: CategoryFormModalProps) {
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [imageFile, setImageFile] = React.useState<File | null>(null);
 
   const {
     register,
@@ -86,6 +88,7 @@ export function CategoryFormModal({
         color: category.color,
         parent_id: category.parent_id || null,
       });
+      setImageFile(null); // Reset image file when editing
     } else {
       reset({
         name: '',
@@ -93,14 +96,16 @@ export function CategoryFormModal({
         color: '#FF6B35',
         parent_id: null,
       });
+      setImageFile(null);
     }
   }, [category, reset]);
 
   const onFormSubmit = async (data: CategoryFormData) => {
     setIsSubmitting(true);
     try {
-      await onSubmit(data);
+      await onSubmit(data, imageFile);
       reset();
+      setImageFile(null);
       onClose();
     } catch (error) {
       console.error('Form submission error:', error);
@@ -202,6 +207,22 @@ export function CategoryFormModal({
               {...register('color')}
               error={errors.color?.message}
             />
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              {t('catalog.image')} ({t('common.optional')})
+            </label>
+            <ImageUpload
+              value={imageFile || category?.image_url}
+              onChange={setImageFile}
+              placeholder="Upload category image (optional)"
+              maxSizeMB={5}
+            />
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              If no image is uploaded, a colored square will be displayed
+            </p>
           </div>
 
           {/* Actions */}

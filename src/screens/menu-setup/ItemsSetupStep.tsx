@@ -16,6 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useItems } from '../../hooks/useItems';
 import { useCategories } from '../../hooks/useCategories';
 import { itemsAPI } from '../../api/items';
+import { ImageUploadService, STORAGE_BUCKETS } from '../../lib/imageUploadService';
 import { ItemFormModal } from './components/ItemFormModal';
 import { ItemBulkCreateModal } from './components/ItemBulkCreateModal';
 import type { ItemData } from '../../api/items';
@@ -33,6 +34,7 @@ interface LocalItem extends ItemData {
   _isModified?: boolean;
   _isDeleted?: boolean;
   _originalData?: any;
+  _imageFile?: File | null;
 }
 
 export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
@@ -73,11 +75,12 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     }
   }, [existingItems]);
 
-  const handleCreateItem = (itemData: ItemData) => {
+  const handleCreateItem = (itemData: ItemData, imageFile?: File | null) => {
     const newItem: LocalItem = {
       ...itemData,
       id: `temp_${Date.now()}_${Math.random()}`,
       _isNew: true,
+      _imageFile: imageFile || null,
     };
 
     setLocalItems((prev) => [...prev, newItem]);
@@ -85,18 +88,23 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     setShowItemForm(false);
   };
 
-  const handleUpdateItem = (itemData: ItemData) => {
+  const handleUpdateItem = (itemData: ItemData, imageFile?: File | null) => {
     if (!editingItem) return;
 
     setLocalItems((prev) =>
       prev.map((item) => {
         if (item.id === editingItem.id) {
           if (item._isNew) {
-            return { ...item, ...itemData };
+            return {
+              ...item,
+              ...itemData,
+              _imageFile: imageFile !== undefined ? imageFile : item._imageFile,
+            };
           }
           return {
             ...item,
             ...itemData,
+            _imageFile: imageFile !== undefined ? imageFile : item._imageFile,
             _isModified: true,
           };
         }
@@ -236,7 +244,41 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     try {
       let operationCount = 0;
 
-      // 1. Delete items
+      // STEP 1: Upload images for items with _imageFile (DEFERRED UPLOAD)
+      const itemsToUpload = [...toCreate, ...toUpdate].filter((item) => item._imageFile);
+
+      if (itemsToUpload.length > 0) {
+        const uploadToast = toast.loading(`Uploading ${itemsToUpload.length} image(s)...`);
+
+        try {
+          const files = itemsToUpload.map((item) => item._imageFile!);
+          const uploadResult = await ImageUploadService.batchUploadImages(
+            files,
+            STORAGE_BUCKETS.ITEMS,
+            `store_${storeId}`,
+            (completed, total) => {
+              toast.loading(`Uploading images: ${completed}/${total}`, { id: uploadToast });
+            }
+          );
+
+          // Map uploaded URLs back to items
+          uploadResult.successful.forEach((result, index) => {
+            const item = itemsToUpload[index];
+            item.image_url = result.url || undefined;
+          });
+
+          toast.success(`Uploaded ${uploadResult.totalUploaded} image(s)`, { id: uploadToast });
+
+          if (uploadResult.totalFailed > 0) {
+            toast.error(`Failed to upload ${uploadResult.totalFailed} image(s)`);
+          }
+        } catch (error) {
+          toast.error('Image upload failed', { id: uploadToast });
+          console.error('Image upload error:', error);
+        }
+      }
+
+      // STEP 2: Delete items
       if (toDelete.length > 0) {
         for (const item of toDelete) {
           await itemsAPI.deleteItem(item.id);
@@ -244,7 +286,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         }
       }
 
-      // 2. Update items
+      // STEP 3: Update items (now with image_url)
       if (toUpdate.length > 0) {
         for (const item of toUpdate) {
           const updateData: Partial<ItemData> = {
@@ -262,7 +304,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         }
       }
 
-      // 3. Create new items (BATCH)
+      // STEP 4: Create new items (now with image_url - BATCH)
       if (toCreate.length > 0) {
         const itemsData: ItemData[] = toCreate.map((item) => ({
           name: item.name,
@@ -447,16 +489,46 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
 
                 {/* Items in Category */}
                 <div className="space-y-2">
-                  {categoryItems.map((item) => (
-                    <div key={item.id} className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedItems.has(item.id)}
-                        onChange={() => toggleItemSelection(item.id)}
-                        className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                      />
-                      <Card className="flex-1 p-4 flex items-center justify-between hover:shadow-md transition-shadow relative">
-                        <div className="flex-1">
+                  {categoryItems.map((item) => {
+                    // Create preview URL for local image file
+                    const itemWithPreview = item._imageFile
+                      ? { ...item, image_url: URL.createObjectURL(item._imageFile) }
+                      : item;
+
+                    return (
+                      <div key={item.id} className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.has(item.id)}
+                          onChange={() => toggleItemSelection(item.id)}
+                          className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                        />
+                        <Card className="flex-1 p-4 flex items-center gap-3 hover:shadow-md transition-shadow relative">
+                          {/* Item image or placeholder */}
+                          {itemWithPreview.image_url ? (
+                            <img
+                              src={itemWithPreview.image_url}
+                              alt={item.name}
+                              className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 rounded-lg bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+                              <svg
+                                className="w-8 h-8 text-gray-400 dark:text-gray-500"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
+                              </svg>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h4 className="font-semibold text-gray-900 dark:text-white">
                               {item.name}
@@ -511,7 +583,8 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                         </div>
                       </Card>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
