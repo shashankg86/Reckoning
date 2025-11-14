@@ -105,14 +105,14 @@ export function ReviewStep({ onBack, onComplete }: ReviewStepProps) {
                 onClick={expandAll}
                 className="text-sm text-orange-600 dark:text-orange-400 hover:underline"
               >
-                Expand All
+                {t('menuSetup.expandAll')}
               </button>
               <span className="text-gray-400">|</span>
               <button
                 onClick={collapseAll}
                 className="text-sm text-orange-600 dark:text-orange-400 hover:underline"
               >
-                Collapse All
+                {t('menuSetup.collapseAll')}
               </button>
             </div>
           )}
@@ -231,7 +231,7 @@ export function ReviewStep({ onBack, onComplete }: ReviewStepProps) {
                                 </p>
                                 {item.stock !== undefined && item.stock !== null && (
                                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    Stock: {item.stock}
+                                    {t('menuSetup.stock')}: {item.stock}
                                   </p>
                                 )}
                               </div>
@@ -240,7 +240,7 @@ export function ReviewStep({ onBack, onComplete }: ReviewStepProps) {
                         </div>
                       ) : (
                         <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
-                          No items in this category
+                          {t('menuSetup.noItemsInCategory')}
                         </div>
                       )}
                     </div>

@@ -248,7 +248,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
       const itemsToUpload = [...toCreate, ...toUpdate].filter((item) => item._imageFile);
 
       if (itemsToUpload.length > 0) {
-        const uploadToast = toast.loading(`Uploading ${itemsToUpload.length} image(s)...`);
+        const uploadToast = toast.loading(t('menuSetup.uploadingImages', { count: itemsToUpload.length }));
 
         try {
           const files = itemsToUpload.map((item) => item._imageFile!);
@@ -257,7 +257,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
             STORAGE_BUCKETS.ITEMS,
             `store_${storeId}`,
             (completed, total) => {
-              toast.loading(`Uploading images: ${completed}/${total}`, { id: uploadToast });
+              toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
             }
           );
 
@@ -267,13 +267,13 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
             item.image_url = result.url || undefined;
           });
 
-          toast.success(`Uploaded ${uploadResult.totalUploaded} image(s)`, { id: uploadToast });
+          toast.success(t('menuSetup.uploadedImages', { count: uploadResult.totalUploaded }), { id: uploadToast });
 
           if (uploadResult.totalFailed > 0) {
-            toast.error(`Failed to upload ${uploadResult.totalFailed} image(s)`);
+            toast.error(t('menuSetup.failedToUploadImages', { count: uploadResult.totalFailed }));
           }
         } catch (error) {
-          toast.error('Image upload failed', { id: uploadToast });
+          toast.error(t('menuSetup.imageUploadFailed'), { id: uploadToast });
           console.error('Image upload error:', error);
         }
       }
@@ -560,8 +560,8 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                               {t('common.currency')}
                               {item.price.toFixed(2)}
                             </span>
-                            {item.sku && <span>SKU: {item.sku}</span>}
-                            {item.stock !== undefined && <span>Stock: {item.stock}</span>}
+                            {item.sku && <span>{t('menuSetup.sku')}: {item.sku}</span>}
+                            {item.stock !== undefined && <span>{t('menuSetup.stock')}: {item.stock}</span>}
                           </div>
                         </div>
                         <div className="flex gap-2">

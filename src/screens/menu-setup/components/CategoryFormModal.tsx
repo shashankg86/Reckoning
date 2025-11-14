@@ -217,11 +217,11 @@ export function CategoryFormModal({
             <ImageUpload
               value={imageFile || category?.image_url}
               onChange={setImageFile}
-              placeholder="Upload category image (optional)"
+              placeholder={t('menuSetup.uploadImagePlaceholder')}
               maxSizeMB={5}
             />
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              If no image is uploaded, a colored square will be displayed
+              {t('menuSetup.imageUploadHint')}
             </p>
           </div>
 

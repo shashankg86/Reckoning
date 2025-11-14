@@ -174,7 +174,7 @@ export function ItemFormModal({
                 {...register('category_id')}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               >
-                <option value="">Select a category...</option>
+                <option value="">{t('menuSetup.selectCategory')}</option>
                 {availableCategories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
                     {cat.name}
@@ -210,11 +210,11 @@ export function ItemFormModal({
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Description *
+              {t('menuSetup.description')} *
             </label>
             <textarea
               {...register('description')}
-              placeholder="Item description..."
+              placeholder={t('menuSetup.itemDescriptionPlaceholder')}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
@@ -231,12 +231,12 @@ export function ItemFormModal({
               Tags ({t('common.optional')})
             </label>
             <Input
-              placeholder="e.g., vegan, spicy, popular (comma-separated)"
+              placeholder={t('menuSetup.tagsPlaceholder')}
               error={errors.tags?.message}
               {...register('tags')}
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Enter tags separated by commas
+              {t('menuSetup.tagsHint')}
             </p>
           </div>
 
@@ -248,11 +248,11 @@ export function ItemFormModal({
             <ImageUpload
               value={imageFile || item?.image_url}
               onChange={setImageFile}
-              placeholder="Upload item image (optional)"
+              placeholder={t('menuSetup.uploadItemImagePlaceholder')}
               maxSizeMB={5}
             />
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Recommended: High-quality product image
+              {t('menuSetup.itemImageUploadHint')}
             </p>
           </div>
 

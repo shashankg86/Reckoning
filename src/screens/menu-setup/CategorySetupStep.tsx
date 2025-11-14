@@ -238,7 +238,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       const categoriesToUpload = [...toCreate, ...toUpdate].filter((cat) => cat._imageFile);
 
       if (categoriesToUpload.length > 0) {
-        const uploadToast = toast.loading(`Uploading ${categoriesToUpload.length} image(s)...`);
+        const uploadToast = toast.loading(t('menuSetup.uploadingImages', { count: categoriesToUpload.length }));
 
         try {
           const files = categoriesToUpload.map((cat) => cat._imageFile!);
@@ -247,7 +247,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
             STORAGE_BUCKETS.CATEGORIES,
             `store_${storeId}`,
             (completed, total) => {
-              toast.loading(`Uploading images: ${completed}/${total}`, { id: uploadToast });
+              toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
             }
           );
 
@@ -257,13 +257,13 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
             category.image_url = result.url || null;
           });
 
-          toast.success(`Uploaded ${uploadResult.totalUploaded} image(s)`, { id: uploadToast });
+          toast.success(t('menuSetup.uploadedImages', { count: uploadResult.totalUploaded }), { id: uploadToast });
 
           if (uploadResult.totalFailed > 0) {
-            toast.error(`Failed to upload ${uploadResult.totalFailed} image(s)`);
+            toast.error(t('menuSetup.failedToUploadImages', { count: uploadResult.totalFailed }));
           }
         } catch (error) {
-          toast.error('Image upload failed', { id: uploadToast });
+          toast.error(t('menuSetup.imageUploadFailed'), { id: uploadToast });
           console.error('Image upload error:', error);
         }
       }
