@@ -256,6 +256,83 @@
       "customRange": "कस्टम रेंज"
     }
   },
+  "menuSetup": {
+    "title": "मेनू सेटअप",
+    "createCategories": "अपनी मेनू श्रेणियां बनाएं",
+    "categoriesDescription": "श्रेणियां बनाकर अपने मेनू को व्यवस्थित करें। आप इन्हें बाद में भी संपादित कर सकते हैं।",
+    "addCategory": "श्रेणी जोड़ें",
+    "useDefaultCategories": "डिफ़ॉल्ट श्रेणियों का उपयोग करें",
+    "useSmartSetup": "स्मार्ट सेटअप का उपयोग करें",
+    "noCategoriesYet": "अभी तक कोई श्रेणी नहीं",
+    "noCategoriesDescription": "अपने मेनू आइटम को व्यवस्थित करने के लिए श्रेणियां बनाएं, या अपने व्यवसाय प्रकार के आधार पर हमारी डिफ़ॉल्ट श्रेणियों का उपयोग करें।",
+    "createCategory": "श्रेणी बनाएं",
+    "editCategory": "श्रेणी संपादित करें",
+    "deleteCategory": "श्रेणी हटाएं",
+    "deleteCategoryConfirmation": "क्या आप वाकई \"{{name}}\" को हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।",
+    "categoryName": "श्रेणी का नाम",
+    "enterCategoryName": "जैसे, स्टार्टर, मुख्य व्यंजन",
+    "categoryDescription": "विवरण",
+    "enterCategoryDescription": "इस श्रेणी का संक्षिप्त विवरण",
+    "categoryColor": "श्रेणी का रंग",
+    "parentCategory": "मूल श्रेणी",
+    "noParentCategory": "कोई नहीं (शीर्ष-स्तरीय श्रेणी)",
+    "subcategoryHint": "उप-श्रेणी बनाने के लिए मूल श्रेणी चुनें",
+    "continueToReview": "समीक्षा के लिए जारी रखें",
+    "reviewAndComplete": "समीक्षा करें और सेटअप पूरा करें",
+    "reviewDescription": "पूरा करने से पहले अपने मेनू सेटअप की समीक्षा करें। आप बाद में भी आइटम जोड़ सकते हैं।",
+    "setupSummary": "सेटअप सारांश",
+    "categoriesCreated": "श्रेणियां बनाई गईं",
+    "itemsAdded": "आइटम जोड़े गए",
+    "yourCategories": "आपकी श्रेणियां",
+    "completionNote": "आप कैटलॉग स्क्रीन से मेनू आइटम जोड़ सकते हैं या फोटो या दस्तावेज़ों से आइटम थोक में जोड़ने के लिए OCR आयात का उपयोग कर सकते हैं।",
+    "completeSetup": "सेटअप पूरा करें",
+    "setupCompleted": "मेनू सेटअप सफलतापूर्वक पूरा हुआ!",
+    "helpText": "मदद चाहिए? सहायता के लिए संपर्क करें।",
+    "chooseSetupMethod": "अपनी श्रेणियां कैसे सेट करें चुनें",
+    "chooseSetupMethodDescription": "वह तरीका चुनें जो आपके लिए सबसे अच्छा काम करता है",
+    "recommended": "अनुशंसित",
+    "tip": "सुझाव",
+    "setupMethodTip": "समय बचाने के लिए टेम्पलेट्स या थोक आयात के साथ शुरू करें। आप हमेशा बाद में कैटलॉग स्क्रीन से और श्रेणियां जोड़ सकते हैं।",
+    "methods": {
+      "template": {
+        "title": "टेम्पलेट का उपयोग करें",
+        "description": "अपने व्यवसाय प्रकार के लिए पूर्व-निर्मित श्रेणियों के साथ शुरू करें"
+      },
+      "ocrImport": {
+        "title": "फोटो से आयात करें",
+        "description": "श्रेणियां निकालने के लिए अपने मेनू की फोटो लें"
+      },
+      "excelImport": {
+        "title": "Excel/CSV से आयात करें",
+        "description": "अपनी श्रेणियों के साथ एक स्प्रेडशीट अपलोड करें"
+      },
+      "bulkCreate": {
+        "title": "थोक बनाएं",
+        "description": "एक तालिका में तेजी से एकाधिक श्रेणियां दर्ज करें"
+      },
+      "manual": {
+        "title": "मैन्युअल रूप से जोड़ें",
+        "description": "एक-एक करके श्रेणियां बनाएं"
+      }
+    },
+    "bulkCreateCategories": "थोक श्रेणियां बनाएं",
+    "bulkCreateDescription": "एक साथ कई श्रेणियां दर्ज करें",
+    "addAnotherCategory": "एक और श्रेणी जोड़ें",
+    "categoriesReady": "श्रेणियां तैयार हैं",
+    "createCategories": "{{count}} श्रेणियां बनाएं",
+    "importFromExcel": "Excel/CSV से श्रेणियां आयात करें",
+    "importFromExcelDescription": "अपनी श्रेणियों के साथ एक फाइल अपलोड करें",
+    "uploadFile": "अपनी फाइल अपलोड करें",
+    "supportedFormats": "समर्थित प्रारूप",
+    "downloadTemplate": "टेम्पलेट डाउनलोड करें",
+    "fileFormat": "फाइल प्रारूप",
+    "requiredColumn": "आवश्यक कॉलम",
+    "optionalColumns": "वैकल्पिक कॉलम",
+    "previewCategories": "श्रेणियों का पूर्वावलोकन करें",
+    "uploadDifferentFile": "अलग फाइल अपलोड करें",
+    "importCategories": "{{count}} श्रेणियां आयात करें",
+    "processingFile": "फाइल प्रोसेस हो रही है..."
+  },
   "common": {
     "loading": "लोड हो रहा है...",
     "noDataFound": "कोई डेटा नहीं मिला",
@@ -288,6 +365,14 @@
     "remove": "हटाएं",
     "update": "अपडेट करें",
     "create": "बनाएं",
+    "delete": "हटाएं",
+    "save": "सहेजें",
+    "saving": "सहेजा जा रहा है...",
+    "creating": "बनाया जा रहा है...",
+    "back": "वापस",
+    "complete": "पूर्ण",
+    "completing": "पूर्ण हो रहा है...",
+    "items": "आइटम",
     "currency": "₹",
     "hello": "नमस्ते",
     "units": "इकाइयां",

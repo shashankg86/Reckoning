@@ -17,6 +17,7 @@ import { CatalogScreen } from '../screens/CatalogScreen';
 import { InvoiceScreen } from '../screens/InvoiceScreen';
 import { OCRImportScreen } from '../screens/OCRImportScreen';
 import { ReportsScreen } from '../screens/ReportsScreen';
+import { MenuSetupScreen } from '../screens/menu-setup/MenuSetupScreen';
 
 export function Router() {
   return (
@@ -42,7 +43,10 @@ export function Router() {
         {/* Onboarding route */}
         <Route path="/onboarding" element={<OnboardingRoute><OnboardingScreen /></OnboardingRoute>} />
         <Route path="/get-started" element={<OnboardingRoute><OnboardingScreen /></OnboardingRoute>} />
-        
+
+        {/* Menu setup route */}
+        <Route path="/menu-setup" element={<MenuSetupRoute><MenuSetupScreen /></MenuSetupRoute>} />
+
         {/* Protected app routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardScreen /></ProtectedRoute>} />
         <Route path="/catalog" element={<ProtectedRoute><CatalogScreen /></ProtectedRoute>} />
@@ -62,19 +66,25 @@ export function Router() {
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { state } = useAuth();
-  
+
   if (state.isLoading) {
     return <LoadingScreen />;
   }
-  
+
   if (!state.isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   if (!state.isOnboarded) {
     return <Navigate to="/get-started" replace />;
   }
-  
+
+  // Check if menu setup is completed
+  const menuSetupCompleted = (state.user as any)?.store?.menu_setup_completed;
+  if (!menuSetupCompleted) {
+    return <Navigate to="/menu-setup" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -139,6 +149,11 @@ function OAuthCallbackRoute() {
   // After OAuth processed, redirect based on state
   if (state.isAuthenticated) {
     if (state.isOnboarded) {
+      // Check if menu setup is completed
+      const menuSetupCompleted = (state.user as any)?.store?.menu_setup_completed;
+      if (!menuSetupCompleted) {
+        return <Navigate to="/menu-setup" replace />;
+      }
       return <Navigate to="/dashboard" replace />;
     }
     return <Navigate to="/get-started" replace />;
@@ -159,6 +174,11 @@ function EmailConfirmCallbackRoute() {
   // After email confirmed, redirect based on state
   if (state.isAuthenticated) {
     if (state.isOnboarded) {
+      // Check if menu setup is completed
+      const menuSetupCompleted = (state.user as any)?.store?.menu_setup_completed;
+      if (!menuSetupCompleted) {
+        return <Navigate to="/menu-setup" replace />;
+      }
       return <Navigate to="/dashboard" replace />;
     }
     return <Navigate to="/get-started" replace />;
@@ -166,4 +186,28 @@ function EmailConfirmCallbackRoute() {
 
   // If not authenticated (email confirmation failed), go to login
   return <Navigate to="/login" replace />;
+}
+
+function MenuSetupRoute({ children }: { children: React.ReactNode }) {
+  const { state } = useAuth();
+
+  if (state.isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!state.isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!state.isOnboarded) {
+    return <Navigate to="/get-started" replace />;
+  }
+
+  // Check if menu setup is already completed
+  const menuSetupCompleted = (state.user as any)?.store?.menu_setup_completed;
+  if (menuSetupCompleted) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
 }

@@ -254,8 +254,86 @@
       "customRange": "نطاق مخصص"
     }
   },
+  "menuSetup": {
+    "title": "إعداد القائمة",
+    "createCategories": "إنشاء فئات القائمة",
+    "categoriesDescription": "نظم قائمتك عن طريق إنشاء الفئات. يمكنك دائماً تعديلها لاحقاً.",
+    "addCategory": "إضافة فئة",
+    "useDefaultCategories": "استخدام الفئات الافتراضية",
+    "useSmartSetup": "استخدام الإعداد الذكي",
+    "noCategoriesYet": "لا توجد فئات بعد",
+    "noCategoriesDescription": "أنشئ فئات لتنظيم عناصر القائمة الخاصة بك، أو استخدم فئاتنا الافتراضية بناءً على نوع عملك.",
+    "createCategory": "إنشاء فئة",
+    "editCategory": "تحرير الفئة",
+    "deleteCategory": "حذف الفئة",
+    "deleteCategoryConfirmation": "هل أنت متأكد من حذف \"{{name}}\"؟ لا يمكن التراجع عن هذا الإجراء.",
+    "categoryName": "اسم الفئة",
+    "enterCategoryName": "مثال: المقبلات، الطبق الرئيسي",
+    "categoryDescription": "الوصف",
+    "enterCategoryDescription": "وصف موجز لهذه الفئة",
+    "categoryColor": "لون الفئة",
+    "parentCategory": "الفئة الأصلية",
+    "noParentCategory": "لا شيء (فئة من المستوى الأعلى)",
+    "subcategoryHint": "اختر فئة أصلية لإنشاء فئة فرعية",
+    "continueToReview": "متابعة للمراجعة",
+    "reviewAndComplete": "مراجعة وإكمال الإعداد",
+    "reviewDescription": "راجع إعداد القائمة قبل الإكمال. يمكنك دائماً إضافة عناصر لاحقاً.",
+    "setupSummary": "ملخص الإعداد",
+    "categoriesCreated": "الفئات المنشأة",
+    "itemsAdded": "العناصر المضافة",
+    "yourCategories": "فئاتك",
+    "completionNote": "يمكنك إضافة عناصر القائمة من شاشة الكتالوج أو استخدام استيراد OCR لإضافة عناصر بالجملة من الصور أو المستندات.",
+    "completeSetup": "إكمال الإعداد",
+    "setupCompleted": "اكتمل إعداد القائمة بنجاح!",
+    "helpText": "هل تحتاج إلى مساعدة؟ اتصل بالدعم للحصول على المساعدة.",
+    "chooseSetupMethod": "اختر كيفية إعداد فئاتك",
+    "chooseSetupMethodDescription": "اختر الطريقة التي تناسبك",
+    "recommended": "موصى به",
+    "tip": "نصيحة",
+    "setupMethodTip": "ابدأ بالقوالب أو الاستيراد بالجملة لتوفير الوقت. يمكنك دائماً إضافة المزيد من الفئات لاحقاً من شاشة الكتالوج.",
+    "methods": {
+      "template": {
+        "title": "استخدام القالب",
+        "description": "ابدأ بفئات جاهزة لنوع عملك"
+      },
+      "ocrImport": {
+        "title": "الاستيراد من الصورة",
+        "description": "التقط صورة لقائمتك لاستخراج الفئات"
+      },
+      "excelImport": {
+        "title": "الاستيراد من Excel/CSV",
+        "description": "قم بتحميل جدول بيانات مع فئاتك"
+      },
+      "bulkCreate": {
+        "title": "إنشاء بالجملة",
+        "description": "أدخل عدة فئات بسرعة في جدول"
+      },
+      "manual": {
+        "title": "إضافة يدوياً",
+        "description": "أنشئ الفئات واحدة تلو الأخرى"
+      }
+    },
+    "bulkCreateCategories": "إنشاء فئات بالجملة",
+    "bulkCreateDescription": "أدخل عدة فئات في وقت واحد",
+    "addAnotherCategory": "إضافة فئة أخرى",
+    "categoriesReady": "الفئات جاهزة",
+    "createCategories": "إنشاء {{count}} فئات",
+    "importFromExcel": "استيراد الفئات من Excel/CSV",
+    "importFromExcelDescription": "قم بتحميل ملف مع فئاتك",
+    "uploadFile": "قم بتحميل ملفك",
+    "supportedFormats": "التنسيقات المدعومة",
+    "downloadTemplate": "تنزيل القالب",
+    "fileFormat": "تنسيق الملف",
+    "requiredColumn": "العمود المطلوب",
+    "optionalColumns": "الأعمدة الاختيارية",
+    "previewCategories": "معاينة الفئات",
+    "uploadDifferentFile": "تحميل ملف آخر",
+    "importCategories": "استيراد {{count}} فئات",
+    "processingFile": "جاري معالجة الملف..."
+  },
   "common": {
     "loading": "جاري التحميل...",
+    "optional": "اختياري",
     "error": "خطأ",
     "success": "نجح",
     "warning": "تحذير",
@@ -270,6 +348,7 @@
     "sort": "ترتيب",
     "export": "تصدير",
     "import": "استيراد",
+    "importing": "جاري الاستيراد...",
     "print": "طباعة",
     "share": "مشاركة",
     "edit": "تحرير",
@@ -277,6 +356,16 @@
     "add": "إضافة",
     "remove": "إزالة",
     "update": "تحديث",
+    "create": "إنشاء",
+    "delete": "حذف",
+    "save": "حفظ",
+    "saving": "جاري الحفظ...",
+    "creating": "جاري الإنشاء...",
+    "back": "رجوع",
+    "complete": "إكمال",
+    "completing": "جاري الإكمال...",
+    "items": "عناصر",
+    "cancel": "إلغاء",
     "create": "إنشاء",
     "currency": "₹"
   }
