@@ -278,30 +278,28 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         }
       }
 
-      // STEP 2: Delete items
+      // STEP 2: Bulk delete items (OPTIMIZED: Single query instead of N queries)
       if (toDelete.length > 0) {
-        for (const item of toDelete) {
-          await itemsAPI.deleteItem(item.id);
-          operationCount++;
-        }
+        const deleteIds = toDelete.map((item) => item.id);
+        await itemsAPI.bulkDeleteItems(deleteIds);
+        operationCount += toDelete.length;
       }
 
-      // STEP 3: Update items (now with image_url)
+      // STEP 3: Bulk update items (OPTIMIZED: Parallel instead of sequential)
       if (toUpdate.length > 0) {
-        for (const item of toUpdate) {
-          const updateData: Partial<ItemData> = {
-            name: item.name,
-            price: item.price,
-            category_id: item.category_id,
-            description: item.description,
-            sku: item.sku,
-            stock: item.stock,
-            image_url: item.image_url,
-            is_active: item.is_active,
-          };
-          await itemsAPI.updateItem(item.id, updateData);
-          operationCount++;
-        }
+        const updates = toUpdate.map((item) => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          category_id: item.category_id,
+          description: item.description,
+          sku: item.sku,
+          stock: item.stock,
+          image_url: item.image_url,
+          is_active: item.is_active,
+        }));
+        await itemsAPI.bulkUpdateItems(updates);
+        operationCount += toUpdate.length;
       }
 
       // STEP 4: Create new items (now with image_url - BATCH)

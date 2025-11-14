@@ -268,30 +268,28 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         }
       }
 
-      // STEP 2: Delete categories
+      // STEP 2: Bulk delete categories (OPTIMIZED: Single query instead of N queries)
       if (toDelete.length > 0) {
-        for (const cat of toDelete) {
-          await categoriesAPI.permanentlyDeleteCategory(cat.id);
-          operationCount++;
-        }
+        const deleteIds = toDelete.map((cat) => cat.id);
+        await categoriesAPI.bulkPermanentlyDeleteCategories(deleteIds);
+        operationCount += toDelete.length;
       }
 
-      // STEP 3: Update modified categories (now with image_url)
+      // STEP 3: Bulk update modified categories (OPTIMIZED: Parallel instead of sequential)
       if (toUpdate.length > 0) {
-        for (const cat of toUpdate) {
-          const updateData: UpdateCategoryData = {
-            name: cat.name,
-            description: cat.description,
-            color: cat.color,
-            icon: cat.icon,
-            image_url: cat.image_url,
-            sort_order: cat.sort_order,
-            parent_id: cat.parent_id,
-            metadata: cat.metadata,
-          };
-          await categoriesAPI.updateCategory(cat.id, updateData);
-          operationCount++;
-        }
+        const updates = toUpdate.map((cat) => ({
+          id: cat.id,
+          name: cat.name,
+          description: cat.description,
+          color: cat.color,
+          icon: cat.icon,
+          image_url: cat.image_url,
+          sort_order: cat.sort_order,
+          parent_id: cat.parent_id,
+          metadata: cat.metadata,
+        }));
+        await categoriesAPI.bulkUpdateCategories(updates);
+        operationCount += toUpdate.length;
       }
 
       // STEP 4: Create new categories (now with image_url)
