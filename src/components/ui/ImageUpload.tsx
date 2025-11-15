@@ -22,7 +22,7 @@ export function ImageUpload({
   className = '',
   disabled = false,
   accept = 'image/jpeg,image/jpg,image/png,image/webp',
-  maxSizeMB = 1, // Changed to 1MB default
+  maxSizeMB = 1,
 }: ImageUploadProps) {
   const { t } = useTranslation();
   const [preview, setPreview] = useState<string | null>(null);
@@ -53,22 +53,33 @@ export function ImageUpload({
 
   /**
    * Process file: validate + compress silently
-   * User doesn't see compression - it happens in background
+   * User sees preview immediately from original file,
+   * then compression happens in background
    */
   const processFile = async (file: File): Promise<void> => {
     setError(null);
     setIsProcessing(true);
 
+    // Create preview from original file IMMEDIATELY
+    // (User sees this right away, compression happens in background)
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
     try {
       // Process image (validate + compress automatically)
+      // This happens in background while user sees the preview
       const processedFile = await ImageProcessor.processForUpload(file);
 
-      // Pass compressed file to parent
+      // Pass compressed file to parent (for upload)
       onChange(processedFile);
     } catch (err) {
       // Show user-friendly error message
       const errorMessage = err instanceof Error ? err.message : 'Invalid image file';
       setError(errorMessage);
+      setPreview(null); // Clear preview on error
       onChange(null);
     } finally {
       setIsProcessing(false);
