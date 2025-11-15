@@ -7,6 +7,7 @@
 import React from 'react';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '../../../components/ui/Button';
+import { CachedImage } from '../../../components/ui/CachedImage';
 import type { Category } from '../../../types/menu';
 
 interface CategoryCardProps {
@@ -38,10 +39,10 @@ export function CategoryCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-3 flex-1">
-          {/* Category image or color indicator */}
-          {category.image_url ? (
-            <img
-              src={category.image_url}
+          {category.image_url || category.id ? (
+            <CachedImage
+              cacheId={category.id}
+              fallbackUrl={category.image_url}
               alt={category.name}
               className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
             />

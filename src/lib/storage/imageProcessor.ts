@@ -22,33 +22,20 @@ const DEFAULT_VALIDATION_RULES: ImageValidationRules = {
   allowedTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
 };
 
-/**
- * Default compression options with WebP conversion
- * - Target 80KB output (WebP format)
- * - Max 1024px dimension (perfect for thumbnails/retina displays)
- * - 80% quality (excellent for WebP)
- * - Converts JPEG/PNG → WebP automatically (25-35% better compression)
- */
 const DEFAULT_COMPRESSION_OPTIONS: ImageCompressionOptions = {
-  maxSizeMB: 0.08, // 80KB target (3x smaller than before!)
-  maxWidthOrHeight: 1024, // Perfect for thumbnails
-  initialQuality: 0.8, // Excellent quality for WebP
+  maxSizeMB: 0.06,
+  maxWidthOrHeight: 1024,
+  initialQuality: 0.8,
   useWebWorker: true,
-  fileType: 'image/webp', // Auto-convert to WebP
+  fileType: 'image/webp',
 };
 
-/**
- * Aggressive compression options (fallback if first pass too large)
- * - Target 60KB output (WebP format)
- * - Max 800px dimension
- * - 75% quality (still good for WebP)
- */
 const AGGRESSIVE_COMPRESSION_OPTIONS: ImageCompressionOptions = {
-  maxSizeMB: 0.06, // 60KB hard limit
+  maxSizeMB: 0.05,
   maxWidthOrHeight: 800,
   initialQuality: 0.75,
   useWebWorker: true,
-  fileType: 'image/webp', // Auto-convert to WebP
+  fileType: 'image/webp',
 };
 
 /**

@@ -15,7 +15,7 @@ import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCategories } from '../../hooks/useCategories';
 import { categoriesAPI } from '../../api/categories';
-import { storageService, STORAGE_PATHS } from '../../lib/storage';
+import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
 import { CategoryCard } from './components/CategoryCard';
 import { CategoryFormModal } from './components/CategoryFormModal';
 import { CategoryBulkCreateModal } from './components/CategoryBulkCreateModal';
@@ -69,11 +69,10 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     }
   }, [existingCategories]);
 
-  const handleCreateCategory = (data: CreateCategoryData, imageFile?: File | null) => {
-    // Create category in local state only (not DB yet)
+  const handleCreateCategory = async (data: CreateCategoryData, imageFile?: File | null) => {
     const newCategory: LocalCategory = {
       ...data,
-      id: `temp_${Date.now()}_${Math.random()}`, // Temporary ID
+      id: `temp_${Date.now()}_${Math.random()}`,
       _isNew: true,
       _imageFile: imageFile || null,
       is_active: true,
@@ -83,18 +82,25 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       updated_at: new Date().toISOString(),
     };
 
+    if (imageFile) {
+      await imageCache.set(newCategory.id, imageFile);
+    }
+
     setLocalCategories((prev) => [...prev, newCategory]);
     toast.success(t('menuSetup.categoryAddedLocally'));
     setShowCategoryForm(false);
   };
 
-  const handleUpdateCategory = (data: UpdateCategoryData, imageFile?: File | null) => {
+  const handleUpdateCategory = async (data: UpdateCategoryData, imageFile?: File | null) => {
     if (!editingCategory) return;
+
+    if (imageFile) {
+      await imageCache.set(editingCategory.id, imageFile);
+    }
 
     setLocalCategories((prev) =>
       prev.map((cat) => {
         if (cat.id === editingCategory.id) {
-          // If it's a new category, just update it
           if (cat._isNew) {
             return {
               ...cat,
@@ -103,7 +109,6 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
               updated_at: new Date().toISOString()
             };
           }
-          // If it's an existing category, mark as modified
           return {
             ...cat,
             ...data,

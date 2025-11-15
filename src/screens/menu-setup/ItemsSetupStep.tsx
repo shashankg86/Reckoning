@@ -12,11 +12,12 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { CachedImage } from '../../components/ui/CachedImage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useItems } from '../../hooks/useItems';
 import { useCategories } from '../../hooks/useCategories';
 import { itemsAPI } from '../../api/items';
-import { storageService, STORAGE_PATHS } from '../../lib/storage';
+import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
 import { ItemFormModal } from './components/ItemFormModal';
 import { ItemBulkCreateModal } from './components/ItemBulkCreateModal';
 import type { ItemData } from '../../api/items';
@@ -75,7 +76,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     }
   }, [existingItems]);
 
-  const handleCreateItem = (itemData: ItemData, imageFile?: File | null) => {
+  const handleCreateItem = async (itemData: ItemData, imageFile?: File | null) => {
     const newItem: LocalItem = {
       ...itemData,
       id: `temp_${Date.now()}_${Math.random()}`,
@@ -83,13 +84,21 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
       _imageFile: imageFile || null,
     };
 
+    if (imageFile) {
+      await imageCache.set(newItem.id, imageFile);
+    }
+
     setLocalItems((prev) => [...prev, newItem]);
     toast.success(t('menuSetup.itemAddedLocally'));
     setShowItemForm(false);
   };
 
-  const handleUpdateItem = (itemData: ItemData, imageFile?: File | null) => {
+  const handleUpdateItem = async (itemData: ItemData, imageFile?: File | null) => {
     if (!editingItem) return;
+
+    if (imageFile) {
+      await imageCache.set(editingItem.id, imageFile);
+    }
 
     setLocalItems((prev) =>
       prev.map((item) => {
@@ -489,11 +498,6 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                 {/* Items in Category */}
                 <div className="space-y-2">
                   {categoryItems.map((item) => {
-                    // Create preview URL for local image file
-                    const itemWithPreview = item._imageFile
-                      ? { ...item, image_url: URL.createObjectURL(item._imageFile) }
-                      : item;
-
                     return (
                       <div key={item.id} className="flex items-center gap-3">
                         <input
@@ -503,10 +507,10 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                           className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                         />
                         <Card className="flex-1 p-4 flex items-center gap-3 hover:shadow-md transition-shadow relative">
-                          {/* Item image or placeholder */}
-                          {itemWithPreview.image_url ? (
-                            <img
-                              src={itemWithPreview.image_url}
+                          {item.image_url || item.id ? (
+                            <CachedImage
+                              cacheId={item.id}
+                              fallbackUrl={item.image_url}
                               alt={item.name}
                               className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                             />

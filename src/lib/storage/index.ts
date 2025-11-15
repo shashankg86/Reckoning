@@ -38,10 +38,10 @@ import type {
   UploadProgress,
 } from './types';
 
-// Re-export types and constants
 export * from './types';
 export { ImageProcessor } from './imageProcessor';
 export { ProgressiveImageUploader } from './progressiveUploader';
+export { imageCache } from './imageCache';
 
 /**
  * Storage Service Factory
@@ -109,37 +109,58 @@ class UniversalStorageService {
     subPath: string,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<UploadResult> {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAYS = [2000, 4000, 8000];
+
     try {
-      // Step 1: Validate and compress
       const processedFile = await ImageProcessor.processForUpload(file);
-
-      // Step 2: Generate unique filename
-      const extension = ImageProcessor.getFileExtension(processedFile);
+      const extension = processedFile.type === 'image/webp' ? 'webp' : ImageProcessor.getFileExtension(processedFile);
       const fileName = ImageProcessor.generateUniqueFileName('img', extension);
-
-      // Create new File with unique name
       const renamedFile = new File([processedFile], fileName, {
         type: processedFile.type,
       });
 
-      // Step 3: Upload
-      const result = await this.adapter.uploadFile(
-        renamedFile,
-        storagePath,
-        subPath,
-        onProgress
-      );
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        try {
+          const result = await this.adapter.uploadFile(
+            renamedFile,
+            storagePath,
+            subPath,
+            onProgress
+          );
 
-      return result;
+          if (result.success) {
+            return result;
+          }
+
+          if (attempt < MAX_RETRIES - 1) {
+            await this.delay(RETRY_DELAYS[attempt]);
+          }
+        } catch (uploadError) {
+          if (attempt === MAX_RETRIES - 1) {
+            throw uploadError;
+          }
+          await this.delay(RETRY_DELAYS[attempt]);
+        }
+      }
+
+      return {
+        success: false,
+        error: 'Failed after 3 retry attempts',
+        fileName: file.name,
+      };
     } catch (error) {
       console.error('[StorageService] Upload error:', error);
-
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to upload image',
         fileName: file.name,
       };
     }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
