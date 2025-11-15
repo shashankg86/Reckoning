@@ -36,6 +36,8 @@ interface LocalCategory extends Omit<Category, 'id'> {
   _imageFile?: File | null; // Local image file before upload
 }
 
+const LOCAL_CATEGORIES_KEY = 'menu_setup_pending_categories';
+
 export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const { t } = useTranslation();
   const { state: authState } = useAuth();
@@ -58,7 +60,20 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync existing categories from DB to local state (only once on mount)
+  // Load pending categories from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_CATEGORIES_KEY);
+      if (stored) {
+        const pendingCategories = JSON.parse(stored) as LocalCategory[];
+        setLocalCategories(pendingCategories);
+      }
+    } catch (error) {
+      console.error('Failed to load pending categories from localStorage:', error);
+    }
+  }, []);
+
+  // Sync existing categories from DB to local state (only if no pending changes)
   useEffect(() => {
     if (existingCategories.length > 0 && localCategories.length === 0) {
       setLocalCategories(
@@ -69,6 +84,22 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       );
     }
   }, [existingCategories]);
+
+  // Persist pending categories to localStorage whenever they change
+  useEffect(() => {
+    if (localCategories.length > 0) {
+      try {
+        const pendingChanges = localCategories.filter((cat) => cat._isNew || cat._isModified || cat._isDeleted);
+        if (pendingChanges.length > 0) {
+          localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(localCategories));
+        } else {
+          localStorage.removeItem(LOCAL_CATEGORIES_KEY);
+        }
+      } catch (error) {
+        console.error('Failed to persist pending categories to localStorage:', error);
+      }
+    }
+  }, [localCategories]);
 
   const handleCreateCategory = async (data: CreateCategoryData, imageFile?: File | null) => {
     const newCategory: LocalCategory = {
@@ -320,6 +351,9 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         `${t('menuSetup.saved')} ${operationCount} ${operationCount === 1 ? t('menuSetup.change') : t('menuSetup.changes')}`
       );
 
+      // Clear localStorage after successful submission
+      localStorage.removeItem(LOCAL_CATEGORIES_KEY);
+
       // Navigate to next step
       onNext();
     } catch (error: any) {
@@ -482,7 +516,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
                       onChange={() => toggleCategorySelection(category.id)}
                       className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                     />
-                    <div className="flex-1 relative">
+                    <div className="flex-1">
                       <CategoryCard
                         category={categoryWithPreview as Category}
                         onEdit={(cat) => {
@@ -494,12 +528,8 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
                         }
                         isSubcategory={!!category.parent_id}
                         parentName={parentCategory?.name}
+                        statusBadge={category._isNew ? 'new' : category._isModified ? 'modified' : null}
                       />
-                      {(category._isNew || category._isModified) && (
-                        <span className="absolute top-2 right-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
-                          {category._isNew ? t('menuSetup.new') : t('menuSetup.modified')}
-                        </span>
-                      )}
                     </div>
                   </div>
                 );

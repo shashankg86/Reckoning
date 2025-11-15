@@ -17,6 +17,7 @@ interface CategoryCardProps {
   isDragging?: boolean;
   isSubcategory?: boolean;
   parentName?: string;
+  statusBadge?: 'new' | 'modified' | null;
 }
 
 export function CategoryCard({
@@ -26,6 +27,7 @@ export function CategoryCard({
   isDragging,
   isSubcategory = false,
   parentName,
+  statusBadge = null,
 }: CategoryCardProps) {
   return (
     <div
@@ -57,13 +59,18 @@ export function CategoryCard({
 
           {/* Category info */}
           <div className="flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-gray-900 dark:text-white">
                 {category.name}
               </h3>
               {isSubcategory && parentName && (
                 <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
                   Subcategory of {parentName}
+                </span>
+              )}
+              {statusBadge && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+                  {statusBadge === 'new' ? 'New' : 'Modified'}
                 </span>
               )}
             </div>

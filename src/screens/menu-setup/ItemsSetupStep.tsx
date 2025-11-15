@@ -39,6 +39,8 @@ interface LocalItem extends ItemData {
   _imageFile?: File | null;
 }
 
+const LOCAL_ITEMS_KEY = 'menu_setup_pending_items';
+
 export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const { t } = useTranslation();
   const { state: authState } = useAuth();
@@ -65,7 +67,20 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync existing items from DB to local state (only once)
+  // Load pending items from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LOCAL_ITEMS_KEY);
+      if (stored) {
+        const pendingItems = JSON.parse(stored) as LocalItem[];
+        setLocalItems(pendingItems);
+      }
+    } catch (error) {
+      console.error('Failed to load pending items from localStorage:', error);
+    }
+  }, []);
+
+  // Sync existing items from DB to local state (only if no pending changes)
   useEffect(() => {
     if (existingItems.length > 0 && localItems.length === 0) {
       setLocalItems(
@@ -76,6 +91,22 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
       );
     }
   }, [existingItems]);
+
+  // Persist pending items to localStorage whenever they change
+  useEffect(() => {
+    if (localItems.length > 0) {
+      try {
+        const pendingChanges = localItems.filter((item) => item._isNew || item._isModified || item._isDeleted);
+        if (pendingChanges.length > 0) {
+          localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(localItems));
+        } else {
+          localStorage.removeItem(LOCAL_ITEMS_KEY);
+        }
+      } catch (error) {
+        console.error('Failed to persist pending items to localStorage:', error);
+      }
+    }
+  }, [localItems]);
 
   const handleCreateItem = async (itemData: ItemData, imageFile?: File | null) => {
     const newItem: LocalItem = {
@@ -333,6 +364,9 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
       toast.success(
         `${t('menuSetup.saved')} ${operationCount} ${operationCount === 1 ? t('menuSetup.change') : t('menuSetup.changes')}`
       );
+
+      // Clear localStorage after successful submission
+      localStorage.removeItem(LOCAL_ITEMS_KEY);
 
       // Navigate to next step
       onComplete();
