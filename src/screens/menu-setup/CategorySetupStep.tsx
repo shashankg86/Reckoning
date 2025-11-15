@@ -7,6 +7,7 @@ import {
   MagnifyingGlassIcon,
   TrashIcon,
   ArrowPathIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -345,8 +346,9 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
           {t('menuSetup.categoriesManualDescription')}
         </p>
         {pendingChanges > 0 && (
-          <p className="text-sm text-orange-600 dark:text-orange-400 mt-2">
-            💡 {pendingChanges} {t('menuSetup.pendingChanges')}
+          <p className="text-sm text-orange-600 dark:text-orange-400 mt-2 flex items-center gap-1">
+            <ExclamationTriangleIcon className="h-4 w-4" />
+            {pendingChanges} {t('menuSetup.pendingChanges')}
           </p>
         )}
       </div>
