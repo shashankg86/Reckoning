@@ -7,6 +7,7 @@ interface ImageUploadProps {
   value?: string | File | null;
   onChange: (file: File | null) => void;
   onRemove?: () => void;
+  onError?: (error: string | null) => void;
   placeholder?: string;
   className?: string;
   disabled?: boolean;
@@ -18,6 +19,7 @@ export function ImageUpload({
   value,
   onChange,
   onRemove,
+  onError,
   placeholder = 'Click to upload image',
   className = '',
   disabled = false,
@@ -58,10 +60,9 @@ export function ImageUpload({
    */
   const processFile = async (file: File): Promise<void> => {
     setError(null);
+    onError?.(null);
     setIsProcessing(true);
 
-    // Create preview from original file IMMEDIATELY
-    // (User sees this right away, compression happens in background)
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreview(reader.result as string);
@@ -69,17 +70,15 @@ export function ImageUpload({
     reader.readAsDataURL(file);
 
     try {
-      // Process image (validate + compress automatically)
-      // This happens in background while user sees the preview
       const processedFile = await ImageProcessor.processForUpload(file);
-
-      // Pass compressed file to parent (for upload)
       onChange(processedFile);
+      setError(null);
+      onError?.(null);
     } catch (err) {
-      // Show user-friendly error message
       const errorMessage = err instanceof Error ? err.message : 'Invalid image file';
       setError(errorMessage);
-      setPreview(null); // Clear preview on error
+      onError?.(errorMessage);
+      setPreview(null);
       onChange(null);
     } finally {
       setIsProcessing(false);
@@ -131,6 +130,7 @@ export function ImageUpload({
     onChange(null);
     setPreview(null);
     setError(null);
+    onError?.(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }

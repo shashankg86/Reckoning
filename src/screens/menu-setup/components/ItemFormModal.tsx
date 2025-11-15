@@ -52,6 +52,7 @@ export function ItemFormModal({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [imageFile, setImageFile] = React.useState<File | null>(null);
   const [cachedImageUrl, setCachedImageUrl] = React.useState<string | null>(null);
+  const [imageError, setImageError] = React.useState<string | null>(null);
 
   const {
     register,
@@ -266,6 +267,7 @@ export function ItemFormModal({
             <ImageUpload
               value={imageFile || cachedImageUrl}
               onChange={setImageFile}
+              onError={setImageError}
               placeholder={t('menuSetup.uploadItemImagePlaceholder')}
               maxSizeMB={5}
             />
@@ -285,7 +287,7 @@ export function ItemFormModal({
             >
               {t('common.cancel')}
             </Button>
-            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            <Button type="submit" className="flex-1" disabled={isSubmitting || imageError !== null}>
               {isSubmitting ? t('common.saving') : item ? t('common.update') : t('common.create')}
             </Button>
           </div>
