@@ -32,7 +32,7 @@ import { ProgressiveImageUploader } from './progressiveUploader';
 import type {
   StorageProvider,
   StorageAdapter,
-  StorageBucket,
+  StoragePath,
   UploadResult,
   BatchUploadResult,
   UploadProgress,
@@ -98,15 +98,15 @@ class UniversalStorageService {
    * Handles validation, compression, and upload automatically
    *
    * @param file - Image file
-   * @param bucket - Storage bucket
-   * @param path - Path within bucket
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath within storage path (e.g., 'store_123')
    * @param onProgress - Progress callback (optional)
    * @returns Upload result
    */
   async uploadImage(
     file: File,
-    bucket: StorageBucket,
-    path: string,
+    storagePath: StoragePath,
+    subPath: string,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<UploadResult> {
     try {
@@ -125,8 +125,8 @@ class UniversalStorageService {
       // Step 3: Upload
       const result = await this.adapter.uploadFile(
         renamedFile,
-        bucket,
-        path,
+        storagePath,
+        subPath,
         onProgress
       );
 
@@ -148,17 +148,17 @@ class UniversalStorageService {
    * Uploads images in parallel with concurrency control
    *
    * @param files - Array of image files
-   * @param bucket - Storage bucket
-   * @param path - Path within bucket
-   * @param concurrentLimit - Max parallel uploads (default: 10)
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath within storage path (e.g., 'store_123')
+   * @param concurrentLimit - Max parallel uploads (default: 20 for 2x speed)
    * @param onProgress - Progress callback (completed, total)
    * @returns Batch upload result
    */
   async batchUploadImages(
     files: File[],
-    bucket: StorageBucket,
-    path: string,
-    concurrentLimit = 10,
+    storagePath: StoragePath,
+    subPath: string,
+    concurrentLimit = 20,
     onProgress?: (completed: number, total: number) => void
   ): Promise<BatchUploadResult> {
     const successful: Array<{ fileName: string; url: string }> = [];
@@ -175,7 +175,7 @@ class UniversalStorageService {
     for (const batch of batches) {
       // Upload batch in parallel
       const results = await Promise.allSettled(
-        batch.map((file) => this.uploadImage(file, bucket, path))
+        batch.map((file) => this.uploadImage(file, storagePath, subPath))
       );
 
       // Collect results
@@ -218,13 +218,13 @@ class UniversalStorageService {
   /**
    * Delete image
    *
-   * @param bucket - Storage bucket
-   * @param path - Path to file
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath to file
    * @returns Success status
    */
-  async deleteImage(bucket: StorageBucket, path: string): Promise<boolean> {
+  async deleteImage(storagePath: StoragePath, subPath: string): Promise<boolean> {
     try {
-      return await this.adapter.deleteFile(bucket, path);
+      return await this.adapter.deleteFile(storagePath, subPath);
     } catch (error) {
       console.error('[StorageService] Delete error:', error);
       return false;
@@ -234,12 +234,12 @@ class UniversalStorageService {
   /**
    * Get public URL for image
    *
-   * @param bucket - Storage bucket
-   * @param path - Path to file
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath to file
    * @returns Public URL
    */
-  getPublicUrl(bucket: StorageBucket, path: string): string {
-    return this.adapter.getPublicUrl(bucket, path);
+  getPublicUrl(storagePath: StoragePath, subPath: string): string {
+    return this.adapter.getPublicUrl(storagePath, subPath);
   }
 
   /**
@@ -247,10 +247,10 @@ class UniversalStorageService {
    *
    * For background uploads while user is filling forms
    *
-   * @param concurrentLimit - Max parallel uploads
+   * @param concurrentLimit - Max parallel uploads (default: 20 for 2x speed)
    * @returns Progressive uploader instance
    */
-  createProgressiveUploader(concurrentLimit = 10): ProgressiveImageUploader {
+  createProgressiveUploader(concurrentLimit = 20): ProgressiveImageUploader {
     return new ProgressiveImageUploader(this.adapter, concurrentLimit);
   }
 }
@@ -271,12 +271,12 @@ export const ImageUploadService = {
    */
   async uploadImage(
     file: File,
-    bucket: string,
-    path: string,
+    storagePath: string,
+    subPath: string,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<UploadResult> {
     console.warn('[ImageUploadService] Deprecated. Use storageService.uploadImage()');
-    return storageService.uploadImage(file, bucket as StorageBucket, path, onProgress);
+    return storageService.uploadImage(file, storagePath as StoragePath, subPath, onProgress);
   },
 
   /**
@@ -284,11 +284,11 @@ export const ImageUploadService = {
    */
   async batchUploadImages(
     files: File[],
-    bucket: string,
-    path: string,
+    storagePath: string,
+    subPath: string,
     onProgress?: (completed: number, total: number) => void
   ): Promise<BatchUploadResult> {
     console.warn('[ImageUploadService] Deprecated. Use storageService.batchUploadImages()');
-    return storageService.batchUploadImages(files, bucket as StorageBucket, path, 10, onProgress);
+    return storageService.batchUploadImages(files, storagePath as StoragePath, subPath, 20, onProgress);
   },
 };

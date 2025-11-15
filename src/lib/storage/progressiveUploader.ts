@@ -13,7 +13,7 @@
  */
 
 import { ImageProcessor } from './imageProcessor';
-import type { StorageAdapter, StorageBucket, UploadResult } from './types';
+import type { StorageAdapter, StoragePath, UploadResult } from './types';
 
 /**
  * Upload task status
@@ -26,8 +26,8 @@ type UploadTaskStatus = 'pending' | 'uploading' | 'completed' | 'failed';
 interface UploadTask {
   id: string;
   file: File;
-  bucket: StorageBucket;
-  path: string;
+  storagePath: StoragePath;
+  subPath: string;
   status: UploadTaskStatus;
   progress: number;
   url?: string;
@@ -48,9 +48,9 @@ export class ProgressiveImageUploader {
    * Constructor
    *
    * @param adapter - Storage adapter to use
-   * @param concurrentLimit - Max concurrent uploads (default: 10)
+   * @param concurrentLimit - Max concurrent uploads (default: 20 for 2x speed)
    */
-  constructor(adapter: StorageAdapter, concurrentLimit = 10) {
+  constructor(adapter: StorageAdapter, concurrentLimit = 20) {
     this.adapter = adapter;
     this.queue = new Map();
     this.concurrentLimit = concurrentLimit;
@@ -64,15 +64,15 @@ export class ProgressiveImageUploader {
    *
    * @param id - Unique ID for this upload (e.g., category ID)
    * @param file - File to upload
-   * @param bucket - Storage bucket
-   * @param path - Path within bucket
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath within storage path (e.g., 'store_123')
    * @returns Upload task ID
    */
   async queueUpload(
     id: string,
     file: File,
-    bucket: StorageBucket,
-    path: string
+    storagePath: StoragePath,
+    subPath: string
   ): Promise<string> {
     // Check if already queued
     if (this.queue.has(id)) {
@@ -84,8 +84,8 @@ export class ProgressiveImageUploader {
     const task: UploadTask = {
       id,
       file,
-      bucket,
-      path,
+      storagePath,
+      subPath,
       status: 'pending',
       progress: 0,
     };
@@ -140,8 +140,8 @@ export class ProgressiveImageUploader {
       // Step 2: Upload
       const result = await this.adapter.uploadFile(
         processedFile,
-        task.bucket,
-        task.path,
+        task.storagePath,
+        task.subPath,
         (progress) => {
           task.progress = progress.percentage;
         }

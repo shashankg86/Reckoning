@@ -14,10 +14,11 @@
 import { supabase } from '../../supabaseClient';
 import type {
   StorageAdapter,
-  StorageBucket,
+  StoragePath,
   UploadProgress,
   UploadResult,
 } from '../types';
+import { STORAGE_BUCKET } from '../types';
 
 /**
  * Supabase Storage Adapter Implementation
@@ -37,15 +38,15 @@ export class SupabaseStorageAdapter implements StorageAdapter {
    * Upload file to Supabase Storage
    *
    * @param file - File to upload
-   * @param bucket - Storage bucket
-   * @param path - Path within bucket
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath within storage path (e.g., 'store_123/img_456.jpg')
    * @param onProgress - Progress callback (note: Supabase doesn't provide progress)
    * @returns Upload result
    */
   async uploadFile(
     file: File,
-    bucket: StorageBucket,
-    path: string,
+    storagePath: StoragePath,
+    subPath: string,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<UploadResult> {
     try {
@@ -63,11 +64,12 @@ export class SupabaseStorageAdapter implements StorageAdapter {
       }
 
       const fileName = file.name;
-      const filePath = `${path}/${fileName}`;
+      // Construct full path: storagePath/subPath/fileName
+      const filePath = `${storagePath}/${subPath}/${fileName}`;
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage (using single bucket)
       const { data, error } = await supabase.storage
-        .from(bucket)
+        .from(STORAGE_BUCKET)
         .upload(filePath, file, {
           cacheControl: '3600', // Cache for 1 hour
           upsert: false, // Don't overwrite existing files
@@ -95,7 +97,7 @@ export class SupabaseStorageAdapter implements StorageAdapter {
       // Get public URL
       const {
         data: { publicUrl },
-      } = supabase.storage.from(bucket).getPublicUrl(filePath);
+      } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(filePath);
 
       if (onProgress) {
         onProgress({ loaded: file.size, total: file.size, percentage: 100 });
@@ -122,25 +124,28 @@ export class SupabaseStorageAdapter implements StorageAdapter {
   /**
    * Delete file from Supabase Storage
    *
-   * @param bucket - Storage bucket
-   * @param path - Path to file
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath to file to delete
    * @returns Success status
    */
-  async deleteFile(bucket: StorageBucket, path: string): Promise<boolean> {
+  async deleteFile(storagePath: StoragePath, subPath: string): Promise<boolean> {
     try {
       if (!this.isConfigured()) {
         console.error('[SupabaseAdapter] Storage not configured');
         return false;
       }
 
-      const { error } = await supabase.storage.from(bucket).remove([path]);
+      // Construct full path
+      const fullPath = `${storagePath}/${subPath}`;
+
+      const { error } = await supabase.storage.from(STORAGE_BUCKET).remove([fullPath]);
 
       if (error) {
         console.error('[SupabaseAdapter] Delete error:', error);
         return false;
       }
 
-      console.log(`[SupabaseAdapter] Deleted: ${path}`);
+      console.log(`[SupabaseAdapter] Deleted: ${fullPath}`);
       return true;
     } catch (error) {
       console.error('[SupabaseAdapter] Unexpected delete error:', error);
@@ -151,19 +156,22 @@ export class SupabaseStorageAdapter implements StorageAdapter {
   /**
    * Get public URL for a file
    *
-   * @param bucket - Storage bucket
-   * @param path - Path to file
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath to file
    * @returns Public URL
    */
-  getPublicUrl(bucket: StorageBucket, path: string): string {
+  getPublicUrl(storagePath: StoragePath, subPath: string): string {
     if (!this.isConfigured()) {
       console.warn('[SupabaseAdapter] Storage not configured');
       return '';
     }
 
+    // Construct full path
+    const fullPath = `${storagePath}/${subPath}`;
+
     const {
       data: { publicUrl },
-    } = supabase.storage.from(bucket).getPublicUrl(path);
+    } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(fullPath);
 
     return publicUrl;
   }
@@ -171,19 +179,21 @@ export class SupabaseStorageAdapter implements StorageAdapter {
   /**
    * Check if a file exists
    *
-   * @param bucket - Storage bucket
-   * @param path - Path to file
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath to file
    * @returns True if file exists
    */
-  async fileExists(bucket: StorageBucket, path: string): Promise<boolean> {
+  async fileExists(storagePath: StoragePath, subPath: string): Promise<boolean> {
     try {
-      const { data, error } = await supabase.storage.from(bucket).list(path.split('/').slice(0, -1).join('/'));
+      // Construct full path
+      const fullPath = `${storagePath}/${subPath}`;
+      const { data, error } = await supabase.storage.from(STORAGE_BUCKET).list(fullPath.split('/').slice(0, -1).join('/'));
 
       if (error) {
         return false;
       }
 
-      const fileName = path.split('/').pop();
+      const fileName = fullPath.split('/').pop();
       return data?.some((file) => file.name === fileName) || false;
     } catch {
       return false;

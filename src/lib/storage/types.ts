@@ -12,15 +12,21 @@
 export type StorageProvider = 'supabase' | 'r2' | 's3';
 
 /**
- * Storage buckets for different image types
+ * Storage bucket name
+ * Using single bucket 'store-assets' with subpaths for organization
  */
-export const STORAGE_BUCKETS = {
-  CATEGORIES: 'category-images',
-  ITEMS: 'item-images',
-  STORES: 'store-images',
+export const STORAGE_BUCKET = 'store-assets' as const;
+
+/**
+ * Storage paths within bucket for different image types
+ */
+export const STORAGE_PATHS = {
+  CATEGORIES: 'categories',
+  ITEMS: 'items',
+  STORES: 'store-logos',
 } as const;
 
-export type StorageBucket = typeof STORAGE_BUCKETS[keyof typeof STORAGE_BUCKETS];
+export type StoragePath = typeof STORAGE_PATHS[keyof typeof STORAGE_PATHS];
 
 /**
  * Upload progress callback
@@ -60,35 +66,35 @@ export interface StorageAdapter {
    * Upload a single file to storage
    *
    * @param file - File to upload
-   * @param bucket - Storage bucket name
-   * @param path - Path within bucket (e.g., 'store_123/category_456.jpg')
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath within storage path (e.g., 'store_123/img_456.jpg')
    * @param onProgress - Optional progress callback
    * @returns Upload result with URL or error
    */
   uploadFile(
     file: File,
-    bucket: StorageBucket,
-    path: string,
+    storagePath: StoragePath,
+    subPath: string,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<UploadResult>;
 
   /**
    * Delete a file from storage
    *
-   * @param bucket - Storage bucket name
-   * @param path - Path to file to delete
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath to file to delete
    * @returns Success status
    */
-  deleteFile(bucket: StorageBucket, path: string): Promise<boolean>;
+  deleteFile(storagePath: StoragePath, subPath: string): Promise<boolean>;
 
   /**
    * Get public URL for a file
    *
-   * @param bucket - Storage bucket name
-   * @param path - Path to file
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath to file
    * @returns Public URL
    */
-  getPublicUrl(bucket: StorageBucket, path: string): string;
+  getPublicUrl(storagePath: StoragePath, subPath: string): string;
 
   /**
    * Check if provider is properly configured

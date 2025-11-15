@@ -17,7 +17,7 @@
 
 import type {
   StorageAdapter,
-  StorageBucket,
+  StoragePath,
   UploadProgress,
   UploadResult,
 } from '../types';
@@ -65,15 +65,15 @@ export class R2StorageAdapter implements StorageAdapter {
    * 3. Return public URL
    *
    * @param file - File to upload
-   * @param bucket - Storage bucket (used as path prefix)
-   * @param path - Path within bucket
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath within storage path (e.g., 'store_123/img_456.jpg')
    * @param onProgress - Progress callback
    * @returns Upload result
    */
   async uploadFile(
     file: File,
-    bucket: StorageBucket,
-    path: string,
+    storagePath: StoragePath,
+    subPath: string,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<UploadResult> {
     try {
@@ -85,7 +85,8 @@ export class R2StorageAdapter implements StorageAdapter {
       }
 
       const fileName = file.name;
-      const fullPath = `${bucket}/${path}/${fileName}`;
+      // Construct full path: storagePath/subPath/fileName
+      const fullPath = `${storagePath}/${subPath}/${fileName}`;
 
       // Step 1: Get presigned URL from your backend
       // TODO: Replace with your actual backend endpoint
@@ -158,18 +159,19 @@ export class R2StorageAdapter implements StorageAdapter {
   /**
    * Delete file from R2
    *
-   * @param bucket - Storage bucket
-   * @param path - Path to file
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath to file to delete
    * @returns Success status
    */
-  async deleteFile(bucket: StorageBucket, path: string): Promise<boolean> {
+  async deleteFile(storagePath: StoragePath, subPath: string): Promise<boolean> {
     try {
       if (!this.isConfigured()) {
         console.error('[R2Adapter] Storage not configured');
         return false;
       }
 
-      const fullPath = `${bucket}/${path}`;
+      // Construct full path
+      const fullPath = `${storagePath}/${subPath}`;
 
       // Get presigned DELETE URL from backend
       const presignedUrl = await this.getPresignedDeleteUrl(fullPath);
@@ -196,17 +198,19 @@ export class R2StorageAdapter implements StorageAdapter {
   /**
    * Get public URL for a file
    *
-   * @param bucket - Storage bucket
-   * @param path - Path to file
+   * @param storagePath - Storage path (categories, items, or store-logos)
+   * @param subPath - Subpath to file
    * @returns Public URL
    */
-  getPublicUrl(bucket: StorageBucket, path: string): string {
+  getPublicUrl(storagePath: StoragePath, subPath: string): string {
     if (!this.isConfigured()) {
       console.warn('[R2Adapter] Storage not configured');
       return '';
     }
 
-    return `${this.publicUrl}/${bucket}/${path}`;
+    // Construct full path
+    const fullPath = `${storagePath}/${subPath}`;
+    return `${this.publicUrl}/${fullPath}`;
   }
 
   /**
