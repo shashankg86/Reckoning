@@ -60,38 +60,57 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load pending categories from localStorage on mount
+  // Load DB categories and merge with pending localStorage changes
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(LOCAL_CATEGORIES_KEY);
-      if (stored) {
-        const pendingCategories = JSON.parse(stored) as LocalCategory[];
-        setLocalCategories(pendingCategories);
-      }
-    } catch (error) {
-      console.error('Failed to load pending categories from localStorage:', error);
-    }
-  }, []);
+    if (existingCategories.length > 0) {
+      try {
+        const stored = localStorage.getItem(LOCAL_CATEGORIES_KEY);
+        const pendingCategories = stored ? (JSON.parse(stored) as LocalCategory[]) : [];
 
-  // Sync existing categories from DB to local state (only if no pending changes)
-  useEffect(() => {
-    if (existingCategories.length > 0 && localCategories.length === 0) {
-      setLocalCategories(
-        existingCategories.map((cat) => ({
+        // Start with DB categories
+        const dbCategories = existingCategories.map((cat) => ({
           ...cat,
-          _originalData: cat, // Store original for comparison
-        }))
-      );
+          _originalData: cat,
+        }));
+
+        // Merge pending changes
+        const mergedCategories = [...dbCategories];
+
+        pendingCategories.forEach((pending) => {
+          if (pending._isNew) {
+            // Add new pending category (not yet in DB)
+            mergedCategories.push(pending);
+          } else if (pending._isModified || pending._isDeleted) {
+            // Update or mark existing category
+            const index = mergedCategories.findIndex((c) => c.id === pending.id);
+            if (index !== -1) {
+              mergedCategories[index] = pending;
+            }
+          }
+        });
+
+        setLocalCategories(mergedCategories);
+      } catch (error) {
+        console.error('Failed to merge categories with localStorage:', error);
+        // Fallback to DB only
+        setLocalCategories(
+          existingCategories.map((cat) => ({
+            ...cat,
+            _originalData: cat,
+          }))
+        );
+      }
     }
   }, [existingCategories]);
 
-  // Persist pending categories to localStorage whenever they change
+  // Persist ONLY pending categories to localStorage whenever they change
   useEffect(() => {
     if (localCategories.length > 0) {
       try {
         const pendingChanges = localCategories.filter((cat) => cat._isNew || cat._isModified || cat._isDeleted);
         if (pendingChanges.length > 0) {
-          localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(localCategories));
+          // ONLY save pending changes, not all categories
+          localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(pendingChanges));
         } else {
           localStorage.removeItem(LOCAL_CATEGORIES_KEY);
         }

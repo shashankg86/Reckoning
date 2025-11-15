@@ -67,38 +67,57 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load pending items from localStorage on mount
+  // Load DB items and merge with pending localStorage changes
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(LOCAL_ITEMS_KEY);
-      if (stored) {
-        const pendingItems = JSON.parse(stored) as LocalItem[];
-        setLocalItems(pendingItems);
-      }
-    } catch (error) {
-      console.error('Failed to load pending items from localStorage:', error);
-    }
-  }, []);
+    if (existingItems.length > 0) {
+      try {
+        const stored = localStorage.getItem(LOCAL_ITEMS_KEY);
+        const pendingItems = stored ? (JSON.parse(stored) as LocalItem[]) : [];
 
-  // Sync existing items from DB to local state (only if no pending changes)
-  useEffect(() => {
-    if (existingItems.length > 0 && localItems.length === 0) {
-      setLocalItems(
-        existingItems.map((item) => ({
+        // Start with DB items
+        const dbItems = existingItems.map((item) => ({
           ...item,
           _originalData: item,
-        }))
-      );
+        }));
+
+        // Merge pending changes
+        const mergedItems = [...dbItems];
+
+        pendingItems.forEach((pending) => {
+          if (pending._isNew) {
+            // Add new pending item (not yet in DB)
+            mergedItems.push(pending);
+          } else if (pending._isModified || pending._isDeleted) {
+            // Update or mark existing item
+            const index = mergedItems.findIndex((i) => i.id === pending.id);
+            if (index !== -1) {
+              mergedItems[index] = pending;
+            }
+          }
+        });
+
+        setLocalItems(mergedItems);
+      } catch (error) {
+        console.error('Failed to merge items with localStorage:', error);
+        // Fallback to DB only
+        setLocalItems(
+          existingItems.map((item) => ({
+            ...item,
+            _originalData: item,
+          }))
+        );
+      }
     }
   }, [existingItems]);
 
-  // Persist pending items to localStorage whenever they change
+  // Persist ONLY pending items to localStorage whenever they change
   useEffect(() => {
     if (localItems.length > 0) {
       try {
         const pendingChanges = localItems.filter((item) => item._isNew || item._isModified || item._isDeleted);
         if (pendingChanges.length > 0) {
-          localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(localItems));
+          // ONLY save pending changes, not all items
+          localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(pendingChanges));
         } else {
           localStorage.removeItem(LOCAL_ITEMS_KEY);
         }
