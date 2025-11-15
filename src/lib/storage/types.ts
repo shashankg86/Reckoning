@@ -133,13 +133,13 @@ export interface ImageValidationRules {
 export interface ImageCompressionOptions {
   /**
    * Target file size in MB
-   * Default: 0.25 (250KB)
+   * Default: 0.08 (80KB for WebP)
    */
   maxSizeMB: number;
 
   /**
    * Maximum width or height
-   * Default: 1920
+   * Default: 1024 (perfect for thumbnails)
    */
   maxWidthOrHeight: number;
 
@@ -154,6 +154,13 @@ export interface ImageCompressionOptions {
    * Default: true
    */
   useWebWorker: boolean;
+
+  /**
+   * Output file type
+   * Default: 'image/webp' (best compression)
+   * Accepts JPEG/PNG input, converts to WebP automatically
+   */
+  fileType?: string;
 }
 
 /**
