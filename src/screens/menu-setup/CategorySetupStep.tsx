@@ -15,7 +15,7 @@ import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCategories } from '../../hooks/useCategories';
 import { categoriesAPI } from '../../api/categories';
-import { ImageUploadService, STORAGE_BUCKETS } from '../../lib/imageUploadService';
+import { storageService, STORAGE_BUCKETS } from '../../lib/storage';
 import { CategoryCard } from './components/CategoryCard';
 import { CategoryFormModal } from './components/CategoryFormModal';
 import { CategoryBulkCreateModal } from './components/CategoryBulkCreateModal';
@@ -242,10 +242,11 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
 
         try {
           const files = categoriesToUpload.map((cat) => cat._imageFile!);
-          const uploadResult = await ImageUploadService.batchUploadImages(
+          const uploadResult = await storageService.batchUploadImages(
             files,
             STORAGE_BUCKETS.CATEGORIES,
             `store_${storeId}`,
+            10, // concurrent limit
             (completed, total) => {
               toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
             }

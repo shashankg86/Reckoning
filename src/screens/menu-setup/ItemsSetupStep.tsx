@@ -16,7 +16,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useItems } from '../../hooks/useItems';
 import { useCategories } from '../../hooks/useCategories';
 import { itemsAPI } from '../../api/items';
-import { ImageUploadService, STORAGE_BUCKETS } from '../../lib/imageUploadService';
+import { storageService, STORAGE_BUCKETS } from '../../lib/storage';
 import { ItemFormModal } from './components/ItemFormModal';
 import { ItemBulkCreateModal } from './components/ItemBulkCreateModal';
 import type { ItemData } from '../../api/items';
@@ -252,10 +252,11 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
 
         try {
           const files = itemsToUpload.map((item) => item._imageFile!);
-          const uploadResult = await ImageUploadService.batchUploadImages(
+          const uploadResult = await storageService.batchUploadImages(
             files,
             STORAGE_BUCKETS.ITEMS,
             `store_${storeId}`,
+            10, // concurrent limit
             (completed, total) => {
               toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
             }
