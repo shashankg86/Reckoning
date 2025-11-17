@@ -347,7 +347,14 @@
     "name": "Name",
     "dateAdded": "Date Added",
     "ascending": "Ascending (A-Z, Low-High)",
-    "descending": "Descending (Z-A, High-Low)"
+    "descending": "Descending (Z-A, High-Low)",
+    "unsavedChanges": "Unsaved Changes",
+    "changesCount": "{{count}} pending changes",
+    "saveAll": "Save All",
+    "discardAll": "Discard All",
+    "allChangesSaved": "All changes saved",
+    "bulkAddCategories": "Bulk Add Categories",
+    "bulkAddItems": "Bulk Add Items"
   },
   "invoice": {
     "title": "Create Invoice",
