@@ -335,7 +335,19 @@
     "categoryUpdated": "Category updated successfully",
     "categoryDeleted": "Category deleted successfully",
     "categoryError": "Failed to save category",
-    "deleteConfirmationMessage": "Are you sure you want to delete this {{type}}: {{name}}?"
+    "deleteConfirmationMessage": "Are you sure you want to delete this {{type}}: {{name}}?",
+    "filters": "Filters",
+    "clearFilters": "Clear Filters",
+    "priceRange": "Price Range",
+    "min": "Min",
+    "max": "Max",
+    "holdCtrlToSelectMultiple": "Hold Ctrl/Cmd to select multiple",
+    "allStock": "All Stock",
+    "sortBy": "Sort By",
+    "name": "Name",
+    "dateAdded": "Date Added",
+    "ascending": "Ascending (A-Z, Low-High)",
+    "descending": "Descending (Z-A, High-Low)"
   },
   "invoice": {
     "title": "Create Invoice",
