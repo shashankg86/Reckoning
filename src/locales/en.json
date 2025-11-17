@@ -360,6 +360,8 @@
     "bulkAddItemsDescription": "Add multiple items at once (max {{max}})",
     "addItemsCount": "Add {{count}} Items",
     "addAnotherItem": "Add Another Item",
+    "quickAddCategories": "Quick add multiple categories",
+    "quickAddItems": "Quick add multiple items",
     "icon": "Icon",
     "itemCount": "Item Count",
     "noCategories": "No categories found",

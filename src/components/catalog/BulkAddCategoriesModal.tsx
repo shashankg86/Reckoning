@@ -3,21 +3,15 @@ import { useTranslation } from 'react-i18next';
 import {
   XMarkIcon,
   PlusIcon,
-  TrashIcon,
-  PhotoIcon
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import type { Category } from '../../types/menu';
-import { storageService } from '../../lib/storage';
 
 interface CategoryFormData {
   name: string;
-  description: string;
   icon: string;
   color: string;
-  image?: File | null;
-  imageUrl?: string;
-  imageUploading?: boolean;
 }
 
 interface BulkAddCategoriesModalProps {
@@ -28,12 +22,8 @@ interface BulkAddCategoriesModalProps {
 
 const DEFAULT_CATEGORY: CategoryFormData = {
   name: '',
-  description: '',
   icon: '📦',
-  color: '#FF6B35',
-  image: null,
-  imageUrl: '',
-  imageUploading: false
+  color: '#FF6B35'
 };
 
 const ICON_OPTIONS = [
@@ -74,29 +64,6 @@ export function BulkAddCategoriesModal({
     setCategories(updated);
   };
 
-  const handleImageUpload = async (index: number, file: File) => {
-    try {
-      // Set uploading state
-      handleChange(index, 'imageUploading', true);
-
-      // Upload to storage (storageService handles processing internally)
-      const result = await storageService.uploadImage(file, 'categories', 'catalog');
-      if (!result.success) {
-        throw new Error(result.error || 'Upload failed');
-      }
-      const imageUrl = result.url!;
-
-      // Update state with image URL
-      handleChange(index, 'imageUrl', imageUrl);
-      handleChange(index, 'image', null);
-      handleChange(index, 'imageUploading', false);
-    } catch (error) {
-      console.error('Image upload failed:', error);
-      handleChange(index, 'imageUploading', false);
-      alert(t('menuSetup.imageUploadFailed'));
-    }
-  };
-
   const handleSubmit = () => {
     // Validate
     const validCategories = categories.filter(cat => cat.name.trim() !== '');
@@ -109,10 +76,9 @@ export function BulkAddCategoriesModal({
     // Map to Category format
     const categoriesToAdd = validCategories.map(cat => ({
       name: cat.name.trim(),
-      description: cat.description.trim(),
+      description: '',
       icon: cat.icon,
-      color: cat.color,
-      image: cat.imageUrl || undefined
+      color: cat.color
     }));
 
     onBulkAdd(categoriesToAdd);
@@ -128,8 +94,9 @@ export function BulkAddCategoriesModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-3xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             {t('catalog.bulkAddCategories')}
           </h2>
@@ -141,183 +108,149 @@ export function BulkAddCategoriesModal({
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-        {/* Instructions */}
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {t('menuSetup.bulkCreateDescription')} (max {MAX_CATEGORIES})
-        </p>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="space-y-4">
+            {/* Instructions */}
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {t('catalog.quickAddCategories')} ({categories.length}/{MAX_CATEGORIES})
+            </p>
 
-        {/* Category Forms */}
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-          {categories.map((category, index) => (
-            <div
-              key={index}
-              className="p-4 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3"
-            >
-              {/* Header with Remove Button */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {t('catalog.category')} #{index + 1}
-                </span>
-                {categories.length > 1 && (
-                  <button
-                    onClick={() => handleRemoveRow(index)}
-                    className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+            {/* Table */}
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      #
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      {t('menuSetup.categoryName')} *
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      {t('catalog.icon')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      {t('catalog.color')}
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      {t('catalog.preview')}
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">
+                      {t('common.actions')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {categories.map((category, index) => (
+                    <tr key={index} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      {/* Index */}
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        {index + 1}
+                      </td>
 
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('menuSetup.categoryName')} *
-                </label>
-                <input
-                  type="text"
-                  value={category.name}
-                  onChange={(e) => handleChange(index, 'name', e.target.value)}
-                  placeholder={t('menuSetup.enterCategoryName')}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
+                      {/* Name Input */}
+                      <td className="px-4 py-3">
+                        <input
+                          type="text"
+                          value={category.name}
+                          onChange={(e) => handleChange(index, 'name', e.target.value)}
+                          placeholder={t('menuSetup.enterCategoryName')}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        />
+                      </td>
 
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('catalog.description')}
-                </label>
-                <input
-                  type="text"
-                  value={category.description}
-                  onChange={(e) => handleChange(index, 'description', e.target.value)}
-                  placeholder={t('catalog.enterDescription')}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                />
-              </div>
+                      {/* Icon Select */}
+                      <td className="px-4 py-3">
+                        <select
+                          value={category.icon}
+                          onChange={(e) => handleChange(index, 'icon', e.target.value)}
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500"
+                        >
+                          {ICON_OPTIONS.map((icon) => (
+                            <option key={icon} value={icon}>
+                              {icon}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
 
-              {/* Icon Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('catalog.icon')}
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {ICON_OPTIONS.map((icon) => (
-                    <button
-                      key={icon}
-                      onClick={() => handleChange(index, 'icon', icon)}
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition-all ${
-                        category.icon === icon
-                          ? 'bg-orange-500 ring-2 ring-orange-500 ring-offset-2 dark:ring-offset-gray-900'
-                          : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      {icon}
-                    </button>
+                      {/* Color Select */}
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1.5">
+                          {COLOR_OPTIONS.slice(0, 5).map((color) => (
+                            <button
+                              key={color}
+                              onClick={() => handleChange(index, 'color', color)}
+                              className={`w-7 h-7 rounded border-2 transition-all ${
+                                category.color === color
+                                  ? 'border-gray-900 dark:border-white scale-110'
+                                  : 'border-transparent hover:scale-105'
+                              }`}
+                              style={{ backgroundColor: color }}
+                              title={color}
+                            />
+                          ))}
+                          <select
+                            value={category.color}
+                            onChange={(e) => handleChange(index, 'color', e.target.value)}
+                            className="w-12 px-1 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500"
+                          >
+                            {COLOR_OPTIONS.map((color) => (
+                              <option key={color} value={color}>
+                                {color}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+
+                      {/* Preview */}
+                      <td className="px-4 py-3">
+                        <div
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-white text-sm font-medium"
+                          style={{ backgroundColor: category.color }}
+                        >
+                          <span>{category.icon}</span>
+                          <span className="max-w-[100px] truncate">
+                            {category.name || t('catalog.categoryName')}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-3 text-center">
+                        {categories.length > 1 && (
+                          <button
+                            onClick={() => handleRemoveRow(index)}
+                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                            title={t('common.remove')}
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
                   ))}
-                </div>
-              </div>
-
-              {/* Color Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('catalog.color')}
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {COLOR_OPTIONS.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => handleChange(index, 'color', color)}
-                      className={`w-10 h-10 rounded-lg transition-all ${
-                        category.color === color
-                          ? 'ring-2 ring-orange-500 ring-offset-2 dark:ring-offset-gray-900'
-                          : 'hover:scale-110'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Image Upload */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('menuSetup.uploadImagePlaceholder')}
-                </label>
-                <div className="flex items-center gap-3">
-                  {category.imageUrl ? (
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={category.imageUrl}
-                        alt={category.name}
-                        className="w-16 h-16 rounded-lg object-cover"
-                      />
-                      <button
-                        onClick={() => {
-                          handleChange(index, 'imageUrl', '');
-                          handleChange(index, 'image', null);
-                        }}
-                        className="text-sm text-red-600 dark:text-red-400 hover:underline"
-                      >
-                        {t('common.remove')}
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg cursor-pointer transition-colors">
-                      <PhotoIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">
-                        {category.imageUploading ? t('common.importing') : t('onboarding.uploadLogo')}
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleImageUpload(index, file);
-                        }}
-                        disabled={category.imageUploading}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {t('menuSetup.imageUploadHint')}
-                </p>
-              </div>
-
-              {/* Preview */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('catalog.preview')}
-                </label>
-                <div
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white"
-                  style={{ backgroundColor: category.color }}
-                >
-                  <span className="text-xl">{category.icon}</span>
-                  <span className="font-medium">{category.name || t('catalog.categoryName')}</span>
-                </div>
-              </div>
+                </tbody>
+              </table>
             </div>
-          ))}
+
+            {/* Add Row Button */}
+            {categories.length < MAX_CATEGORIES && (
+              <button
+                onClick={handleAddRow}
+                className="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-orange-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors flex items-center justify-center gap-2"
+              >
+                <PlusIcon className="h-4 w-4" />
+                {t('menuSetup.addAnotherCategory')}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Add Row Button */}
-        {categories.length < MAX_CATEGORIES && (
-          <Button
-            variant="secondary"
-            onClick={handleAddRow}
-            className="w-full flex items-center justify-center gap-2"
-          >
-            <PlusIcon className="h-4 w-4" />
-            {t('menuSetup.addAnotherCategory')}
-          </Button>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-3">
+        {/* Footer Actions */}
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
           <Button variant="secondary" onClick={handleClose} className="flex-1">
             {t('common.cancel')}
           </Button>
@@ -328,7 +261,6 @@ export function BulkAddCategoriesModal({
           </Button>
         </div>
       </div>
-    </div>
     </div>
   );
 }
