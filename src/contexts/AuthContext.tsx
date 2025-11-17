@@ -530,12 +530,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateStoreSettings = async (updates: Partial<Store>) => {
+  const updateStoreSettings = async (updates: Partial<Store>, options?: { showToast?: boolean }) => {
     try {
       if (!state.user || !state.user.store) throw new Error('No authenticated user or store');
       await storesAPI.updateStore((state.user.store as any).id, updates);
       await loadUserProfile(state.user.uid, state.user.email ?? null, { force: true });
-      toast.success(i18n.t('auth.messages.settingsUpdated'));
+      if (options?.showToast) {
+        toast.success(i18n.t('auth.messages.settingsUpdated'));
+      }
     } catch (error) {
       console.error('[AuthContext] Update store settings error:', error);
       dispatch({ type: 'SET_ERROR', payload: i18n.t('auth.messages.accountError') });
