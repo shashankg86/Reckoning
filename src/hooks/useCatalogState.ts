@@ -72,8 +72,23 @@ export function useCatalogState(storeId: string) {
         itemsAPI.getItems(storeId)
       ]);
 
+      // Map items to ensure proper structure
+      const mappedItems = items.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        category: typeof item.category === 'string' ? item.category : item.category?.name || 'Uncategorized',
+        category_id: item.category_id,
+        sku: item.sku,
+        stock: item.stock,
+        image: item.image_url,
+        is_active: item.is_active,
+        created_at: item.created_at
+      }));
+
       setDbCategories(categories);
-      setDbItems(items);
+      setDbItems(mappedItems);
     } catch (error) {
       console.error('Failed to load catalog data:', error);
       throw error;
@@ -81,6 +96,13 @@ export function useCatalogState(storeId: string) {
       setLoading(false);
     }
   }, [storeId]);
+
+  // Load data on mount when storeId is available
+  useEffect(() => {
+    if (storeId) {
+      loadData();
+    }
+  }, [storeId, loadData]);
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = useCallback(() => {
@@ -333,12 +355,13 @@ export function useCatalogState(storeId: string) {
       if (pendingChanges.items.toAdd.length > 0) {
         const itemsToCreate = pendingChanges.items.toAdd.map(item => ({
           name: item.name!,
-          price: item.price!,
+          price: parseFloat(item.price as any) || 0,
           category: item.category || 'Uncategorized',
-          category_id: (item as any).categoryId,
+          category_id: (item as any).category_id,
           sku: item.sku,
           stock: item.stock || 0,
-          image_url: item.image
+          image_url: item.image,
+          description: (item as any).description
         }));
         await itemsAPI.bulkCreateItems(storeId, itemsToCreate);
       }
@@ -348,12 +371,13 @@ export function useCatalogState(storeId: string) {
         const updates = pendingChanges.items.toUpdate.map(item => ({
           id: item.id!,
           name: item.name,
-          price: item.price,
+          price: item.price ? parseFloat(item.price as any) : undefined,
           category: item.category,
-          category_id: (item as any).categoryId,
+          category_id: (item as any).category_id,
           sku: item.sku,
           stock: item.stock,
-          image_url: item.image
+          image_url: item.image,
+          description: (item as any).description
         }));
         await itemsAPI.bulkUpdateItems(updates);
       }
@@ -380,10 +404,26 @@ export function useCatalogState(storeId: string) {
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
+  // Calculate item counts per category
+  const getItemCounts = useCallback((): Record<string, number> => {
+    const items = getMergedItems();
+    const counts: Record<string, number> = {};
+
+    items.forEach(item => {
+      const categoryId = item.category_id;
+      if (categoryId) {
+        counts[categoryId] = (counts[categoryId] || 0) + 1;
+      }
+    });
+
+    return counts;
+  }, [getMergedItems]);
+
   return {
     // Data
     categories: getMergedCategories(),
     items: getMergedItems(),
+    itemCounts: getItemCounts(),
     loading,
 
     // State
