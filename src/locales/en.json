@@ -295,6 +295,21 @@
       "inStock": "In Stock",
       "lowStock": "Low Stock",
       "outOfStock": "Out of Stock"
+    },
+    "stock": "Stock",
+    "sku": "SKU",
+    "enterSKU": "Enter SKU",
+    "imageURL": "Image URL",
+    "enterImageURL": "Enter image URL",
+    "imageURLHint": "Paste an image URL or upload to an image hosting service",
+    "selectCategory": "Select a category",
+    "filter": "Filter",
+    "allCategories": "All Categories",
+    "tryDifferentSearch": "Try adjusting your search or filters",
+    "validation": {
+      "nameRequired": "Item name is required",
+      "priceInvalid": "Price must be greater than 0",
+      "categoryRequired": "Category is required"
     }
   },
   "invoice": {
