@@ -7,25 +7,69 @@
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-/* Dark mode styles */
+/* CRED-like Dark Mode - Premium feel with deep blacks */
 .dark {
   color-scheme: dark;
+  background-color: #0C0C0D;
+  color: #FAFAFA;
 }
 
-/* Custom scrollbar for dark mode */
+/* Apply CRED-like dark background to body and root */
+.dark body {
+  background-color: #0C0C0D;
+}
+
+/* Custom scrollbar for dark mode - CRED style */
 .dark::-webkit-scrollbar {
   width: 8px;
 }
 
 .dark::-webkit-scrollbar-track {
-  background: #374151;
+  background: #18181B;
 }
 
 .dark::-webkit-scrollbar-thumb {
-  background: #6b7280;
+  background: #27272A;
   border-radius: 4px;
 }
 
 .dark::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: #2A2A2D;
+}
+
+/* Override default Tailwind gray colors in dark mode for CRED-like appearance */
+@layer utilities {
+  /* Background colors */
+  .dark .bg-gray-50 { background-color: #18181B; }
+  .dark .bg-gray-100 { background-color: #1F1F23; }
+  .dark .bg-gray-200 { background-color: #27272A; }
+  .dark .bg-gray-800 { background-color: #18181B; }
+  .dark .bg-gray-900 { background-color: #0C0C0D; }
+
+  /* Text colors */
+  .dark .text-gray-100 { color: #FAFAFA; }
+  .dark .text-gray-200 { color: #FAFAFA; }
+  .dark .text-gray-300 { color: #A1A1AA; }
+  .dark .text-gray-400 { color: #A1A1AA; }
+  .dark .text-gray-500 { color: #71717A; }
+  .dark .text-gray-600 { color: #71717A; }
+  .dark .text-gray-700 { color: #A1A1AA; }
+  .dark .text-gray-800 { color: #FAFAFA; }
+  .dark .text-gray-900 { color: #FAFAFA; }
+
+  /* Border colors */
+  .dark .border-gray-200 { border-color: #27272A; }
+  .dark .border-gray-300 { border-color: #27272A; }
+  .dark .border-gray-600 { border-color: #2A2A2D; }
+  .dark .border-gray-700 { border-color: #27272A; }
+  .dark .border-gray-800 { border-color: #2A2A2D; }
+
+  /* Hover states */
+  .dark .hover\:bg-gray-100:hover { background-color: #1F1F23; }
+  .dark .hover\:bg-gray-700:hover { background-color: #1F1F23; }
+  .dark .hover\:bg-gray-800:hover { background-color: #27272A; }
+
+  /* Focus states */
+  .dark .focus\:border-gray-500:focus { border-color: #2A2A2D; }
+  .dark .focus\:ring-gray-500:focus { --tw-ring-color: #2A2A2D; }
 }

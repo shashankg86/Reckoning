@@ -103,4 +103,25 @@ export const storesAPI = {
       return [] as any[];
     }
   },
+
+  async updateStore(storeId: string, updates: Partial<StoreData>) {
+    try {
+      const user = await supabase.auth.getUser();
+      if (!user.data.user) throw new Error('Not authenticated');
+
+      const { data: store, error } = await supabase
+        .from('stores')
+        .update(updates)
+        .eq('id', storeId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return store;
+    } catch (error: any) {
+      console.error('Update store error:', error);
+      throw new Error(error.message || 'Failed to update store');
+    }
+  },
 };

@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast';
 import { Router } from './components/Router';
 import { AuthProvider } from './contexts/AuthContext';
 import { POSProvider } from './contexts/POSContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import './lib/i18n';
 
 /**
@@ -139,42 +140,44 @@ function App() {
 
   return (
     <AuthProvider>
-      <POSProvider>
-        <Router />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-              fontSize: '14px',
-              padding: '12px 20px',
-              borderRadius: '8px',
-            },
-            success: {
-              duration: 3000,
-              iconTheme: {
-                primary: '#4ade80',
-                secondary: '#fff',
+      <ThemeProvider>
+        <POSProvider>
+          <Router />
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: '#363636',
+                color: '#fff',
+                fontSize: '14px',
+                padding: '12px 20px',
+                borderRadius: '8px',
               },
-            },
-            error: {
-              duration: 5000,
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
+              success: {
+                duration: 3000,
+                iconTheme: {
+                  primary: '#4ade80',
+                  secondary: '#fff',
+                },
               },
-            },
-            loading: {
-              iconTheme: {
-                primary: '#3b82f6',
-                secondary: '#fff',
+              error: {
+                duration: 5000,
+                iconTheme: {
+                  primary: '#ef4444',
+                  secondary: '#fff',
+                },
               },
-            },
-          }}
-        />
-      </POSProvider>
+              loading: {
+                iconTheme: {
+                  primary: '#3b82f6',
+                  secondary: '#fff',
+                },
+              },
+            }}
+          />
+        </POSProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
