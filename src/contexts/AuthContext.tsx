@@ -82,6 +82,7 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<void>;
   completeOnboarding: (storeData: Store) => Promise<void>;
   updateStoreSettings: (updates: Partial<Store>) => Promise<void>;
+  refreshUserProfile: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -541,11 +542,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshUserProfile = async () => {
+    if (!state.user) return;
+    await loadUserProfile(state.user.uid, state.user.email ?? null, { force: true });
+  };
+
   const clearError = () => dispatch({ type: 'CLEAR_ERROR' });
 
   return (
     <AuthContext.Provider
-      value={{ state, login, loginWithGoogle, register, logout, resetPassword, completeOnboarding, updateStoreSettings, clearError }}
+      value={{ state, login, loginWithGoogle, register, logout, resetPassword, completeOnboarding, updateStoreSettings, refreshUserProfile, clearError }}
     >
       {children}
     </AuthContext.Provider>

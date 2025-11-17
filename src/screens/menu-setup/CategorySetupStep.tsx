@@ -7,6 +7,7 @@ import {
   MagnifyingGlassIcon,
   TrashIcon,
   ArrowPathIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -15,7 +16,7 @@ import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCategories } from '../../hooks/useCategories';
 import { categoriesAPI } from '../../api/categories';
-import { ImageUploadService, STORAGE_BUCKETS } from '../../lib/imageUploadService';
+import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
 import { CategoryCard } from './components/CategoryCard';
 import { CategoryFormModal } from './components/CategoryFormModal';
 import { CategoryBulkCreateModal } from './components/CategoryBulkCreateModal';
@@ -35,15 +36,14 @@ interface LocalCategory extends Omit<Category, 'id'> {
   _imageFile?: File | null; // Local image file before upload
 }
 
+const LOCAL_CATEGORIES_KEY = 'menu_setup_pending_categories';
+
 export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const { t } = useTranslation();
   const { state: authState } = useAuth();
   const storeId = (authState.user as any)?.store?.id;
 
-  // Load existing categories from DB
   const { categories: existingCategories, loading: loadingExisting } = useCategories({ autoLoad: true });
-
-  // Local state for all categories (existing + new)
   const [localCategories, setLocalCategories] = useState<LocalCategory[]>([]);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
@@ -57,23 +57,62 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync existing categories from DB to local state (only once on mount)
   useEffect(() => {
-    if (existingCategories.length > 0 && localCategories.length === 0) {
-      setLocalCategories(
-        existingCategories.map((cat) => ({
+    if (existingCategories.length > 0) {
+      try {
+        const stored = localStorage.getItem(LOCAL_CATEGORIES_KEY);
+        const pendingCategories = stored ? (JSON.parse(stored) as LocalCategory[]) : [];
+
+        const dbCategories = existingCategories.map((cat) => ({
           ...cat,
-          _originalData: cat, // Store original for comparison
-        }))
-      );
+          _originalData: cat,
+        }));
+
+        const mergedCategories = [...dbCategories];
+
+        pendingCategories.forEach((pending) => {
+          if (pending._isNew) {
+            mergedCategories.push(pending);
+          } else if (pending._isModified || pending._isDeleted) {
+            const index = mergedCategories.findIndex((c) => c.id === pending.id);
+            if (index !== -1) {
+              mergedCategories[index] = pending;
+            }
+          }
+        });
+
+        setLocalCategories(mergedCategories);
+      } catch (error) {
+        console.error('Failed to merge categories with localStorage:', error);
+        setLocalCategories(
+          existingCategories.map((cat) => ({
+            ...cat,
+            _originalData: cat,
+          }))
+        );
+      }
     }
   }, [existingCategories]);
 
-  const handleCreateCategory = (data: CreateCategoryData, imageFile?: File | null) => {
-    // Create category in local state only (not DB yet)
+  useEffect(() => {
+    if (localCategories.length > 0) {
+      try {
+        const pendingChanges = localCategories.filter((cat) => cat._isNew || cat._isModified || cat._isDeleted);
+        if (pendingChanges.length > 0) {
+          localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(pendingChanges));
+        } else {
+          localStorage.removeItem(LOCAL_CATEGORIES_KEY);
+        }
+      } catch (error) {
+        console.error('Failed to persist pending categories to localStorage:', error);
+      }
+    }
+  }, [localCategories]);
+
+  const handleCreateCategory = async (data: CreateCategoryData, imageFile?: File | null) => {
     const newCategory: LocalCategory = {
       ...data,
-      id: `temp_${Date.now()}_${Math.random()}`, // Temporary ID
+      id: `temp_${Date.now()}_${Math.random()}`,
       _isNew: true,
       _imageFile: imageFile || null,
       is_active: true,
@@ -83,18 +122,25 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       updated_at: new Date().toISOString(),
     };
 
+    if (imageFile) {
+      await imageCache.set(newCategory.id, imageFile);
+    }
+
     setLocalCategories((prev) => [...prev, newCategory]);
     toast.success(t('menuSetup.categoryAddedLocally'));
     setShowCategoryForm(false);
   };
 
-  const handleUpdateCategory = (data: UpdateCategoryData, imageFile?: File | null) => {
+  const handleUpdateCategory = async (data: UpdateCategoryData, imageFile?: File | null) => {
     if (!editingCategory) return;
+
+    if (imageFile) {
+      await imageCache.set(editingCategory.id, imageFile);
+    }
 
     setLocalCategories((prev) =>
       prev.map((cat) => {
         if (cat.id === editingCategory.id) {
-          // If it's a new category, just update it
           if (cat._isNew) {
             return {
               ...cat,
@@ -103,7 +149,6 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
               updated_at: new Date().toISOString()
             };
           }
-          // If it's an existing category, mark as modified
           return {
             ...cat,
             ...data,
@@ -202,7 +247,6 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     }
   };
 
-  // Filter out deleted categories from display
   const activeCategories = localCategories.filter((cat) => !cat._isDeleted);
 
   const filteredCategories = activeCategories.filter(
@@ -211,19 +255,16 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       (cat.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
-  // Sync all changes to database and navigate
   const handleContinueToItems = async () => {
     if (activeCategories.length === 0) {
       toast.error(t('menuSetup.pleaseAddCategories'));
       return;
     }
 
-    // Separate categories by operation type
     const toCreate = localCategories.filter((cat) => cat._isNew && !cat._isDeleted);
     const toUpdate = localCategories.filter((cat) => cat._isModified && !cat._isDeleted && !cat._isNew);
     const toDelete = localCategories.filter((cat) => cat._isDeleted && !cat._isNew);
 
-    // If no changes, just navigate
     if (toCreate.length === 0 && toUpdate.length === 0 && toDelete.length === 0) {
       onNext();
       return;
@@ -234,7 +275,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     try {
       let operationCount = 0;
 
-      // STEP 1: Upload images for categories with _imageFile (DEFERRED UPLOAD)
+      // STEP 1: Upload images
       const categoriesToUpload = [...toCreate, ...toUpdate].filter((cat) => cat._imageFile);
 
       if (categoriesToUpload.length > 0) {
@@ -242,16 +283,16 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
 
         try {
           const files = categoriesToUpload.map((cat) => cat._imageFile!);
-          const uploadResult = await ImageUploadService.batchUploadImages(
+          const uploadResult = await storageService.batchUploadImages(
             files,
-            STORAGE_BUCKETS.CATEGORIES,
+            STORAGE_PATHS.CATEGORIES,
             `store_${storeId}`,
+            20,
             (completed, total) => {
               toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
             }
           );
 
-          // Map uploaded URLs back to categories
           uploadResult.successful.forEach((result, index) => {
             const category = categoriesToUpload[index];
             category.image_url = result.url || null;
@@ -268,14 +309,14 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         }
       }
 
-      // STEP 2: Bulk delete categories (OPTIMIZED: Single query instead of N queries)
+      // STEP 2: Delete categories
       if (toDelete.length > 0) {
         const deleteIds = toDelete.map((cat) => cat.id);
         await categoriesAPI.bulkPermanentlyDeleteCategories(deleteIds);
         operationCount += toDelete.length;
       }
 
-      // STEP 3: Bulk update modified categories (OPTIMIZED: Parallel instead of sequential)
+      // STEP 3: Update categories
       if (toUpdate.length > 0) {
         const updates = toUpdate.map((cat) => ({
           id: cat.id,
@@ -292,7 +333,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         operationCount += toUpdate.length;
       }
 
-      // STEP 4: Create new categories (now with image_url)
+      // STEP 4: Create categories
       if (toCreate.length > 0) {
         const categoriesData: CreateCategoryData[] = toCreate.map((cat) => ({
           name: cat.name,
@@ -313,7 +354,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         `${t('menuSetup.saved')} ${operationCount} ${operationCount === 1 ? t('menuSetup.change') : t('menuSetup.changes')}`
       );
 
-      // Navigate to next step
+      localStorage.removeItem(LOCAL_CATEGORIES_KEY);
       onNext();
     } catch (error: any) {
       console.error('Failed to sync categories:', error);
@@ -339,8 +380,9 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
           {t('menuSetup.categoriesManualDescription')}
         </p>
         {pendingChanges > 0 && (
-          <p className="text-sm text-orange-600 dark:text-orange-400 mt-2">
-            💡 {pendingChanges} {t('menuSetup.pendingChanges')}
+          <p className="text-sm text-orange-600 dark:text-orange-400 mt-2 flex items-center gap-1">
+            <ExclamationTriangleIcon className="h-4 w-4" />
+            {pendingChanges} {t('menuSetup.pendingChanges')}
           </p>
         )}
       </div>
@@ -474,7 +516,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
                       onChange={() => toggleCategorySelection(category.id)}
                       className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                     />
-                    <div className="flex-1 relative">
+                    <div className="flex-1">
                       <CategoryCard
                         category={categoryWithPreview as Category}
                         onEdit={(cat) => {
@@ -486,12 +528,8 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
                         }
                         isSubcategory={!!category.parent_id}
                         parentName={parentCategory?.name}
+                        statusBadge={category._isNew ? 'new' : category._isModified ? 'modified' : null}
                       />
-                      {(category._isNew || category._isModified) && (
-                        <span className="absolute top-2 right-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
-                          {category._isNew ? t('menuSetup.new') : t('menuSetup.modified')}
-                        </span>
-                      )}
                     </div>
                   </div>
                 );

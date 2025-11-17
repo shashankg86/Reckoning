@@ -1,9 +1,3 @@
-/**
- * CategoryFormModal Component
- *
- * Modal for creating/editing categories with validation
- */
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { ImageUpload } from '../../../components/ui/ImageUpload';
+import { imageCache } from '../../../lib/storage';
 import type { Category, CreateCategoryData, UpdateCategoryData } from '../../../types/menu';
 
 const categorySchema = z.object({
@@ -55,6 +50,8 @@ export function CategoryFormModal({
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [imageFile, setImageFile] = React.useState<File | null>(null);
+  const [cachedImageUrl, setCachedImageUrl] = React.useState<string | null>(null);
+  const [imageError, setImageError] = React.useState<string | null>(null);
 
   const {
     register,
@@ -73,7 +70,6 @@ export function CategoryFormModal({
     },
   });
 
-  // Filter out current category from parent options (can't be its own parent)
   const parentOptions = availableParentCategories.filter(
     (cat) => cat.id !== category?.id
   );
@@ -81,6 +77,21 @@ export function CategoryFormModal({
   const selectedColor = watch('color');
 
   React.useEffect(() => {
+    const loadCachedImage = async () => {
+      if (category?.id) {
+        const cached = await imageCache.get(category.id);
+        if (cached) {
+          setCachedImageUrl(cached);
+        } else if (category.image_url) {
+          setCachedImageUrl(category.image_url);
+        } else {
+          setCachedImageUrl(null);
+        }
+      } else {
+        setCachedImageUrl(null);
+      }
+    };
+
     if (category) {
       reset({
         name: category.name,
@@ -88,7 +99,7 @@ export function CategoryFormModal({
         color: category.color,
         parent_id: category.parent_id || null,
       });
-      setImageFile(null); // Reset image file when editing
+      loadCachedImage();
     } else {
       reset({
         name: '',
@@ -97,6 +108,7 @@ export function CategoryFormModal({
         parent_id: null,
       });
       setImageFile(null);
+      setCachedImageUrl(null);
     }
   }, [category, reset]);
 
@@ -215,8 +227,9 @@ export function CategoryFormModal({
               {t('catalog.image')} ({t('common.optional')})
             </label>
             <ImageUpload
-              value={imageFile || category?.image_url}
+              value={imageFile || cachedImageUrl}
               onChange={setImageFile}
+              onError={setImageError}
               placeholder={t('menuSetup.uploadImagePlaceholder')}
               maxSizeMB={5}
             />
@@ -236,7 +249,7 @@ export function CategoryFormModal({
             >
               {t('common.cancel')}
             </Button>
-            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            <Button type="submit" className="flex-1" disabled={isSubmitting || imageError !== null}>
               {isSubmitting
                 ? t('common.saving')
                 : category

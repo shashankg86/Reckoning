@@ -217,6 +217,8 @@
     "uploadedImages": "Uploaded {{count}} image(s)",
     "failedToUploadImages": "Failed to upload {{count}} image(s)",
     "imageUploadFailed": "Image upload failed",
+    "imageTooLarge": "Image must be less than 1MB",
+    "invalidImageType": "Invalid file type. Please upload JPEG, PNG, or WebP",
     "uploadImagePlaceholder": "Upload category image (optional)",
     "imageUploadHint": "If no image is uploaded, a colored square will be displayed",
     "uploadItemImagePlaceholder": "Upload item image (optional)",
@@ -369,6 +371,7 @@
   "common": {
     "loading": "Loading...",
     "optional": "Optional",
+    "or": "or",
     "noDataFound": "No data found",
     "tryDifferentSearch": "Try adjusting your search terms",
     "showing": "Showing",

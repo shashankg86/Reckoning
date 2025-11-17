@@ -8,15 +8,17 @@ import {
   TrashIcon,
   PencilIcon,
   ArrowPathIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { CachedImage } from '../../components/ui/CachedImage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useItems } from '../../hooks/useItems';
 import { useCategories } from '../../hooks/useCategories';
 import { itemsAPI } from '../../api/items';
-import { ImageUploadService, STORAGE_BUCKETS } from '../../lib/imageUploadService';
+import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
 import { ItemFormModal } from './components/ItemFormModal';
 import { ItemBulkCreateModal } from './components/ItemBulkCreateModal';
 import type { ItemData } from '../../api/items';
@@ -37,19 +39,19 @@ interface LocalItem extends ItemData {
   _imageFile?: File | null;
 }
 
+const LOCAL_ITEMS_KEY = 'menu_setup_pending_items';
+
 export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const { t } = useTranslation();
   const { state: authState } = useAuth();
   const storeId = (authState.user as any)?.store?.id;
 
-  // Load existing items and categories ONCE (optimized)
   const { items: existingItems, loading: loadingItems } = useItems({ autoLoad: true });
   const { categories, loading: loadingCategories } = useCategories({
     autoLoad: true,
     filter: { is_active: true }
   });
 
-  // Local state for all items
   const [localItems, setLocalItems] = useState<LocalItem[]>([]);
   const [showItemForm, setShowItemForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
@@ -63,19 +65,59 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync existing items from DB to local state (only once)
   useEffect(() => {
-    if (existingItems.length > 0 && localItems.length === 0) {
-      setLocalItems(
-        existingItems.map((item) => ({
+    if (existingItems.length > 0) {
+      try {
+        const stored = localStorage.getItem(LOCAL_ITEMS_KEY);
+        const pendingItems = stored ? (JSON.parse(stored) as LocalItem[]) : [];
+
+        const dbItems = existingItems.map((item) => ({
           ...item,
           _originalData: item,
-        }))
-      );
+        }));
+
+        const mergedItems = [...dbItems];
+
+        pendingItems.forEach((pending) => {
+          if (pending._isNew) {
+            mergedItems.push(pending);
+          } else if (pending._isModified || pending._isDeleted) {
+            const index = mergedItems.findIndex((i) => i.id === pending.id);
+            if (index !== -1) {
+              mergedItems[index] = pending;
+            }
+          }
+        });
+
+        setLocalItems(mergedItems);
+      } catch (error) {
+        console.error('Failed to merge items with localStorage:', error);
+        setLocalItems(
+          existingItems.map((item) => ({
+            ...item,
+            _originalData: item,
+          }))
+        );
+      }
     }
   }, [existingItems]);
 
-  const handleCreateItem = (itemData: ItemData, imageFile?: File | null) => {
+  useEffect(() => {
+    if (localItems.length > 0) {
+      try {
+        const pendingChanges = localItems.filter((item) => item._isNew || item._isModified || item._isDeleted);
+        if (pendingChanges.length > 0) {
+          localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(pendingChanges));
+        } else {
+          localStorage.removeItem(LOCAL_ITEMS_KEY);
+        }
+      } catch (error) {
+        console.error('Failed to persist pending items to localStorage:', error);
+      }
+    }
+  }, [localItems]);
+
+  const handleCreateItem = async (itemData: ItemData, imageFile?: File | null) => {
     const newItem: LocalItem = {
       ...itemData,
       id: `temp_${Date.now()}_${Math.random()}`,
@@ -83,13 +125,21 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
       _imageFile: imageFile || null,
     };
 
+    if (imageFile) {
+      await imageCache.set(newItem.id, imageFile);
+    }
+
     setLocalItems((prev) => [...prev, newItem]);
     toast.success(t('menuSetup.itemAddedLocally'));
     setShowItemForm(false);
   };
 
-  const handleUpdateItem = (itemData: ItemData, imageFile?: File | null) => {
+  const handleUpdateItem = async (itemData: ItemData, imageFile?: File | null) => {
     if (!editingItem) return;
+
+    if (imageFile) {
+      await imageCache.set(editingItem.id, imageFile);
+    }
 
     setLocalItems((prev) =>
       prev.map((item) => {
@@ -227,13 +277,11 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     return category?.color || '#6B7280';
   };
 
-  // Sync all changes to database and navigate
   const handleContinueToReview = async () => {
     const toCreate = localItems.filter((item) => item._isNew && !item._isDeleted);
     const toUpdate = localItems.filter((item) => item._isModified && !item._isDeleted && !item._isNew);
     const toDelete = localItems.filter((item) => item._isDeleted && !item._isNew);
 
-    // If no changes, just navigate
     if (toCreate.length === 0 && toUpdate.length === 0 && toDelete.length === 0) {
       onComplete();
       return;
@@ -244,7 +292,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     try {
       let operationCount = 0;
 
-      // STEP 1: Upload images for items with _imageFile (DEFERRED UPLOAD)
+      // STEP 1: Upload images
       const itemsToUpload = [...toCreate, ...toUpdate].filter((item) => item._imageFile);
 
       if (itemsToUpload.length > 0) {
@@ -252,16 +300,16 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
 
         try {
           const files = itemsToUpload.map((item) => item._imageFile!);
-          const uploadResult = await ImageUploadService.batchUploadImages(
+          const uploadResult = await storageService.batchUploadImages(
             files,
-            STORAGE_BUCKETS.ITEMS,
+            STORAGE_PATHS.ITEMS,
             `store_${storeId}`,
+            20,
             (completed, total) => {
               toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
             }
           );
 
-          // Map uploaded URLs back to items
           uploadResult.successful.forEach((result, index) => {
             const item = itemsToUpload[index];
             item.image_url = result.url || undefined;
@@ -278,14 +326,14 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         }
       }
 
-      // STEP 2: Bulk delete items (OPTIMIZED: Single query instead of N queries)
+      // STEP 2: Delete items
       if (toDelete.length > 0) {
         const deleteIds = toDelete.map((item) => item.id);
         await itemsAPI.bulkDeleteItems(deleteIds);
         operationCount += toDelete.length;
       }
 
-      // STEP 3: Bulk update items (OPTIMIZED: Parallel instead of sequential)
+      // STEP 3: Update items
       if (toUpdate.length > 0) {
         const updates = toUpdate.map((item) => ({
           id: item.id,
@@ -302,7 +350,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         operationCount += toUpdate.length;
       }
 
-      // STEP 4: Create new items (now with image_url - BATCH)
+      // STEP 4: Create items
       if (toCreate.length > 0) {
         const itemsData: ItemData[] = toCreate.map((item) => ({
           name: item.name,
@@ -323,7 +371,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         `${t('menuSetup.saved')} ${operationCount} ${operationCount === 1 ? t('menuSetup.change') : t('menuSetup.changes')}`
       );
 
-      // Navigate to next step
+      localStorage.removeItem(LOCAL_ITEMS_KEY);
       onComplete();
     } catch (error: any) {
       console.error('Failed to sync items:', error);
@@ -348,8 +396,9 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
           Add items to your categories. Changes will be saved when you continue to review.
         </p>
         {pendingChanges > 0 && (
-          <p className="text-sm text-orange-600 dark:text-orange-400 mt-2">
-            💡 {pendingChanges} {t('menuSetup.pendingChanges')}
+          <p className="text-sm text-orange-600 dark:text-orange-400 mt-2 flex items-center gap-1">
+            <ExclamationTriangleIcon className="h-4 w-4" />
+            {pendingChanges} {t('menuSetup.pendingChanges')}
           </p>
         )}
       </div>
@@ -488,11 +537,6 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                 {/* Items in Category */}
                 <div className="space-y-2">
                   {categoryItems.map((item) => {
-                    // Create preview URL for local image file
-                    const itemWithPreview = item._imageFile
-                      ? { ...item, image_url: URL.createObjectURL(item._imageFile) }
-                      : item;
-
                     return (
                       <div key={item.id} className="flex items-center gap-3">
                         <input
@@ -502,10 +546,10 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                           className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                         />
                         <Card className="flex-1 p-4 flex items-center gap-3 hover:shadow-md transition-shadow relative">
-                          {/* Item image or placeholder */}
-                          {itemWithPreview.image_url ? (
-                            <img
-                              src={itemWithPreview.image_url}
+                          {item.image_url || item.id ? (
+                            <CachedImage
+                              cacheId={item.id}
+                              fallbackUrl={item.image_url}
                               alt={item.name}
                               className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
                             />

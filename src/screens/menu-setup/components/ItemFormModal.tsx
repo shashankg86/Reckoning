@@ -1,9 +1,3 @@
-/**
- * ItemFormModal Component
- *
- * Modal for creating/editing items with validation and dynamic metadata support
- */
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { ImageUpload } from '../../../components/ui/ImageUpload';
+import { imageCache } from '../../../lib/storage';
 import type { Category } from '../../../types/menu';
 import type { ItemData } from '../../../api/items';
 
@@ -50,6 +45,8 @@ export function ItemFormModal({
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [imageFile, setImageFile] = React.useState<File | null>(null);
+  const [cachedImageUrl, setCachedImageUrl] = React.useState<string | null>(null);
+  const [imageError, setImageError] = React.useState<string | null>(null);
 
   const {
     register,
@@ -70,6 +67,21 @@ export function ItemFormModal({
   });
 
   React.useEffect(() => {
+    const loadCachedImage = async () => {
+      if (item?.id) {
+        const cached = await imageCache.get(item.id);
+        if (cached) {
+          setCachedImageUrl(cached);
+        } else if (item.image_url) {
+          setCachedImageUrl(item.image_url);
+        } else {
+          setCachedImageUrl(null);
+        }
+      } else {
+        setCachedImageUrl(null);
+      }
+    };
+
     if (item) {
       reset({
         name: item.name,
@@ -80,7 +92,7 @@ export function ItemFormModal({
         stock: item.stock || 0,
         tags: item.tags?.join(', ') || '',
       });
-      setImageFile(null); // Reset image file when editing
+      loadCachedImage();
     } else {
       reset({
         name: '',
@@ -92,6 +104,7 @@ export function ItemFormModal({
         tags: '',
       });
       setImageFile(null);
+      setCachedImageUrl(null);
     }
   }, [item, defaultCategoryId, reset]);
 
@@ -246,8 +259,9 @@ export function ItemFormModal({
               {t('catalog.image')} ({t('common.optional')})
             </label>
             <ImageUpload
-              value={imageFile || item?.image_url}
+              value={imageFile || cachedImageUrl}
               onChange={setImageFile}
+              onError={setImageError}
               placeholder={t('menuSetup.uploadItemImagePlaceholder')}
               maxSizeMB={5}
             />
@@ -267,7 +281,7 @@ export function ItemFormModal({
             >
               {t('common.cancel')}
             </Button>
-            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+            <Button type="submit" className="flex-1" disabled={isSubmitting || imageError !== null}>
               {isSubmitting ? t('common.saving') : item ? t('common.update') : t('common.create')}
             </Button>
           </div>

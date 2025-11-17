@@ -1,12 +1,7 @@
-/**
- * CategoryCard Component
- *
- * Displays a category with edit/delete actions
- */
-
 import React from 'react';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '../../../components/ui/Button';
+import { CachedImage } from '../../../components/ui/CachedImage';
 import type { Category } from '../../../types/menu';
 
 interface CategoryCardProps {
@@ -16,6 +11,7 @@ interface CategoryCardProps {
   isDragging?: boolean;
   isSubcategory?: boolean;
   parentName?: string;
+  statusBadge?: 'new' | 'modified' | null;
 }
 
 export function CategoryCard({
@@ -25,6 +21,7 @@ export function CategoryCard({
   isDragging,
   isSubcategory = false,
   parentName,
+  statusBadge = null,
 }: CategoryCardProps) {
   return (
     <div
@@ -38,10 +35,10 @@ export function CategoryCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-3 flex-1">
-          {/* Category image or color indicator */}
-          {category.image_url ? (
-            <img
-              src={category.image_url}
+          {category.image_url || category.id ? (
+            <CachedImage
+              cacheId={category.id}
+              fallbackUrl={category.image_url}
               alt={category.name}
               className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
             />
@@ -54,15 +51,19 @@ export function CategoryCard({
             </div>
           )}
 
-          {/* Category info */}
           <div className="flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-gray-900 dark:text-white">
                 {category.name}
               </h3>
               {isSubcategory && parentName && (
                 <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
                   Subcategory of {parentName}
+                </span>
+              )}
+              {statusBadge && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+                  {statusBadge === 'new' ? 'New' : 'Modified'}
                 </span>
               )}
             </div>
@@ -77,7 +78,6 @@ export function CategoryCard({
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center space-x-2">
           <Button
             variant="ghost"
