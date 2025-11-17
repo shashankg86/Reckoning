@@ -354,7 +354,13 @@
     "discardAll": "Discard All",
     "allChangesSaved": "All changes saved",
     "bulkAddCategories": "Bulk Add Categories",
-    "bulkAddItems": "Bulk Add Items"
+    "bulkAddItems": "Bulk Add Items",
+    "icon": "Icon",
+    "itemCount": "Item Count",
+    "noCategories": "No categories found",
+    "previous": "Previous",
+    "next": "Next",
+    "showing": "Showing"
   },
   "invoice": {
     "title": "Create Invoice",
