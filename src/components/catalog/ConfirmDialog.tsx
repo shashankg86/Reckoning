@@ -6,7 +6,6 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
-import { Modal } from '../ui/Modal';
 
 export type ConfirmDialogType = 'delete' | 'discard' | 'warning';
 
@@ -75,9 +74,12 @@ export function ConfirmDialog({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="">
-      <div className="space-y-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md p-6">
+        <div className="space-y-4">
         {/* Icon */}
         <div className="flex justify-center">
           {getIcon()}
@@ -115,7 +117,8 @@ export function ConfirmDialog({
             {isLoading ? t('common.saving') : (confirmText || t('common.confirm'))}
           </button>
         </div>
+        </div>
       </div>
-    </Modal>
+    </div>
   );
 }

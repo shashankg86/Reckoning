@@ -7,10 +7,8 @@ import {
   PhotoIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
-import { Modal } from '../ui/Modal';
 import type { Category } from '../../types/menu';
-import { processImage } from '../../lib/storage/imageProcessor';
-import { uploadImage } from '../../lib/api/items';
+import { storageService } from '../../lib/storage';
 
 interface CategoryFormData {
   name: string;
@@ -81,14 +79,12 @@ export function BulkAddCategoriesModal({
       // Set uploading state
       handleChange(index, 'imageUploading', true);
 
-      // Process and optimize image
-      const processedBlob = await processImage(file);
-      const processedFile = new File([processedBlob], file.name, {
-        type: 'image/webp'
-      });
-
-      // Upload to storage
-      const imageUrl = await uploadImage(processedFile);
+      // Upload to storage (storageService handles processing internally)
+      const result = await storageService.uploadImage(file, 'categories', 'catalog');
+      if (!result.success) {
+        throw new Error(result.error || 'Upload failed');
+      }
+      const imageUrl = result.url!;
 
       // Update state with image URL
       handleChange(index, 'imageUrl', imageUrl);
@@ -128,9 +124,24 @@ export function BulkAddCategoriesModal({
     onClose();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={t('catalog.bulkAddCategories')}>
-      <div className="space-y-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {t('catalog.bulkAddCategories')}
+          </h2>
+          <button
+            onClick={handleClose}
+            className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
         {/* Instructions */}
         <p className="text-sm text-gray-600 dark:text-gray-400">
           {t('menuSetup.bulkCreateDescription')} (max {MAX_CATEGORIES})
@@ -317,6 +328,7 @@ export function BulkAddCategoriesModal({
           </Button>
         </div>
       </div>
-    </Modal>
+    </div>
+    </div>
   );
 }
