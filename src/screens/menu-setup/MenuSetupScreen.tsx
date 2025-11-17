@@ -12,7 +12,7 @@ import type { MenuSetupStep } from '../../types/menu';
 export function MenuSetupScreen() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { state: authState } = useAuth();
+  const { state: authState, refreshUserProfile } = useAuth();
   const storeId = (authState.user as any)?.store?.id;
 
   const [currentStep, setCurrentStep] = useState<MenuSetupStep>('categories');
@@ -34,6 +34,8 @@ export function MenuSetupScreen() {
         .eq('id', storeId);
 
       if (error) throw error;
+
+      await refreshUserProfile();
 
       toast.success(t('menuSetup.setupCompleted'));
       navigate('/dashboard', { replace: true });
