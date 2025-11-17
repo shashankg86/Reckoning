@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from './AuthContext';
 import type { Theme } from '../types';
@@ -14,9 +14,23 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const { state: authState } = useAuth();
   const { i18n } = useTranslation();
 
-  const theme = (authState.user?.store?.theme as Theme) || 'light';
+  // Initialize theme from localStorage or default to light
+  const [currentTheme, setCurrentTheme] = useState<Theme>(() => {
+    const savedTheme = localStorage.getItem('theme');
+    return (savedTheme as Theme) || 'light';
+  });
+
+  // Use database theme if user is authenticated, otherwise use current theme
+  const theme = (authState.user?.store?.theme as Theme) || currentTheme;
   const language = authState.user?.store?.language || 'en';
   const direction: 'ltr' | 'rtl' = language === 'ar' ? 'rtl' : 'ltr';
+
+  // Update current theme when database theme changes
+  useEffect(() => {
+    if (authState.user?.store?.theme) {
+      setCurrentTheme(authState.user.store.theme as Theme);
+    }
+  }, [authState.user?.store?.theme]);
 
   useEffect(() => {
     const root = document.documentElement;
