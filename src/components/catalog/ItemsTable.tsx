@@ -5,7 +5,7 @@ import {
   TrashIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  PhotoIcon
+  CubeIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import type { Item } from '../../types/menu';
@@ -119,17 +119,22 @@ export function ItemsTable({
                   >
                     {/* Image */}
                     <td className="px-4 py-3">
-                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                        {item.image ? (
+                      {item.image ? (
+                        <div className="w-12 h-12 rounded-lg overflow-hidden">
                           <img
                             src={item.image}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
-                        ) : (
-                          <PhotoIcon className="h-6 w-6 text-gray-400" />
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <div
+                          className="w-12 h-12 rounded-lg flex items-center justify-center"
+                          style={{ backgroundColor: category?.color || '#6B7280' }}
+                        >
+                          <CubeIcon className="h-6 w-6 text-white" />
+                        </div>
+                      )}
                     </td>
 
                     {/* Name */}

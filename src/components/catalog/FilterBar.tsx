@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { Input } from '../ui/Input';
+import { Button } from '../ui/Button';
 import type { Category } from '../../types/menu';
 import type { CatalogFilters } from '../../hooks/useCatalogFilters';
 
@@ -180,6 +181,17 @@ export function FilterBar({ filters, categories, maxPrice, onFilterChange, onRes
                 </select>
               </div>
             </div>
+          </div>
+
+          {/* Apply Filters Button */}
+          <div className="flex justify-end pt-2">
+            <Button
+              onClick={() => setShowAdvanced(false)}
+              className="flex items-center gap-2"
+            >
+              <CheckIcon className="h-4 w-4" />
+              {t('catalog.applyFilters')}
+            </Button>
           </div>
         </div>
       )}

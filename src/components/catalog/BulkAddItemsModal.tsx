@@ -152,7 +152,7 @@ export function BulkAddItemsModal({
         <div className="p-6 space-y-4">
         {/* Instructions */}
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          Add multiple items at once (max {MAX_ITEMS})
+          {t('catalog.bulkAddItemsDescription', { max: MAX_ITEMS })}
         </p>
 
         {/* Item Forms */}
@@ -342,7 +342,7 @@ export function BulkAddItemsModal({
             className="w-full flex items-center justify-center gap-2"
           >
             <PlusIcon className="h-4 w-4" />
-            Add Another Item
+            {t('catalog.addAnotherItem')}
           </Button>
         )}
 
@@ -352,7 +352,9 @@ export function BulkAddItemsModal({
             {t('common.cancel')}
           </Button>
           <Button onClick={handleSubmit} className="flex-1">
-            Add {items.filter(i => i.name.trim() && i.category_id && i.price).length} Items
+            {t('catalog.addItemsCount', {
+              count: items.filter(i => i.name.trim() && i.category_id && i.price).length
+            })}
           </Button>
         </div>
       </div>
