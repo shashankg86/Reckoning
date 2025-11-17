@@ -21,17 +21,10 @@ export function LanguageSelector() {
 
   const handleLanguageChange = async (languageCode: Language) => {
     if (!state.user?.store) return;
-    
-    // Change i18n language
+
     await i18n.changeLanguage(languageCode);
-    
-    // Update store settings
     await updateStoreSettings({ language: languageCode });
-    
-    // Update document direction for RTL support
-    const langData = i18n.getResourceBundle(languageCode, 'translation');
-    document.documentElement.dir = langData?._meta?.direction || 'ltr';
-    
+
     setIsOpen(false);
   };
 
