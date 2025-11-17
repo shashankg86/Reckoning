@@ -1,10 +1,3 @@
-/**
- * MenuSetupScreen Component
- *
- * Main menu setup wizard that guides users through category creation
- * after onboarding. Enterprise-level implementation with step management.
- */
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -24,9 +17,6 @@ export function MenuSetupScreen() {
 
   const [currentStep, setCurrentStep] = useState<MenuSetupStep>('categories');
 
-  /**
-   * Complete the menu setup process
-   */
   const handleComplete = async () => {
     if (!storeId) {
       toast.error('Store not found');
@@ -46,8 +36,6 @@ export function MenuSetupScreen() {
       if (error) throw error;
 
       toast.success(t('menuSetup.setupCompleted'));
-
-      // Navigate to dashboard
       navigate('/dashboard', { replace: true });
     } catch (error: any) {
       console.error('Complete menu setup error:', error);
@@ -56,9 +44,6 @@ export function MenuSetupScreen() {
     }
   };
 
-  /**
-   * Navigate to next step
-   */
   const handleNextStep = () => {
     if (currentStep === 'categories') {
       setCurrentStep('items');
@@ -67,9 +52,6 @@ export function MenuSetupScreen() {
     }
   };
 
-  /**
-   * Navigate to previous step
-   */
   const handlePreviousStep = () => {
     if (currentStep === 'items') {
       setCurrentStep('categories');
@@ -78,9 +60,6 @@ export function MenuSetupScreen() {
     }
   };
 
-  /**
-   * Get progress percentage
-   */
   const getProgress = () => {
     switch (currentStep) {
       case 'categories':
@@ -97,7 +76,6 @@ export function MenuSetupScreen() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -115,7 +93,6 @@ export function MenuSetupScreen() {
           </div>
         </div>
 
-        {/* Step Content */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 sm:p-8">
           {currentStep === 'categories' && (
             <CategorySetupStep onNext={handleNextStep} />
@@ -133,7 +110,6 @@ export function MenuSetupScreen() {
           )}
         </div>
 
-        {/* Help Text */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {t('menuSetup.helpText')}

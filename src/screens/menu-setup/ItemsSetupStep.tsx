@@ -46,14 +46,12 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const { state: authState } = useAuth();
   const storeId = (authState.user as any)?.store?.id;
 
-  // Load existing items and categories ONCE (optimized)
   const { items: existingItems, loading: loadingItems } = useItems({ autoLoad: true });
   const { categories, loading: loadingCategories } = useCategories({
     autoLoad: true,
     filter: { is_active: true }
   });
 
-  // Local state for all items
   const [localItems, setLocalItems] = useState<LocalItem[]>([]);
   const [showItemForm, setShowItemForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
@@ -67,28 +65,23 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load DB items and merge with pending localStorage changes
   useEffect(() => {
     if (existingItems.length > 0) {
       try {
         const stored = localStorage.getItem(LOCAL_ITEMS_KEY);
         const pendingItems = stored ? (JSON.parse(stored) as LocalItem[]) : [];
 
-        // Start with DB items
         const dbItems = existingItems.map((item) => ({
           ...item,
           _originalData: item,
         }));
 
-        // Merge pending changes
         const mergedItems = [...dbItems];
 
         pendingItems.forEach((pending) => {
           if (pending._isNew) {
-            // Add new pending item (not yet in DB)
             mergedItems.push(pending);
           } else if (pending._isModified || pending._isDeleted) {
-            // Update or mark existing item
             const index = mergedItems.findIndex((i) => i.id === pending.id);
             if (index !== -1) {
               mergedItems[index] = pending;
@@ -99,7 +92,6 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         setLocalItems(mergedItems);
       } catch (error) {
         console.error('Failed to merge items with localStorage:', error);
-        // Fallback to DB only
         setLocalItems(
           existingItems.map((item) => ({
             ...item,
@@ -110,13 +102,11 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     }
   }, [existingItems]);
 
-  // Persist ONLY pending items to localStorage whenever they change
   useEffect(() => {
     if (localItems.length > 0) {
       try {
         const pendingChanges = localItems.filter((item) => item._isNew || item._isModified || item._isDeleted);
         if (pendingChanges.length > 0) {
-          // ONLY save pending changes, not all items
           localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(pendingChanges));
         } else {
           localStorage.removeItem(LOCAL_ITEMS_KEY);
@@ -287,13 +277,11 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     return category?.color || '#6B7280';
   };
 
-  // Sync all changes to database and navigate
   const handleContinueToReview = async () => {
     const toCreate = localItems.filter((item) => item._isNew && !item._isDeleted);
     const toUpdate = localItems.filter((item) => item._isModified && !item._isDeleted && !item._isNew);
     const toDelete = localItems.filter((item) => item._isDeleted && !item._isNew);
 
-    // If no changes, just navigate
     if (toCreate.length === 0 && toUpdate.length === 0 && toDelete.length === 0) {
       onComplete();
       return;
@@ -304,7 +292,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
     try {
       let operationCount = 0;
 
-      // STEP 1: Upload images for items with _imageFile (DEFERRED UPLOAD)
+      // STEP 1: Upload images
       const itemsToUpload = [...toCreate, ...toUpdate].filter((item) => item._imageFile);
 
       if (itemsToUpload.length > 0) {
@@ -316,13 +304,12 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
             files,
             STORAGE_PATHS.ITEMS,
             `store_${storeId}`,
-            20, // concurrent limit (2x faster than before)
+            20,
             (completed, total) => {
               toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
             }
           );
 
-          // Map uploaded URLs back to items
           uploadResult.successful.forEach((result, index) => {
             const item = itemsToUpload[index];
             item.image_url = result.url || undefined;
@@ -339,14 +326,14 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         }
       }
 
-      // STEP 2: Bulk delete items (OPTIMIZED: Single query instead of N queries)
+      // STEP 2: Delete items
       if (toDelete.length > 0) {
         const deleteIds = toDelete.map((item) => item.id);
         await itemsAPI.bulkDeleteItems(deleteIds);
         operationCount += toDelete.length;
       }
 
-      // STEP 3: Bulk update items (OPTIMIZED: Parallel instead of sequential)
+      // STEP 3: Update items
       if (toUpdate.length > 0) {
         const updates = toUpdate.map((item) => ({
           id: item.id,
@@ -363,7 +350,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         operationCount += toUpdate.length;
       }
 
-      // STEP 4: Create new items (now with image_url - BATCH)
+      // STEP 4: Create items
       if (toCreate.length > 0) {
         const itemsData: ItemData[] = toCreate.map((item) => ({
           name: item.name,
@@ -384,10 +371,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         `${t('menuSetup.saved')} ${operationCount} ${operationCount === 1 ? t('menuSetup.change') : t('menuSetup.changes')}`
       );
 
-      // Clear localStorage after successful submission
       localStorage.removeItem(LOCAL_ITEMS_KEY);
-
-      // Navigate to next step
       onComplete();
     } catch (error: any) {
       console.error('Failed to sync items:', error);

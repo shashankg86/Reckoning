@@ -1,9 +1,3 @@
-/**
- * ItemFormModal Component
- *
- * Modal for creating/editing items with validation and dynamic metadata support
- */
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';

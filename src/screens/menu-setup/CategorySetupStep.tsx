@@ -43,10 +43,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const { state: authState } = useAuth();
   const storeId = (authState.user as any)?.store?.id;
 
-  // Load existing categories from DB
   const { categories: existingCategories, loading: loadingExisting } = useCategories({ autoLoad: true });
-
-  // Local state for all categories (existing + new)
   const [localCategories, setLocalCategories] = useState<LocalCategory[]>([]);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
@@ -60,28 +57,23 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Load DB categories and merge with pending localStorage changes
   useEffect(() => {
     if (existingCategories.length > 0) {
       try {
         const stored = localStorage.getItem(LOCAL_CATEGORIES_KEY);
         const pendingCategories = stored ? (JSON.parse(stored) as LocalCategory[]) : [];
 
-        // Start with DB categories
         const dbCategories = existingCategories.map((cat) => ({
           ...cat,
           _originalData: cat,
         }));
 
-        // Merge pending changes
         const mergedCategories = [...dbCategories];
 
         pendingCategories.forEach((pending) => {
           if (pending._isNew) {
-            // Add new pending category (not yet in DB)
             mergedCategories.push(pending);
           } else if (pending._isModified || pending._isDeleted) {
-            // Update or mark existing category
             const index = mergedCategories.findIndex((c) => c.id === pending.id);
             if (index !== -1) {
               mergedCategories[index] = pending;
@@ -92,7 +84,6 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         setLocalCategories(mergedCategories);
       } catch (error) {
         console.error('Failed to merge categories with localStorage:', error);
-        // Fallback to DB only
         setLocalCategories(
           existingCategories.map((cat) => ({
             ...cat,
@@ -103,13 +94,11 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     }
   }, [existingCategories]);
 
-  // Persist ONLY pending categories to localStorage whenever they change
   useEffect(() => {
     if (localCategories.length > 0) {
       try {
         const pendingChanges = localCategories.filter((cat) => cat._isNew || cat._isModified || cat._isDeleted);
         if (pendingChanges.length > 0) {
-          // ONLY save pending changes, not all categories
           localStorage.setItem(LOCAL_CATEGORIES_KEY, JSON.stringify(pendingChanges));
         } else {
           localStorage.removeItem(LOCAL_CATEGORIES_KEY);
@@ -258,7 +247,6 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     }
   };
 
-  // Filter out deleted categories from display
   const activeCategories = localCategories.filter((cat) => !cat._isDeleted);
 
   const filteredCategories = activeCategories.filter(
@@ -267,19 +255,16 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       (cat.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
-  // Sync all changes to database and navigate
   const handleContinueToItems = async () => {
     if (activeCategories.length === 0) {
       toast.error(t('menuSetup.pleaseAddCategories'));
       return;
     }
 
-    // Separate categories by operation type
     const toCreate = localCategories.filter((cat) => cat._isNew && !cat._isDeleted);
     const toUpdate = localCategories.filter((cat) => cat._isModified && !cat._isDeleted && !cat._isNew);
     const toDelete = localCategories.filter((cat) => cat._isDeleted && !cat._isNew);
 
-    // If no changes, just navigate
     if (toCreate.length === 0 && toUpdate.length === 0 && toDelete.length === 0) {
       onNext();
       return;
@@ -290,7 +275,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     try {
       let operationCount = 0;
 
-      // STEP 1: Upload images for categories with _imageFile (DEFERRED UPLOAD)
+      // STEP 1: Upload images
       const categoriesToUpload = [...toCreate, ...toUpdate].filter((cat) => cat._imageFile);
 
       if (categoriesToUpload.length > 0) {
@@ -302,13 +287,12 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
             files,
             STORAGE_PATHS.CATEGORIES,
             `store_${storeId}`,
-            20, // concurrent limit (2x faster than before)
+            20,
             (completed, total) => {
               toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
             }
           );
 
-          // Map uploaded URLs back to categories
           uploadResult.successful.forEach((result, index) => {
             const category = categoriesToUpload[index];
             category.image_url = result.url || null;
@@ -325,14 +309,14 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         }
       }
 
-      // STEP 2: Bulk delete categories (OPTIMIZED: Single query instead of N queries)
+      // STEP 2: Delete categories
       if (toDelete.length > 0) {
         const deleteIds = toDelete.map((cat) => cat.id);
         await categoriesAPI.bulkPermanentlyDeleteCategories(deleteIds);
         operationCount += toDelete.length;
       }
 
-      // STEP 3: Bulk update modified categories (OPTIMIZED: Parallel instead of sequential)
+      // STEP 3: Update categories
       if (toUpdate.length > 0) {
         const updates = toUpdate.map((cat) => ({
           id: cat.id,
@@ -349,7 +333,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         operationCount += toUpdate.length;
       }
 
-      // STEP 4: Create new categories (now with image_url)
+      // STEP 4: Create categories
       if (toCreate.length > 0) {
         const categoriesData: CreateCategoryData[] = toCreate.map((cat) => ({
           name: cat.name,
@@ -370,10 +354,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         `${t('menuSetup.saved')} ${operationCount} ${operationCount === 1 ? t('menuSetup.change') : t('menuSetup.changes')}`
       );
 
-      // Clear localStorage after successful submission
       localStorage.removeItem(LOCAL_CATEGORIES_KEY);
-
-      // Navigate to next step
       onNext();
     } catch (error: any) {
       console.error('Failed to sync categories:', error);

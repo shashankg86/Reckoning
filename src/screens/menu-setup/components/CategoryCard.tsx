@@ -1,9 +1,3 @@
-/**
- * CategoryCard Component
- *
- * Displays a category with edit/delete actions
- */
-
 import React from 'react';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '../../../components/ui/Button';
@@ -57,7 +51,6 @@ export function CategoryCard({
             </div>
           )}
 
-          {/* Category info */}
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -85,7 +78,6 @@ export function CategoryCard({
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center space-x-2">
           <Button
             variant="ghost"

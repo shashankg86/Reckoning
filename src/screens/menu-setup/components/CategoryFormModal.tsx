@@ -1,9 +1,3 @@
-/**
- * CategoryFormModal Component
- *
- * Modal for creating/editing categories with validation
- */
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
