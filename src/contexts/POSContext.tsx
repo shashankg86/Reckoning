@@ -89,7 +89,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         id: it.id,
         name: it.name,
         price: parseFloat(it.price),
-        category: it.category,
+        category: typeof it.category === 'string' ? it.category : it.category?.name || 'Uncategorized',
         categoryId: it.category_id,
         stock: it.stock,
         sku: it.sku,
