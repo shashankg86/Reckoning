@@ -311,7 +311,7 @@
     "allCategories": "All Categories",
     "tryDifferentSearch": "Try adjusting your search or filters",
     "validation": {
-      "nameRequired": "Item name is required",
+      "nameRequired": "Category name is required",
       "priceInvalid": "Price must be greater than 0",
       "categoryRequired": "Category is required"
     },

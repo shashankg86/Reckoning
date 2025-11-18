@@ -195,6 +195,9 @@
       "inStock": "متوفر",
       "lowStock": "مخزون منخفض",
       "outOfStock": "نفد المخزون"
+    },
+    "validation": {
+      "nameRequired": "اسم الفئة مطلوب"
     }
   },
   "invoice": {

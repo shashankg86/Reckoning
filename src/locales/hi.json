@@ -135,6 +135,9 @@
       "inStock": "स्टॉक में",
       "lowStock": "कम स्टॉक",
       "outOfStock": "स्टॉक खत्म"
+    },
+    "validation": {
+      "nameRequired": "श्रेणी का नाम आवश्यक है"
     }
   },
   "invoice": {

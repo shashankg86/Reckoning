@@ -247,16 +247,54 @@ export function CatalogScreen() {
     setShowEditCategory(true);
   };
 
-  const handleSaveCategory = (categoryData: any) => {
-    if (editingCategory) {
-      updateCategory({ ...categoryData, id: editingCategory.id });
-      toast.success('Category updated (pending save)');
-    } else {
-      addCategory(categoryData);
-      toast.success('Category added (pending save)');
+  const handleSaveCategory = async (categoryData: any, imageFile?: File | null) => {
+    try {
+      let imageUrl = categoryData.image_url || null;
+
+      // Upload image if provided
+      if (imageFile) {
+        const uploadToast = toast.loading(t('menuSetup.uploadingImages', { count: 1 }));
+
+        try {
+          const uploadResult = await storageService.batchUploadImages(
+            [imageFile],
+            STORAGE_PATHS.CATEGORIES,
+            `store_${storeId}`,
+            1
+          );
+
+          if (uploadResult.successful.length > 0) {
+            imageUrl = uploadResult.successful[0].url;
+            toast.success(t('menuSetup.uploadedImages', { count: 1 }), { id: uploadToast });
+          } else {
+            toast.error(t('menuSetup.imageUploadFailed'), { id: uploadToast });
+          }
+        } catch (error) {
+          toast.error(t('menuSetup.imageUploadFailed'), { id: uploadToast });
+          console.error('Image upload error:', error);
+        }
+      }
+
+      // Save category with image URL
+      const categoryToSave = {
+        ...categoryData,
+        image_url: imageUrl
+      };
+
+      if (editingCategory) {
+        updateCategory({ ...categoryToSave, id: editingCategory.id });
+        toast.success(t('catalog.categoryUpdated'));
+      } else {
+        addCategory(categoryToSave);
+        toast.success(t('catalog.categoryAdded'));
+      }
+
+      setShowEditCategory(false);
+      setEditingCategory(null);
+    } catch (error) {
+      console.error('Save category error:', error);
+      toast.error(t('common.error'));
     }
-    setShowEditCategory(false);
-    setEditingCategory(null);
   };
 
   const handleDeleteCategory = (categoryId: string) => {

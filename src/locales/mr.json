@@ -256,5 +256,10 @@
     "added": "जोडले",
     "change": "बदला",
     "upload": "अपलोड करा"
+  },
+  "catalog": {
+    "validation": {
+      "nameRequired": "श्रेणीचे नाव आवश्यक आहे"
+    }
   }
 }
