@@ -256,7 +256,7 @@
   },
   "menuSetup": {
     "title": "إعداد القائمة",
-    "createCategories": "إنشاء فئات القائمة",
+    "createCategories": "إنشاء {{count}} فئات",
     "categoriesDescription": "نظم قائمتك عن طريق إنشاء الفئات. يمكنك دائماً تعديلها لاحقاً.",
     "addCategory": "إضافة فئة",
     "useDefaultCategories": "استخدام الفئات الافتراضية",
@@ -317,7 +317,6 @@
     "bulkCreateDescription": "أدخل عدة فئات في وقت واحد",
     "addAnotherCategory": "إضافة فئة أخرى",
     "categoriesReady": "الفئات جاهزة",
-    "createCategories": "إنشاء {{count}} فئات",
     "importFromExcel": "استيراد الفئات من Excel/CSV",
     "importFromExcelDescription": "قم بتحميل ملف مع فئاتك",
     "uploadFile": "قم بتحميل ملفك",
@@ -329,7 +328,17 @@
     "previewCategories": "معاينة الفئات",
     "uploadDifferentFile": "تحميل ملف آخر",
     "importCategories": "استيراد {{count}} فئات",
-    "processingFile": "جاري معالجة الملف..."
+    "processingFile": "جاري معالجة الملف...",
+    "nameTooShort": "يجب أن يكون الاسم حرفين على الأقل",
+    "nameTooLong": "الاسم طويل جدًا (50 حرفًا كحد أقصى)",
+    "descriptionTooLong": "الوصف طويل جدًا (500 حرف كحد أقصى)",
+    "descriptionRequired": "الوصف مطلوب",
+    "imageTooLarge": "يجب أن تكون الصورة أقل من 5 ميجابايت",
+    "uploadingImages": "جارٍ تحميل {{count}} صور...",
+    "uploadingProgress": "جارٍ تحميل الصور: {{completed}}/{{total}}",
+    "uploadedImages": "تم تحميل {{count}} صور بنجاح",
+    "failedToUploadImages": "فشل تحميل {{count}} صور",
+    "imageUploadFailed": "فشل تحميل الصورة"
   },
   "common": {
     "loading": "جاري التحميل...",
@@ -366,7 +375,9 @@
     "completing": "جاري الإكمال...",
     "items": "عناصر",
     "cancel": "إلغاء",
-    "create": "إنشاء",
-    "currency": "₹"
+    "currency": "₹",
+    "added": "تمت الإضافة",
+    "change": "تغيير",
+    "upload": "رفع"
   }
 }

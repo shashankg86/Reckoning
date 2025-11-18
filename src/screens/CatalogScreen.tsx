@@ -15,6 +15,7 @@ import { ItemFormModal } from '../components/catalog/ItemFormModal';
 import { useCatalogState } from '../hooks/useCatalogState';
 import { useCatalogFilters } from '../hooks/useCatalogFilters';
 import { useAuth } from '../contexts/AuthContext';
+import { storageService, STORAGE_PATHS } from '../lib/storage';
 import type { Category, Item } from '../types/menu';
 
 type TabView = 'categories' | 'items' | 'fullMenu';
@@ -125,14 +126,120 @@ export function CatalogScreen() {
     }
   };
 
-  const handleBulkAddCategories = (categoriesToAdd: any[]) => {
-    categoriesToAdd.forEach(cat => addCategory(cat));
-    toast.success(`Added ${categoriesToAdd.length} categories to pending changes`);
+  const handleBulkAddCategories = async (categoriesToAdd: any[], imageFiles: (File | null)[]) => {
+    try {
+      // Upload images first
+      const filesToUpload = imageFiles.filter(f => f !== null) as File[];
+      let uploadedUrls: (string | null)[] = Array(imageFiles.length).fill(null);
+
+      if (filesToUpload.length > 0) {
+        const uploadToast = toast.loading(t('menuSetup.uploadingImages', { count: filesToUpload.length }));
+
+        try {
+          const uploadResult = await storageService.batchUploadImages(
+            filesToUpload,
+            STORAGE_PATHS.CATEGORIES,
+            `store_${storeId}`,
+            20,
+            (completed, total) => {
+              toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
+            }
+          );
+
+          // Map uploaded URLs back to original positions
+          let uploadedIndex = 0;
+          uploadedUrls = imageFiles.map(file => {
+            if (file !== null) {
+              const result = uploadResult.successful[uploadedIndex];
+              uploadedIndex++;
+              return result?.url || null;
+            }
+            return null;
+          });
+
+          toast.success(t('menuSetup.uploadedImages', { count: uploadResult.totalUploaded }), { id: uploadToast });
+
+          if (uploadResult.totalFailed > 0) {
+            toast.error(t('menuSetup.failedToUploadImages', { count: uploadResult.totalFailed }));
+          }
+        } catch (error) {
+          toast.error(t('menuSetup.imageUploadFailed'), { id: uploadToast });
+          console.error('Image upload error:', error);
+        }
+      }
+
+      // Add categories with uploaded image URLs
+      categoriesToAdd.forEach((cat, index) => {
+        addCategory({
+          ...cat,
+          image_url: uploadedUrls[index] || cat.image_url
+        });
+      });
+
+      toast.success(`${t('common.added')} ${categoriesToAdd.length} ${t('catalog.categories')}`);
+      setShowBulkAddCategories(false);
+    } catch (error) {
+      console.error('Bulk add categories error:', error);
+      toast.error(t('common.error'));
+    }
   };
 
-  const handleBulkAddItems = (itemsToAdd: any[]) => {
-    itemsToAdd.forEach(item => addItem(item));
-    toast.success(`Added ${itemsToAdd.length} items to pending changes`);
+  const handleBulkAddItems = async (itemsToAdd: any[], imageFiles: (File | null)[]) => {
+    try {
+      // Upload images first
+      const filesToUpload = imageFiles.filter(f => f !== null) as File[];
+      let uploadedUrls: (string | null)[] = Array(imageFiles.length).fill(null);
+
+      if (filesToUpload.length > 0) {
+        const uploadToast = toast.loading(t('menuSetup.uploadingImages', { count: filesToUpload.length }));
+
+        try {
+          const uploadResult = await storageService.batchUploadImages(
+            filesToUpload,
+            STORAGE_PATHS.ITEMS,
+            `store_${storeId}`,
+            20,
+            (completed, total) => {
+              toast.loading(t('menuSetup.uploadingProgress', { completed, total }), { id: uploadToast });
+            }
+          );
+
+          // Map uploaded URLs back to original positions
+          let uploadedIndex = 0;
+          uploadedUrls = imageFiles.map(file => {
+            if (file !== null) {
+              const result = uploadResult.successful[uploadedIndex];
+              uploadedIndex++;
+              return result?.url || null;
+            }
+            return null;
+          });
+
+          toast.success(t('menuSetup.uploadedImages', { count: uploadResult.totalUploaded }), { id: uploadToast });
+
+          if (uploadResult.totalFailed > 0) {
+            toast.error(t('menuSetup.failedToUploadImages', { count: uploadResult.totalFailed }));
+          }
+        } catch (error) {
+          toast.error(t('menuSetup.imageUploadFailed'), { id: uploadToast });
+          console.error('Image upload error:', error);
+        }
+      }
+
+      // Add items with uploaded image URLs
+      itemsToAdd.forEach((item, index) => {
+        addItem({
+          ...item,
+          image_url: uploadedUrls[index] || item.image_url
+        });
+      });
+
+      toast.success(`${t('common.added')} ${itemsToAdd.length} ${t('catalog.items')}`);
+      setShowBulkAddItems(false);
+    } catch (error) {
+      console.error('Bulk add items error:', error);
+      toast.error(t('common.error'));
+    }
   };
 
   const handleEditCategory = (category: Category) => {
