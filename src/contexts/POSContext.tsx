@@ -85,7 +85,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       const items = await itemsAPI.getItems(storeId);
-      const formatted: Item[] = items.map((it: any) => ({ id: it.id, name: it.name, price: parseFloat(it.price), category: it.category, stock: it.stock, sku: it.sku, image: it.image_url }));
+      const formatted: Item[] = items.map((it: any) => ({
+        id: it.id,
+        name: it.name,
+        price: parseFloat(it.price),
+        category: typeof it.category === 'string' ? it.category : it.category?.name || 'Uncategorized',
+        categoryId: it.category_id,
+        stock: it.stock,
+        sku: it.sku,
+        image: it.image_url
+      }));
       dispatch({ type: 'SET_ITEMS', payload: formatted });
     } catch (e) {
       console.error('Load items error:', e);
@@ -137,16 +146,47 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const handleAddItem = async (item: Omit<Item, 'id'>) => {
     if (!storeId) { toast.error('No store selected'); return; }
     try {
-      const newItem = await itemsAPI.createItem(storeId, { name: item.name, category: item.category, price: item.price, sku: item.sku, stock: item.stock || 0, image_url: item.image });
-      const formatted: Item = { id: newItem.id, name: newItem.name, price: parseFloat(newItem.price), category: newItem.category, stock: newItem.stock, sku: newItem.sku, image: newItem.image_url };
+      const newItem = await itemsAPI.createItem(storeId, {
+        name: item.name,
+        category: item.category,
+        category_id: (item as any).categoryId,
+        price: item.price,
+        sku: item.sku,
+        stock: item.stock || 0,
+        image_url: item.image
+      });
+      const formatted: Item = {
+        id: newItem.id,
+        name: newItem.name,
+        price: parseFloat(newItem.price),
+        category: newItem.category,
+        categoryId: newItem.category_id,
+        stock: newItem.stock,
+        sku: newItem.sku,
+        image: newItem.image_url
+      };
       dispatch({ type: 'ADD_ITEM', payload: formatted });
       toast.success('Item added to catalog');
     } catch (e) { console.error('Add item error:', e); toast.error('Failed to add item'); }
   };
 
   const handleUpdateItem = async (item: Item) => {
-    try { await itemsAPI.updateItem(item.id, { name: item.name, category: item.category, price: item.price, sku: item.sku, stock: item.stock, image_url: item.image }); dispatch({ type: 'UPDATE_ITEM', payload: item }); toast.success('Item updated successfully'); }
-    catch (e) { console.error('Update item error:', e); toast.error('Failed to update item'); }
+    try {
+      await itemsAPI.updateItem(item.id, {
+        name: item.name,
+        category: item.category,
+        category_id: (item as any).categoryId,
+        price: item.price,
+        sku: item.sku,
+        stock: item.stock,
+        image_url: item.image
+      });
+      dispatch({ type: 'UPDATE_ITEM', payload: item });
+      toast.success('Item updated successfully');
+    } catch (e) {
+      console.error('Update item error:', e);
+      toast.error('Failed to update item');
+    }
   };
 
   const handleAddToCart = (item: Item) => { dispatch({ type: 'ADD_TO_CART', payload: item }); toast.success(`${item.name} added to cart`); };

@@ -1,381 +1,396 @@
-import {
-  CameraIcon,
-  CubeIcon,
-  ListBulletIcon,
-  MagnifyingGlassIcon,
-  PencilIcon,
-  PlusIcon,
-  Squares2X2Icon,
-  TrashIcon
-} from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import { Layout } from '../components/layout/Layout';
-import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { DataTable, Column } from '../components/ui/DataTable';
-import { FAB } from '../components/ui/FAB';
-import { Input } from '../components/ui/Input';
-import { usePOS } from '../contexts/POSContext';
-import type { Item } from '../contexts/POSContext';
+import { FilterBar } from '../components/catalog/FilterBar';
+import { ActionBar } from '../components/catalog/ActionBar';
+import { CategoriesTable } from '../components/catalog/CategoriesTable';
+import { ItemsTable } from '../components/catalog/ItemsTable';
+import { FullMenuView } from '../components/catalog/FullMenuView';
+import { BulkAddCategoriesModal } from '../components/catalog/BulkAddCategoriesModal';
+import { BulkAddItemsModal } from '../components/catalog/BulkAddItemsModal';
+import { ConfirmDialog } from '../components/catalog/ConfirmDialog';
+import { CategoryFormModal } from '../components/catalog/CategoryFormModal';
+import { ItemFormModal } from '../components/catalog/ItemFormModal';
+import { useCatalogState } from '../hooks/useCatalogState';
+import { useCatalogFilters } from '../hooks/useCatalogFilters';
+import { useAuth } from '../contexts/AuthContext';
+import type { Category, Item } from '../types/menu';
+
+type TabView = 'categories' | 'items' | 'fullMenu';
 
 export function CatalogScreen() {
   const { t } = useTranslation();
-  const { state, dispatch } = usePOS();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; itemId: string | null }>({
+  const { state: authState } = useAuth();
+  const storeId = (authState.user as any)?.store?.id;
+
+  // State Management
+  const {
+    categories,
+    items,
+    itemCounts,
+    pendingChanges,
+    loading,
+    saveAll,
+    discardAll,
+    addCategory,
+    updateCategory,
+    deleteCategory,
+    addItem,
+    updateItem,
+    deleteItem,
+    loadData
+  } = useCatalogState(storeId);
+
+  const {
+    filters,
+    updateFilter,
+    resetFilters,
+    filterCategories,
+    filterItems,
+    getMaxPrice
+  } = useCatalogFilters();
+
+  // UI State
+  const [currentTab, setCurrentTab] = useState<TabView>('categories');
+  const [showBulkAddCategories, setShowBulkAddCategories] = useState(false);
+  const [showBulkAddItems, setShowBulkAddItems] = useState(false);
+  const [showEditCategory, setShowEditCategory] = useState(false);
+  const [showEditItem, setShowEditItem] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [selectedCategoryForItem, setSelectedCategoryForItem] = useState<string | undefined>();
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    type: 'delete' | 'discard';
+    target: 'category' | 'item' | 'all';
+    id?: string;
+    name?: string;
+  }>({
     isOpen: false,
-    itemId: null
+    type: 'delete',
+    target: 'all'
   });
 
-  const filteredItems = state.items.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Calculate pending changes count
+  const pendingChangesCount = useMemo(() => {
+    const { categories: catChanges, items: itemChanges } = pendingChanges;
+    return (
+      catChanges.toAdd.length +
+      catChanges.toUpdate.length +
+      catChanges.toDelete.length +
+      itemChanges.toAdd.length +
+      itemChanges.toUpdate.length +
+      itemChanges.toDelete.length
+    );
+  }, [pendingChanges]);
 
+  // Filter and sort data
+  const filteredCategories = useMemo(() => {
+    return filterCategories(categories);
+  }, [categories, filterCategories]);
+
+  const filteredItems = useMemo(() => {
+    return filterItems(items);
+  }, [items, filterItems]);
+
+  const maxPrice = useMemo(() => {
+    return getMaxPrice(items);
+  }, [items, getMaxPrice]);
+
+  // Handlers
+  const handleSaveAll = async () => {
+    try {
+      setIsSaving(true);
+      await saveAll();
+      toast.success(t('catalog.allChangesSaved'));
+    } catch (error) {
+      console.error('Save failed:', error);
+      toast.error('Failed to save changes');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDiscardAll = () => {
+    if (pendingChangesCount > 0) {
+      setConfirmDialog({
+        isOpen: true,
+        type: 'discard',
+        target: 'all'
+      });
+    }
+  };
+
+  const handleBulkAddCategories = (categoriesToAdd: any[]) => {
+    categoriesToAdd.forEach(cat => addCategory(cat));
+    toast.success(`Added ${categoriesToAdd.length} categories to pending changes`);
+  };
+
+  const handleBulkAddItems = (itemsToAdd: any[]) => {
+    itemsToAdd.forEach(item => addItem(item));
+    toast.success(`Added ${itemsToAdd.length} items to pending changes`);
+  };
+
+  const handleEditCategory = (category: Category) => {
+    setEditingCategory(category);
+    setShowEditCategory(true);
+  };
+
+  const handleSaveCategory = (categoryData: any) => {
+    if (editingCategory) {
+      updateCategory({ ...categoryData, id: editingCategory.id });
+      toast.success('Category updated (pending save)');
+    } else {
+      addCategory(categoryData);
+      toast.success('Category added (pending save)');
+    }
+    setShowEditCategory(false);
+    setEditingCategory(null);
+  };
+
+  const handleDeleteCategory = (categoryId: string) => {
+    const category = categories.find(c => c.id === categoryId);
+    setConfirmDialog({
+      isOpen: true,
+      type: 'delete',
+      target: 'category',
+      id: categoryId,
+      name: category?.name
+    });
+  };
+
+  const handleEditItem = (item: Item) => {
+    setEditingItem(item);
+    setShowEditItem(true);
+  };
+
+  const handleSaveItem = (itemData: any) => {
+    if (editingItem) {
+      updateItem({ ...itemData, id: editingItem.id });
+      toast.success('Item updated (pending save)');
+    } else {
+      addItem(itemData);
+      toast.success('Item added (pending save)');
+    }
+    setShowEditItem(false);
+    setEditingItem(null);
+  };
 
   const handleDeleteItem = (itemId: string) => {
-    setDeleteConfirm({ isOpen: true, itemId });
+    const item = items.find(i => i.id === itemId);
+    setConfirmDialog({
+      isOpen: true,
+      type: 'delete',
+      target: 'item',
+      id: itemId,
+      name: item?.name
+    });
   };
 
-  const confirmDelete = () => {
-    if (deleteConfirm.itemId) {
-      dispatch({ type: 'DELETE_ITEM', payload: deleteConfirm.itemId });
+  const handleAddItemToCategory = (categoryId: string) => {
+    setSelectedCategoryForItem(categoryId);
+    setShowBulkAddItems(true);
+  };
+
+  const handleConfirmDialog = async () => {
+    if (confirmDialog.type === 'discard' && confirmDialog.target === 'all') {
+      discardAll();
+      toast.success('All changes discarded');
+    } else if (confirmDialog.type === 'delete') {
+      if (confirmDialog.target === 'category' && confirmDialog.id) {
+        deleteCategory(confirmDialog.id);
+        toast.success('Category deleted (pending save)');
+      } else if (confirmDialog.target === 'item' && confirmDialog.id) {
+        deleteItem(confirmDialog.id);
+        toast.success('Item deleted (pending save)');
+      }
     }
-    setDeleteConfirm({ isOpen: false, itemId: null });
+    setConfirmDialog({ isOpen: false, type: 'delete', target: 'all' });
   };
 
-  const itemColumns: Column<Item>[] = [
-    {
-      key: 'image',
-      title: t('common.image'),
-      render: (_, item) => (
-        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden">
-          {item.image ? (
-            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-          ) : (
-            <CubeIcon className="w-6 h-6 text-gray-400" />
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'name',
-      title: t('catalog.itemName'),
-      sortable: true,
-    },
-    {
-      key: 'category',
-      title: t('catalog.category'),
-      sortable: true,
-    },
-    {
-      key: 'price',
-      title: t('catalog.price'),
-      sortable: true,
-      render: (value) => `${t('common.currency')}${value}`,
-    },
-    {
-      key: 'stock',
-      title: t('catalog.stock'),
-      sortable: true,
-      render: (value, item) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-          (value || 0) === 0 ? 'bg-red-100 text-red-800' :
-          (value || 0) <= 5 ? 'bg-yellow-100 text-yellow-800' :
-          'bg-green-100 text-green-800'
-        }`}>
-          {value || 0} {t('common.units')}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      title: t('common.actions'),
-      render: (_, item) => (
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setEditingItem(item)}
-          >
-            <PencilIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDeleteItem(item.id)}
-            className="text-red-600 hover:text-red-700"
-          >
-            <TrashIcon className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ];
+  const getConfirmDialogContent = () => {
+    if (confirmDialog.type === 'discard') {
+      return {
+        title: t('catalog.discardAll'),
+        message: `Are you sure you want to discard ${pendingChangesCount} pending changes? This action cannot be undone.`,
+        confirmText: t('catalog.discardAll')
+      };
+    } else if (confirmDialog.target === 'category') {
+      return {
+        title: t('catalog.deleteCategory'),
+        message: t('catalog.deleteConfirmationMessage', {
+          type: t('catalog.category').toLowerCase(),
+          name: confirmDialog.name || ''
+        }),
+        confirmText: t('common.delete')
+      };
+    } else {
+      return {
+        title: t('catalog.deleteItem'),
+        message: t('catalog.deleteConfirmationMessage', {
+          type: t('catalog.item').toLowerCase(),
+          name: confirmDialog.name || ''
+        }),
+        confirmText: t('common.delete')
+      };
+    }
+  };
 
-  const EmptyState = () => (
-    <div className="text-center py-12">
-      <div className="mx-auto w-24 h-24 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
-        <CubeIcon className="w-12 h-12 text-gray-400" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {t('catalog.noItemsYet')}
-      </h3>
-      <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-        {t('catalog.startBuilding')}
-      </p>
-      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-        <Button onClick={() => setShowAddModal(true)}>
-          <PlusIcon className="w-4 h-4 mr-2" />
-          {t('catalog.addItem')}
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => dispatch({ type: 'SET_CURRENT_SCREEN', payload: 'ocr' })}
-        >
-          <CameraIcon className="w-4 h-4 mr-2" />
-          {t('catalog.importFromPhoto')}
-        </Button>
-      </div>
-    </div>
-  );
+  const confirmContent = getConfirmDialogContent();
 
   return (
     <Layout title={t('catalog.title')}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Search and Filter Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex-1 relative">
-            <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <Input
-              placeholder={t('catalog.searchItems')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant={viewMode === 'grid' ? 'primary' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Filter Bar */}
+        <FilterBar
+          filters={filters}
+          categories={categories}
+          maxPrice={maxPrice}
+          onFilterChange={updateFilter}
+          onReset={resetFilters}
+        />
+
+        {/* Action Bar */}
+        <ActionBar
+          hasUnsavedChanges={pendingChangesCount > 0}
+          changeCount={pendingChangesCount}
+          onSaveAll={handleSaveAll}
+          onDiscardAll={handleDiscardAll}
+          onBulkAddCategories={() => setShowBulkAddCategories(true)}
+          onBulkAddItems={() => {
+            setSelectedCategoryForItem(undefined);
+            setShowBulkAddItems(true);
+          }}
+          isSaving={isSaving}
+        />
+
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setCurrentTab('categories')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                currentTab === 'categories'
+                  ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
             >
-              <Squares2X2Icon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'primary' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('list')}
+              {t('catalog.categories')}
+            </button>
+            <button
+              onClick={() => setCurrentTab('items')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                currentTab === 'items'
+                  ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
             >
-              <ListBulletIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'table' ? 'primary' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('table')}
+              {t('catalog.allItems')}
+            </button>
+            <button
+              onClick={() => setCurrentTab('fullMenu')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                currentTab === 'fullMenu'
+                  ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0V4a1 1 0 011-1h16a1 1 0 011 1v16a1 1 0 01-1 1H4a1 1 0 01-1-1V10z" />
-              </svg>
-            </Button>
-          </div>
+              {t('catalog.fullMenu')}
+            </button>
+          </nav>
         </div>
 
-        {/* Items Display */}
-        {filteredItems.length === 0 ? (
-          <EmptyState />
+        {/* Tab Content */}
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+          </div>
         ) : (
           <>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {filteredItems.length} {t('dashboard.items')}
-              </h2>
-            </div>
-
-            {viewMode === 'table' ? (
-              <DataTable
-                data={filteredItems}
-                columns={itemColumns}
-                searchable={false}
-                emptyMessage={t('catalog.noItemsFound')}
-                emptyIcon={<CubeIcon className="w-16 h-16" />}
-                pageSize={10}
+            {currentTab === 'categories' && (
+              <CategoriesTable
+                categories={filteredCategories}
+                itemCounts={itemCounts}
+                onEdit={handleEditCategory}
+                onDelete={handleDeleteCategory}
               />
-            ) : viewMode === 'grid' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredItems.map((item) => (
-                  <Card key={item.id} hover className="overflow-hidden">
-                    <div className="aspect-square bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <CubeIcon className="h-12 w-12 text-gray-400" />
-                      )}
-                      {/* Stock indicators */}
-                      {item.stock !== undefined && (
-                        <div className="absolute top-2 right-2">
-                          {item.stock === 0 ? (
-                            <span className="bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">
-                              {t('catalog.stockStatus.outOfStock')}
-                            </span>
-                          ) : item.stock <= 5 ? (
-                            <span className="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">
-                              {t('catalog.stockStatus.lowStock')}
-                            </span>
-                          ) : (
-                            <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">
-                              {t('catalog.stockStatus.inStock')}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                        {item.name}
-                      </h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                        {item.category}
-                      </p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-orange-500 dark:text-orange-400">
-                          {t('common.currency')}{item.price}
-                        </span>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingItem(item)}
-                            className="p-2"
-                          >
-                            <PencilIcon className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="p-2 text-red-600 hover:text-red-700"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredItems.map((item) => (
-                  <Card key={item.id} className="p-4">
-                    <div className="flex items-center">
-                      <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                        {item.image ? (
-                          <img
-                            src={item.image}
-                            alt={item.name}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                        ) : (
-                          <CubeIcon className="h-8 w-8 text-gray-400" />
-                        )}
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {item.name}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {item.category}
-                        </p>
-                        <p className="text-lg font-bold text-orange-500 dark:text-orange-400">
-                          {t('common.currency')}{item.price}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setEditingItem(item)}
-                        >
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
+            )}
+
+            {currentTab === 'items' && (
+              <ItemsTable
+                items={filteredItems}
+                categories={categories}
+                onEdit={handleEditItem}
+                onDelete={handleDeleteItem}
+              />
+            )}
+
+            {currentTab === 'fullMenu' && (
+              <FullMenuView
+                categories={filteredCategories}
+                items={items}
+                onEditCategory={handleEditCategory}
+                onDeleteCategory={handleDeleteCategory}
+                onEditItem={handleEditItem}
+                onDeleteItem={handleDeleteItem}
+                onAddItemToCategory={handleAddItemToCategory}
+              />
             )}
           </>
         )}
 
-        {/* Floating Action Button */}
-        <FAB onClick={() => setShowAddModal(true)} icon={<PlusIcon className="h-6 w-6" />} />
+        {/* Modals */}
+        <BulkAddCategoriesModal
+          isOpen={showBulkAddCategories}
+          onClose={() => setShowBulkAddCategories(false)}
+          onBulkAdd={handleBulkAddCategories}
+        />
 
-        {/* Add/Edit Item Modal would go here - simplified for this demo */}
-        {(showAddModal || editingItem) && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                {editingItem
-                  ? t('catalog.editItem')
-                  : t('catalog.addItem')
-                }
-              </h2>
-              <div className="space-y-4">
-                <Input label={t('catalog.itemName')} placeholder={t('catalog.enterItemName')} />
-                <Input label={t('catalog.price')} type="number" placeholder="0" />
-                <Input label={t('catalog.category')} placeholder={t('catalog.enterCategory')} />
-              </div>
-              <div className="flex gap-3 mt-6">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setEditingItem(null);
-                  }}
-                  className="flex-1"
-                >
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  onClick={() => {
-                    // Handle save logic here
-                    setShowAddModal(false);
-                    setEditingItem(null);
-                  }}
-                  className="flex-1"
-                >
-                  {t('catalog.save')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        <BulkAddItemsModal
+          isOpen={showBulkAddItems}
+          onClose={() => {
+            setShowBulkAddItems(false);
+            setSelectedCategoryForItem(undefined);
+          }}
+          categories={categories}
+          onBulkAdd={handleBulkAddItems}
+          preselectedCategoryId={selectedCategoryForItem}
+        />
 
+        <CategoryFormModal
+          isOpen={showEditCategory}
+          onClose={() => {
+            setShowEditCategory(false);
+            setEditingCategory(null);
+          }}
+          onSave={handleSaveCategory}
+          editingCategory={editingCategory}
+        />
+
+        <ItemFormModal
+          isOpen={showEditItem}
+          onClose={() => {
+            setShowEditItem(false);
+            setEditingItem(null);
+          }}
+          onSave={handleSaveItem}
+          editingItem={editingItem}
+          categories={categories}
+        />
+
+        {/* Confirmation Dialog */}
         <ConfirmDialog
-          isOpen={deleteConfirm.isOpen}
-          onClose={() => setDeleteConfirm({ isOpen: false, itemId: null })}
-          onConfirm={confirmDelete}
-          title={t('catalog.confirmDelete')}
-          message={t('catalog.deleteConfirmation')}
-          confirmText={t('catalog.delete')}
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog({ isOpen: false, type: 'delete', target: 'all' })}
+          onConfirm={handleConfirmDialog}
+          title={confirmContent.title}
+          message={confirmContent.message}
+          confirmText={confirmContent.confirmText}
+          type={confirmDialog.type}
         />
       </div>
     </Layout>
