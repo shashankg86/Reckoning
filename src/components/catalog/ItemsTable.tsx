@@ -195,10 +195,10 @@ export function ItemsTable({
 
                     {/* Image */}
                     <td className="px-4 py-3">
-                      {item.image ? (
-                        <div className="w-12 h-12 rounded-lg overflow-hidden">
+                      {item.image_url ? (
+                        <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
                           <img
-                            src={item.image}
+                            src={item.image_url}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -230,13 +230,14 @@ export function ItemsTable({
                     {/* Category */}
                     <td className="px-4 py-3">
                       {category ? (
-                        <span
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white"
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white"
                           style={{ backgroundColor: category.color }}
                         >
-                          <span>{category.icon}</span>
+                          <div
+                            className="w-2 h-2 rounded-full bg-white/30"
+                          />
                           <span>{category.name}</span>
-                        </span>
+                        </div>
                       ) : (
                         <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
                       )}

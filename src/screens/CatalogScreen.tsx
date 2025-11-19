@@ -442,14 +442,16 @@ export function CatalogScreen() {
   return (
     <Layout title={t('catalog.title')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Filter Bar */}
-        <FilterBar
-          filters={filters}
-          categories={categories}
-          maxPrice={maxPrice}
-          onFilterChange={updateFilter}
-          onReset={resetFilters}
-        />
+        {/* Filter Bar - Only show on Items tab */}
+        {currentTab === 'items' && (
+          <FilterBar
+            filters={filters}
+            categories={categories}
+            maxPrice={maxPrice}
+            onFilterChange={updateFilter}
+            onReset={resetFilters}
+          />
+        )}
 
         {/* Action Bar */}
         <ActionBar
@@ -530,7 +532,7 @@ export function CatalogScreen() {
 
             {currentTab === 'fullMenu' && (
               <FullMenuView
-                categories={filteredCategories}
+                categories={categories}
                 items={items}
                 onEditCategory={handleEditCategory}
                 onDeleteCategory={handleDeleteCategory}
