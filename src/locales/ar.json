@@ -351,7 +351,8 @@
     "uploadingProgress": "جارٍ تحميل الصور: {{completed}}/{{total}}",
     "uploadedImages": "تم تحميل {{count}} صور بنجاح",
     "failedToUploadImages": "فشل تحميل {{count}} صور",
-    "imageUploadFailed": "فشل تحميل الصورة"
+    "imageUploadFailed": "فشل تحميل الصورة",
+    "pleaseFixImageErrors": "يرجى إصلاح أخطاء الصورة قبل الإرسال"
   },
   "common": {
     "loading": "جاري التحميل...",

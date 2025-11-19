@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
   XMarkIcon,
   PlusIcon,
@@ -51,6 +52,7 @@ export function BulkAddItemsModal({
     { ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }
   ]);
   const [errors, setErrors] = useState<{ [key: number]: { name?: string; price?: string; category_id?: string; description?: string } }>({});
+  const [imageErrors, setImageErrors] = useState<{ [key: number]: string | null }>({});
 
   const handleAddRow = () => {
     if (items.length < MAX_ITEMS) {
@@ -82,6 +84,13 @@ export function BulkAddItemsModal({
 
   const handleImageChange = (index: number, file: File | null) => {
     handleChange(index, 'imageFile', file);
+  };
+
+  const handleImageError = (index: number, error: string | null) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [index]: error
+    }));
   };
 
   const validateItems = (): boolean => {
@@ -128,6 +137,13 @@ export function BulkAddItemsModal({
       return;
     }
 
+    // Check for image errors
+    const hasImageErrors = Object.values(imageErrors).some(error => error !== null);
+    if (hasImageErrors) {
+      toast.error(t('menuSetup.pleaseFixImageErrors'));
+      return;
+    }
+
     const validItems = items.filter(
       item =>
         item.name.trim() !== '' &&
@@ -163,6 +179,7 @@ export function BulkAddItemsModal({
   const handleClose = () => {
     setItems([{ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }]);
     setErrors({});
+    setImageErrors({});
     onClose();
   };
 
@@ -372,6 +389,7 @@ export function BulkAddItemsModal({
                       <ImageUpload
                         value={item.imageFile}
                         onChange={(file) => handleImageChange(index, file)}
+                        onError={(error) => handleImageError(index, error)}
                         placeholder={t('menuSetup.uploadImagePlaceholder')}
                         maxSizeMB={5}
                       />

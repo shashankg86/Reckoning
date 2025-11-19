@@ -215,7 +215,8 @@
     "uploadingProgress": "प्रतिमा अपलोड होत आहेत: {{completed}}/{{total}}",
     "uploadedImages": "{{count}} प्रतिमा यशस्वीरित्या अपलोड झाल्या",
     "failedToUploadImages": "{{count}} प्रतिमा अपलोड करण्यात अयशस्वी",
-    "imageUploadFailed": "प्रतिमा अपलोड अयशस्वी"
+    "imageUploadFailed": "प्रतिमा अपलोड अयशस्वी",
+    "pleaseFixImageErrors": "कृपया सबमिट करण्यापूर्वी प्रतिमा त्रुटी दुरुस्त करा"
   },
   "common": {
     "loading": "लोड होत आहे...",

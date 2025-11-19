@@ -305,7 +305,8 @@
     "uploadingProgress": "छवियाँ अपलोड हो रही हैं: {{completed}}/{{total}}",
     "uploadedImages": "{{count}} छवियाँ सफलतापूर्वक अपलोड की गईं",
     "failedToUploadImages": "{{count}} छवियाँ अपलोड करने में विफल",
-    "imageUploadFailed": "छवि अपलोड विफल"
+    "imageUploadFailed": "छवि अपलोड विफल",
+    "pleaseFixImageErrors": "कृपया सबमिट करने से पहले छवि त्रुटियों को ठीक करें"
   },
   "common": {
     "loading": "लोड हो रहा है...",

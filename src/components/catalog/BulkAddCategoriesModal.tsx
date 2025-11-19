@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import {
   XMarkIcon,
   PlusIcon,
@@ -44,6 +45,7 @@ export function BulkAddCategoriesModal({
   const { t } = useTranslation();
   const [categories, setCategories] = useState<CategoryFormData[]>([{ ...DEFAULT_CATEGORY }]);
   const [errors, setErrors] = useState<{ [key: number]: { name?: string; description?: string } }>({});
+  const [imageErrors, setImageErrors] = useState<{ [key: number]: string | null }>({});
 
   const handleAddRow = () => {
     if (categories.length < MAX_CATEGORIES) {
@@ -75,6 +77,13 @@ export function BulkAddCategoriesModal({
 
   const handleImageChange = (index: number, file: File | null) => {
     handleChange(index, 'imageFile', file);
+  };
+
+  const handleImageError = (index: number, error: string | null) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [index]: error
+    }));
   };
 
   const validateCategories = (): boolean => {
@@ -109,6 +118,13 @@ export function BulkAddCategoriesModal({
       return;
     }
 
+    // Check for image errors
+    const hasImageErrors = Object.values(imageErrors).some(error => error !== null);
+    if (hasImageErrors) {
+      toast.error(t('menuSetup.pleaseFixImageErrors'));
+      return;
+    }
+
     const validCategories = categories.filter(cat => cat.name.trim() !== '');
 
     if (validCategories.length === 0) {
@@ -134,6 +150,7 @@ export function BulkAddCategoriesModal({
   const handleClose = () => {
     setCategories([{ ...DEFAULT_CATEGORY }]);
     setErrors({});
+    setImageErrors({});
     onClose();
   };
 
@@ -279,6 +296,7 @@ export function BulkAddCategoriesModal({
                     <ImageUpload
                       value={category.imageFile}
                       onChange={(file) => handleImageChange(index, file)}
+                      onError={(error) => handleImageError(index, error)}
                       placeholder={t('menuSetup.uploadImagePlaceholder')}
                       maxSizeMB={5}
                     />
