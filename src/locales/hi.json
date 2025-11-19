@@ -148,7 +148,8 @@
     "categoriesDeleted": "{{count}} श्रेणियाँ सफलतापूर्वक हटाई गईं",
     "itemsDeleted": "{{count}} आइटम सफलतापूर्वक हटाए गए",
     "itemDeleted": "आइटम सफलतापूर्वक हटाया गया",
-    "allChangesDiscarded": "सभी परिवर्तन रद्द किए गए"
+    "allChangesDiscarded": "सभी परिवर्तन रद्द किए गए",
+    "image": "छवि"
   },
   "invoice": {
     "title": "बिल बनाएं",

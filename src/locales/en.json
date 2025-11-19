@@ -381,7 +381,8 @@
     "categoriesDeleted": "{{count}} categories deleted successfully",
     "itemsDeleted": "{{count}} items deleted successfully",
     "itemDeleted": "Item deleted successfully",
-    "allChangesDiscarded": "All changes discarded"
+    "allChangesDiscarded": "All changes discarded",
+    "image": "Image"
   },
   "invoice": {
     "title": "Create Invoice",

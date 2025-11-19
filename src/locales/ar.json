@@ -208,7 +208,8 @@
     "categoriesDeleted": "تم حذف {{count}} فئات بنجاح",
     "itemsDeleted": "تم حذف {{count}} عناصر بنجاح",
     "itemDeleted": "تم حذف العنصر بنجاح",
-    "allChangesDiscarded": "تم تجاهل جميع التغييرات"
+    "allChangesDiscarded": "تم تجاهل جميع التغييرات",
+    "image": "صورة"
   },
   "invoice": {
     "title": "إنشاء فاتورة",

@@ -276,6 +276,7 @@
     "categoriesDeleted": "{{count}} श्रेणी यशस्वीरित्या हटवल्या",
     "itemsDeleted": "{{count}} आयटम यशस्वीरित्या हटवले",
     "itemDeleted": "आयटम यशस्वीरित्या हटवला",
-    "allChangesDiscarded": "सर्व बदल रद्द केले"
+    "allChangesDiscarded": "सर्व बदल रद्द केले",
+    "image": "प्रतिमा"
   }
 }
