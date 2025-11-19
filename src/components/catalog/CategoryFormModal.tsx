@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { ImageUpload } from '../ui/ImageUpload';
 import type { Category, CreateCategoryData, UpdateCategoryData } from '../../types/menu';
+
+interface CategoryFormData {
+  name: string;
+  description: string;
+  color: string;
+}
 
 interface CategoryFormModalProps {
   isOpen: boolean;
@@ -26,81 +33,46 @@ const PREDEFINED_COLORS = [
 
 export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: CategoryFormModalProps) {
   const { t } = useTranslation();
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    color: '#FF6B35',
-  });
-  const [originalData, setOriginalData] = useState({
-    name: '',
-    description: '',
-    color: '#FF6B35',
+  const { register, handleSubmit: handleFormSubmit, formState: { errors, isDirty }, reset, watch, setValue } = useForm<CategoryFormData>({
+    defaultValues: {
+      name: '',
+      description: '',
+      color: '#FF6B35',
+    },
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (editingCategory) {
-      const initialData = {
-        name: editingCategory.name || '',
-        description: editingCategory.description || '',
-        color: editingCategory.color || '#FF6B35',
-      };
-      setFormData(initialData);
-      setOriginalData(initialData);
+    if (isOpen) {
+      if (editingCategory) {
+        reset({
+          name: editingCategory.name || '',
+          description: editingCategory.description || '',
+          color: editingCategory.color || '#FF6B35',
+        });
+      } else {
+        reset({
+          name: '',
+          description: '',
+          color: '#FF6B35',
+        });
+      }
       setImageFile(null);
-    } else {
-      setFormData({
-        name: '',
-        description: '',
-        color: '#FF6B35',
-      });
-      setOriginalData({
-        name: '',
-        description: '',
-        color: '#FF6B35',
-      });
-      setImageFile(null);
+      setImageError(null);
     }
-    setErrors({});
-    setImageError(null);
-  }, [editingCategory, isOpen]);
+  }, [editingCategory, isOpen, reset]);
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = t('catalog.validation.nameRequired');
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = t('menuSetup.nameTooShort');
-    } else if (formData.name.trim().length > 50) {
-      newErrors.name = t('menuSetup.nameTooLong');
-    }
-
-    if (formData.description && formData.description.length > 200) {
-      newErrors.description = t('menuSetup.descriptionTooLong');
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validate() || imageError) {
-      return;
-    }
+  const onSubmit = async (data: CategoryFormData) => {
+    if (imageError) return;
 
     setIsSubmitting(true);
     try {
       const categoryData: any = {
-        name: formData.name.trim(),
-        description: formData.description.trim() || '',
-        color: formData.color,
-        // NO icon field
+        name: data.name.trim(),
+        description: data.description.trim() || '',
+        color: data.color,
       };
 
       if (editingCategory) {
@@ -116,16 +88,8 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
     }
   };
 
-  // Check if form has changed
-  const hasFormChanged = editingCategory
-    ? formData.name.trim() !== originalData.name.trim() ||
-      formData.description.trim() !== originalData.description.trim() ||
-      formData.color !== originalData.color ||
-      imageFile !== null
-    : formData.name.trim() !== '' ||
-      formData.description.trim() !== '' ||
-      formData.color !== '#FF6B35' ||
-      imageFile !== null;
+  const hasFormChanged = isDirty || imageFile !== null;
+  const colorValue = watch('color');
 
   if (!isOpen) return null;
 
@@ -146,15 +110,25 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="p-6 space-y-4">
           {/* Category Name */}
-          <Input
-            label={t('menuSetup.categoryName')}
-            placeholder={t('menuSetup.enterCategoryName')}
-            error={errors.name}
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('menuSetup.categoryName')}
+            </label>
+            <input
+              {...register('name', {
+                required: t('catalog.validation.nameRequired'),
+                minLength: { value: 2, message: t('menuSetup.nameTooShort') },
+                maxLength: { value: 50, message: t('menuSetup.nameTooLong') },
+              })}
+              placeholder={t('menuSetup.enterCategoryName')}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name.message}</p>
+            )}
+          </div>
 
           {/* Description */}
           <div>
@@ -162,15 +136,16 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
               {t('menuSetup.categoryDescription')} ({t('common.optional')})
             </label>
             <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              {...register('description', {
+                maxLength: { value: 200, message: t('menuSetup.descriptionTooLong') },
+              })}
               placeholder={t('menuSetup.enterCategoryDescription')}
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
             {errors.description && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                {errors.description}
+                {errors.description.message}
               </p>
             )}
           </div>
@@ -185,9 +160,9 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
                 <button
                   key={color}
                   type="button"
-                  onClick={() => setFormData({ ...formData, color })}
+                  onClick={() => setValue('color', color, { shouldDirty: true })}
                   className={`w-8 h-8 rounded-full border-2 transition-all ${
-                    formData.color === color
+                    colorValue === color
                       ? 'border-gray-900 dark:border-white scale-110'
                       : 'border-transparent'
                   }`}
@@ -195,11 +170,11 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
                 />
               ))}
             </div>
-            <Input
+            <input
+              {...register('color')}
               type="text"
               placeholder="#FF6B35"
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
 
