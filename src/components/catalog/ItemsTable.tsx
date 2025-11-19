@@ -115,15 +115,13 @@ export function ItemsTable({
           <span className="text-sm font-medium text-orange-900 dark:text-orange-100">
             {selectedIds.size} {t('catalog.itemsSelected')}
           </span>
-          <Button
-            variant="secondary"
-            size="sm"
+          <button
             onClick={handleBulkDelete}
-            className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
           >
-            <TrashIcon className="h-4 w-4 mr-2" />
+            <TrashIcon className="h-4 w-4" />
             {t('catalog.deleteSelected')}
-          </Button>
+          </button>
         </div>
       )}
 
