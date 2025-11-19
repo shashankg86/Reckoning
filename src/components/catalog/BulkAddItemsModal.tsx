@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm, useFieldArray } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import {
   XMarkIcon,
@@ -18,6 +19,10 @@ interface ItemFormData {
   stock: string;
   description: string;
   imageFile?: File | null;
+}
+
+interface BulkItemsFormData {
+  items: ItemFormData[];
 }
 
 interface BulkAddItemsModalProps {
@@ -48,42 +53,41 @@ export function BulkAddItemsModal({
   preselectedCategoryId
 }: BulkAddItemsModalProps) {
   const { t } = useTranslation();
-  const [items, setItems] = useState<ItemFormData[]>([
-    { ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }
-  ]);
-  const [errors, setErrors] = useState<{ [key: number]: { name?: string; price?: string; category_id?: string; description?: string } }>({});
+  const { control, register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<BulkItemsFormData>({
+    defaultValues: {
+      items: [{ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }],
+    },
+  });
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'items',
+  });
   const [imageErrors, setImageErrors] = useState<{ [key: number]: string | null }>({});
 
+  useEffect(() => {
+    if (!isOpen) {
+      reset({ items: [{ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }] });
+      setImageErrors({});
+    }
+  }, [isOpen, preselectedCategoryId, reset]);
+
   const handleAddRow = () => {
-    if (items.length < MAX_ITEMS) {
-      setItems([...items, { ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }]);
+    if (fields.length < MAX_ITEMS) {
+      append({ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' });
     }
   };
 
   const handleRemoveRow = (index: number) => {
-    if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
-      const newErrors = { ...errors };
-      delete newErrors[index];
-      setErrors(newErrors);
-    }
-  };
-
-  const handleChange = (index: number, field: keyof ItemFormData, value: any) => {
-    const updated = [...items];
-    updated[index] = { ...updated[index], [field]: value };
-    setItems(updated);
-
-    // Clear error for this field
-    if (errors[index]) {
-      const newErrors = { ...errors };
-      delete newErrors[index]?.[field as 'name' | 'price' | 'category_id' | 'description'];
-      setErrors(newErrors);
+    if (fields.length > 1) {
+      remove(index);
+      const newImageErrors = { ...imageErrors };
+      delete newImageErrors[index];
+      setImageErrors(newImageErrors);
     }
   };
 
   const handleImageChange = (index: number, file: File | null) => {
-    handleChange(index, 'imageFile', file);
+    setValue(`items.${index}.imageFile`, file, { shouldValidate: true });
   };
 
   const handleImageError = (index: number, error: string | null) => {
@@ -93,50 +97,7 @@ export function BulkAddItemsModal({
     }));
   };
 
-  const validateItems = (): boolean => {
-    const newErrors: { [key: number]: { name?: string; price?: string; category_id?: string; description?: string } } = {};
-    let hasErrors = false;
-
-    items.forEach((item, index) => {
-      if (item.name.trim()) {
-        // Only validate if name is provided
-        if (item.name.trim().length < 1) {
-          newErrors[index] = { ...newErrors[index], name: t('catalog.validation.nameRequired') };
-          hasErrors = true;
-        }
-        if (item.name.trim().length > 200) {
-          newErrors[index] = { ...newErrors[index], name: t('menuSetup.nameTooLong') };
-          hasErrors = true;
-        }
-        if (!item.category_id || item.category_id === '') {
-          newErrors[index] = { ...newErrors[index], category_id: t('catalog.validation.categoryRequired') };
-          hasErrors = true;
-        }
-        if (!item.price || parseFloat(item.price) <= 0) {
-          newErrors[index] = { ...newErrors[index], price: t('catalog.validation.priceInvalid') };
-          hasErrors = true;
-        }
-        if (!item.description || item.description.trim().length === 0) {
-          newErrors[index] = { ...newErrors[index], description: t('menuSetup.descriptionRequired') };
-          hasErrors = true;
-        }
-        if (item.description && item.description.length > 500) {
-          newErrors[index] = { ...newErrors[index], description: t('menuSetup.descriptionTooLong') };
-          hasErrors = true;
-        }
-      }
-    });
-
-    setErrors(newErrors);
-    return !hasErrors;
-  };
-
-  const handleSubmit = () => {
-    // Validate
-    if (!validateItems()) {
-      return;
-    }
-
+  const onSubmit = (data: BulkItemsFormData) => {
     // Check for image errors
     const hasImageErrors = Object.values(imageErrors).some(error => error !== null);
     if (hasImageErrors) {
@@ -144,7 +105,7 @@ export function BulkAddItemsModal({
       return;
     }
 
-    const validItems = items.filter(
+    const validItems = data.items.filter(
       item =>
         item.name.trim() !== '' &&
         item.category_id !== '' &&
@@ -173,19 +134,13 @@ export function BulkAddItemsModal({
     const imageFiles = validItems.map(item => item.imageFile || null);
 
     onBulkAdd(itemsToAdd, imageFiles);
-    handleClose();
-  };
-
-  const handleClose = () => {
-    setItems([{ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }]);
-    setErrors({});
-    setImageErrors({});
     onClose();
   };
 
   if (!isOpen) return null;
 
-  const validCount = items.filter(i => i.name.trim() && i.category_id && i.price && parseFloat(i.price) > 0 && i.description.trim()).length;
+  const watchedItems = watch('items');
+  const validCount = watchedItems.filter(i => i.name?.trim() && i.category_id && i.price && parseFloat(i.price) > 0 && i.description?.trim()).length;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -201,7 +156,7 @@ export function BulkAddItemsModal({
             </p>
           </div>
           <button
-            onClick={handleClose}
+            onClick={onClose}
             className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
           >
             <XMarkIcon className="h-5 w-5" />
@@ -209,228 +164,224 @@ export function BulkAddItemsModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-6">
           <div className="space-y-4">
-            {items.map((item, index) => {
-              const selectedCategory = categories.find(cat => cat.id === item.category_id);
+            {fields.map((field, index) => (
+              <div
+                key={field.id}
+                className="p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 space-y-4"
+              >
+                {/* Header with number and delete */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 bg-orange-500 text-white rounded-full font-semibold text-sm">
+                      {index + 1}
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                      {watch(`items.${index}.name`) || t('catalog.itemName')}
+                    </h3>
+                  </div>
+                  {fields.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(index)}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      title={t('common.remove')}
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
 
-              return (
-                <div
-                  key={index}
-                  className="p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 space-y-4"
-                >
-                  {/* Header with number and delete */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-8 h-8 bg-orange-500 text-white rounded-full font-semibold text-sm">
-                        {index + 1}
-                      </div>
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                        {item.name || t('catalog.itemName')}
-                      </h3>
-                      {selectedCategory && (
-                        <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                          style={{ backgroundColor: selectedCategory.color }}
-                        >
-                          {selectedCategory.icon} {selectedCategory.name}
-                        </span>
+                {/* Form Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Left Column */}
+                  <div className="space-y-4">
+                    {/* Item Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('catalog.itemName')} *
+                      </label>
+                      <input
+                        {...register(`items.${index}.name`, {
+                          required: t('catalog.validation.nameRequired'),
+                          maxLength: { value: 200, message: t('menuSetup.nameTooLong') },
+                        })}
+                        type="text"
+                        placeholder={t('catalog.enterItemName')}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                          errors.items?.[index]?.name
+                            ? 'border-red-500 dark:border-red-400'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      />
+                      {errors.items?.[index]?.name && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {errors.items[index]?.name?.message}
+                        </p>
                       )}
                     </div>
-                    {items.length > 1 && (
-                      <button
-                        onClick={() => handleRemoveRow(index)}
-                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                        title={t('common.remove')}
-                      >
-                        <TrashIcon className="h-5 w-5" />
-                      </button>
-                    )}
-                  </div>
 
-                  {/* Form Fields */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Left Column */}
-                    <div className="space-y-4">
-                      {/* Item Name */}
+                    {/* Category */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('catalog.category')} *
+                      </label>
+                      <select
+                        {...register(`items.${index}.category_id`, {
+                          required: t('catalog.validation.categoryRequired'),
+                        })}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                          errors.items?.[index]?.category_id
+                            ? 'border-red-500 dark:border-red-400'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      >
+                        <option value="">{t('catalog.selectCategory')}</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.items?.[index]?.category_id && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {errors.items[index]?.category_id?.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Price & Stock */}
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          {t('catalog.itemName')} *
+                          {t('catalog.price')} *
                         </label>
                         <input
-                          type="text"
-                          value={item.name}
-                          onChange={(e) => handleChange(index, 'name', e.target.value)}
-                          placeholder={t('catalog.enterItemName')}
+                          {...register(`items.${index}.price`, {
+                            required: t('catalog.validation.priceInvalid'),
+                            validate: (value) => parseFloat(value) > 0 || t('catalog.validation.priceInvalid'),
+                          })}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
                           className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                            errors[index]?.name
+                            errors.items?.[index]?.price
                               ? 'border-red-500 dark:border-red-400'
                               : 'border-gray-300 dark:border-gray-600'
                           }`}
                         />
-                        {errors[index]?.name && (
+                        {errors.items?.[index]?.price && (
                           <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                            {errors[index].name}
+                            {errors.items[index]?.price?.message}
                           </p>
                         )}
                       </div>
-
-                      {/* Category */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          {t('catalog.category')} *
+                          {t('catalog.stock')}
                         </label>
-                        <select
-                          value={item.category_id}
-                          onChange={(e) => handleChange(index, 'category_id', e.target.value)}
-                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                            errors[index]?.category_id
-                              ? 'border-red-500 dark:border-red-400'
-                              : 'border-gray-300 dark:border-gray-600'
-                          }`}
-                        >
-                          <option value="">{t('menuSetup.selectCategory')}</option>
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.id}>
-                              {category.icon} {category.name}
-                            </option>
-                          ))}
-                        </select>
-                        {errors[index]?.category_id && (
-                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                            {errors[index].category_id}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Description */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          {t('catalog.description')} *
-                        </label>
-                        <textarea
-                          value={item.description}
-                          onChange={(e) => handleChange(index, 'description', e.target.value)}
-                          placeholder={t('catalog.enterDescription')}
-                          rows={3}
-                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                            errors[index]?.description
-                              ? 'border-red-500 dark:border-red-400'
-                              : 'border-gray-300 dark:border-gray-600'
-                          }`}
+                        <input
+                          {...register(`items.${index}.stock`)}
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
                         />
-                        {errors[index]?.description && (
-                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                            {errors[index].description}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Price, SKU, Stock */}
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            {t('catalog.price')} *
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.price}
-                            onChange={(e) => handleChange(index, 'price', e.target.value)}
-                            placeholder="0.00"
-                            className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                              errors[index]?.price
-                                ? 'border-red-500 dark:border-red-400'
-                                : 'border-gray-300 dark:border-gray-600'
-                            }`}
-                          />
-                          {errors[index]?.price && (
-                            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                              {errors[index].price}
-                            </p>
-                          )}
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            {t('catalog.stock')}
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={item.stock}
-                            onChange={(e) => handleChange(index, 'stock', e.target.value)}
-                            placeholder="0"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            {t('catalog.sku')}
-                          </label>
-                          <input
-                            type="text"
-                            value={item.sku}
-                            onChange={(e) => handleChange(index, 'sku', e.target.value)}
-                            placeholder={t('catalog.enterSKU')}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                          />
-                        </div>
                       </div>
                     </div>
 
-                    {/* Right Column - Image Upload */}
+                    {/* SKU */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('catalog.sku')} ({t('common.optional')})
+                      </label>
+                      <input
+                        {...register(`items.${index}.sku`)}
+                        type="text"
+                        placeholder={t('catalog.enterSKU')}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column */}
+                  <div className="space-y-4">
+                    {/* Description */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('menuSetup.description')} *
+                      </label>
+                      <textarea
+                        {...register(`items.${index}.description`, {
+                          required: t('menuSetup.descriptionRequired'),
+                          maxLength: { value: 500, message: t('menuSetup.descriptionTooLong') },
+                        })}
+                        placeholder={t('menuSetup.itemDescriptionPlaceholder')}
+                        rows={4}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                          errors.items?.[index]?.description
+                            ? 'border-red-500 dark:border-red-400'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      />
+                      {errors.items?.[index]?.description && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {errors.items[index]?.description?.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Image Upload */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         {t('catalog.image')} ({t('common.optional')})
                       </label>
                       <ImageUpload
-                        value={item.imageFile}
+                        value={watch(`items.${index}.imageFile`)}
                         onChange={(file) => handleImageChange(index, file)}
                         onError={(error) => handleImageError(index, error)}
-                        placeholder={t('menuSetup.uploadImagePlaceholder')}
+                        placeholder={t('menuSetup.uploadItemImagePlaceholder')}
                         maxSizeMB={5}
                       />
                       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        {t('menuSetup.imageUploadHint')}
+                        {t('menuSetup.itemImageUploadHint')}
                       </p>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
 
             {/* Add Another Button */}
-            {items.length < MAX_ITEMS && (
+            {fields.length < MAX_ITEMS && (
               <button
+                type="button"
                 onClick={handleAddRow}
                 className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-orange-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors flex items-center justify-center gap-2"
               >
                 <PlusIcon className="h-5 w-5" />
-                {t('catalog.addAnotherItem')}
+                {t('menuSetup.addAnotherItem')}
               </button>
             )}
           </div>
-        </div>
 
-        {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            {validCount} {validCount === 1 ? t('catalog.item') : t('catalog.items')} {t('menuSetup.categoriesReady').toLowerCase()}
+          {/* Footer Actions */}
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {validCount} {t('menuSetup.items')}
+            </div>
+            <div className="flex gap-3">
+              <Button type="button" variant="secondary" onClick={onClose}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" disabled={validCount === 0}>
+                {t('catalog.addItemsCount', { count: validCount })}
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-3">
-            <Button variant="secondary" onClick={handleClose}>
-              {t('common.cancel')}
-            </Button>
-            <Button onClick={handleSubmit} disabled={validCount === 0}>
-              {t('catalog.addItemsCount', {
-                count: validCount
-              })}
-            </Button>
-          </div>
-        </div>
+        </form>
       </div>
     </div>
   );
