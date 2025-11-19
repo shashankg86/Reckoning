@@ -226,36 +226,6 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
             />
           </div>
 
-          {/* Image URL */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('catalog.imageURL')}
-            </label>
-            <div className="flex gap-2">
-              <input
-                {...register('image_url')}
-                placeholder={t('catalog.enterImageURL')}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-              {imageValue && (
-                <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 flex-shrink-0">
-                  <img
-                    src={imageValue}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '';
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {t('catalog.imageURLHint')}
-            </p>
-          </div>
-
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -267,6 +237,21 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
               placeholder={t('catalog.enterDescription')}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
             />
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('catalog.image')} {t('common.optional')}
+            </label>
+            <ImageUpload
+              onImageSelect={setImageFile}
+              onError={setImageError}
+              existingImageUrl={editingItem?.image_url || undefined}
+            />
+            {imageError && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{imageError}</p>
+            )}
           </div>
 
           {/* Actions */}
@@ -283,7 +268,7 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
             <Button
               type="submit"
               className="flex-1"
-              disabled={isSubmitting || !isDirty}
+              disabled={isSubmitting || imageError !== null || !hasFormChanged}
             >
               {isSubmitting
                 ? t('common.saving')

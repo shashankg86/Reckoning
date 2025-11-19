@@ -332,16 +332,54 @@ export function CatalogScreen() {
     setShowEditItem(true);
   };
 
-  const handleSaveItem = (itemData: any) => {
-    if (editingItem) {
-      updateItem({ ...itemData, id: editingItem.id });
-      toast.success('Item updated (pending save)');
-    } else {
-      addItem(itemData);
-      toast.success('Item added (pending save)');
+  const handleSaveItem = async (itemData: any, imageFile?: File | null) => {
+    try {
+      let imageUrl = itemData.image_url || null;
+
+      // Upload image if provided
+      if (imageFile) {
+        const uploadToast = toast.loading(t('menuSetup.uploadingImages', { count: 1 }));
+
+        try {
+          const uploadResult = await storageService.batchUploadImages(
+            [imageFile],
+            STORAGE_PATHS.ITEMS,
+            `store_${storeId}`,
+            1
+          );
+
+          if (uploadResult.successful.length > 0) {
+            imageUrl = uploadResult.successful[0].url;
+            toast.success(t('menuSetup.uploadedImages', { count: 1 }), { id: uploadToast });
+          } else {
+            toast.error(t('menuSetup.imageUploadFailed'), { id: uploadToast });
+          }
+        } catch (error) {
+          toast.error(t('menuSetup.imageUploadFailed'), { id: uploadToast });
+          console.error('Image upload error:', error);
+        }
+      }
+
+      // Save item with image URL
+      const itemToSave = {
+        ...itemData,
+        image_url: imageUrl
+      };
+
+      if (editingItem) {
+        updateItem({ ...itemToSave, id: editingItem.id });
+        toast.success('Item updated (pending save)');
+      } else {
+        addItem(itemToSave);
+        toast.success('Item added (pending save)');
+      }
+
+      setShowEditItem(false);
+      setEditingItem(null);
+    } catch (error) {
+      console.error('Save item error:', error);
+      toast.error(t('common.error'));
     }
-    setShowEditItem(false);
-    setEditingItem(null);
   };
 
   const handleDeleteItem = (itemId: string) => {
