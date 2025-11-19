@@ -200,6 +200,8 @@
     "validation": {
       "nameRequired": "اسم الفئة مطلوب"
     },
+    "searchCategories": "البحث في الفئات...",
+    "searchMenu": "بحث في القائمة...",
     "categoriesSelected": "الفئات المحددة",
     "itemsSelected": "العناصر المحددة",
     "deleteSelected": "حذف المحدد",

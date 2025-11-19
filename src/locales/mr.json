@@ -273,6 +273,8 @@
     "validation": {
       "nameRequired": "श्रेणीचे नाव आवश्यक आहे"
     },
+    "searchCategories": "श्रेणी शोधा...",
+    "searchMenu": "मेनू शोधा...",
     "categoriesSelected": "श्रेणी निवडल्या",
     "itemsSelected": "आयटम निवडले",
     "deleteSelected": "निवडलेले हटवा",

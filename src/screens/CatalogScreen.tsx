@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/layout/Layout';
 import { FilterBar } from '../components/catalog/FilterBar';
+import { SearchBar } from '../components/catalog/SearchBar';
 import { ActionBar } from '../components/catalog/ActionBar';
 import { CategoriesTable } from '../components/catalog/CategoriesTable';
 import { ItemsTable } from '../components/catalog/ItemsTable';
@@ -55,6 +56,12 @@ export function CatalogScreen() {
   // UI State
   const [currentTab, setCurrentTab] = useState<TabView>('categories');
   const [showBulkAddCategories, setShowBulkAddCategories] = useState(false);
+
+  // Reset filters when switching tabs
+  const handleTabChange = (tab: TabView) => {
+    setCurrentTab(tab);
+    resetFilters();
+  };
   const [showBulkAddItems, setShowBulkAddItems] = useState(false);
   const [showEditCategory, setShowEditCategory] = useState(false);
   const [showEditItem, setShowEditItem] = useState(false);
@@ -442,7 +449,16 @@ export function CatalogScreen() {
   return (
     <Layout title={t('catalog.title')}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Filter Bar - Only show on Items tab */}
+        {/* Search Bar for Categories Tab */}
+        {currentTab === 'categories' && (
+          <SearchBar
+            value={filters.search}
+            onChange={(value) => updateFilter('search', value)}
+            placeholder={t('catalog.searchCategories')}
+          />
+        )}
+
+        {/* Full Filter Bar for Items Tab */}
         {currentTab === 'items' && (
           <FilterBar
             filters={filters}
@@ -450,6 +466,15 @@ export function CatalogScreen() {
             maxPrice={maxPrice}
             onFilterChange={updateFilter}
             onReset={resetFilters}
+          />
+        )}
+
+        {/* Search Bar for Full Menu Tab */}
+        {currentTab === 'fullMenu' && (
+          <SearchBar
+            value={filters.search}
+            onChange={(value) => updateFilter('search', value)}
+            placeholder={t('catalog.searchMenu')}
           />
         )}
 
@@ -471,7 +496,7 @@ export function CatalogScreen() {
         <div className="border-b border-gray-200 dark:border-gray-700">
           <nav className="-mb-px flex space-x-8">
             <button
-              onClick={() => setCurrentTab('categories')}
+              onClick={() => handleTabChange('categories')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 currentTab === 'categories'
                   ? 'border-orange-500 text-orange-600 dark:text-orange-400'
@@ -481,7 +506,7 @@ export function CatalogScreen() {
               {t('catalog.categories')}
             </button>
             <button
-              onClick={() => setCurrentTab('items')}
+              onClick={() => handleTabChange('items')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 currentTab === 'items'
                   ? 'border-orange-500 text-orange-600 dark:text-orange-400'
@@ -491,7 +516,7 @@ export function CatalogScreen() {
               {t('catalog.allItems')}
             </button>
             <button
-              onClick={() => setCurrentTab('fullMenu')}
+              onClick={() => handleTabChange('fullMenu')}
               className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                 currentTab === 'fullMenu'
                   ? 'border-orange-500 text-orange-600 dark:text-orange-400'
@@ -532,8 +557,8 @@ export function CatalogScreen() {
 
             {currentTab === 'fullMenu' && (
               <FullMenuView
-                categories={categories}
-                items={items}
+                categories={filteredCategories}
+                items={filteredItems}
                 onEditCategory={handleEditCategory}
                 onDeleteCategory={handleDeleteCategory}
                 onEditItem={handleEditItem}

@@ -318,6 +318,8 @@
       "categoryRequired": "Category is required"
     },
     "searchCatalog": "Search categories and items...",
+    "searchCategories": "Search categories...",
+    "searchMenu": "Search menu...",
     "categories": "Categories",
     "allItems": "All Items",
     "fullMenu": "Full Menu",

@@ -140,6 +140,8 @@
     "validation": {
       "nameRequired": "श्रेणी का नाम आवश्यक है"
     },
+    "searchCategories": "श्रेणियाँ खोजें...",
+    "searchMenu": "मेनू खोजें...",
     "categoriesSelected": "श्रेणियाँ चयनित",
     "itemsSelected": "आइटम चयनित",
     "deleteSelected": "चयनित हटाएं",
