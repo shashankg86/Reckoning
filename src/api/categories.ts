@@ -177,7 +177,7 @@ export const categoriesAPI = {
           name: categoryData.name,
           description: categoryData.description || null,
           color: categoryData.color || '#FF6B35',
-          icon: categoryData.icon || 'square-3-stack-3d',
+          icon: categoryData.icon || null,
           image_url: categoryData.image_url || null,
           sort_order: nextSortOrder,
           parent_id: categoryData.parent_id || null,
@@ -226,7 +226,7 @@ export const categoriesAPI = {
         name: categoryData.name,
         description: categoryData.description || null,
         color: categoryData.color || '#FF6B35',
-        icon: categoryData.icon || 'square-3-stack-3d',
+        icon: categoryData.icon || null,
         image_url: categoryData.image_url || null,
         sort_order: categoryData.sort_order !== undefined
           ? categoryData.sort_order

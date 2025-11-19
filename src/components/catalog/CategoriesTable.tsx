@@ -113,7 +113,7 @@ export function CategoriesTable({
                 />
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.icon')}
+                {t('catalog.image')}
               </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t('common.name')}
@@ -154,14 +154,22 @@ export function CategoriesTable({
                     />
                   </td>
 
-                  {/* Icon */}
+                  {/* Image */}
                   <td className="px-4 py-3">
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white"
-                      style={{ backgroundColor: category.color }}
-                    >
-                      <span className="text-xl">{category.icon}</span>
-                    </div>
+                    {category.image_url ? (
+                      <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                        <img
+                          src={category.image_url}
+                          alt={category.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="w-10 h-10 rounded-lg"
+                        style={{ backgroundColor: category.color }}
+                      />
+                    )}
                   </td>
 
                   {/* Name */}
