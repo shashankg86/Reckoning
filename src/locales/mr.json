@@ -264,6 +264,12 @@
     "description": "वर्णन"
   },
   "catalog": {
+    "stockStatus": {
+      "label": "साठा स्थिती",
+      "inStock": "साठा उपलब्ध",
+      "lowStock": "कमी साठा",
+      "outOfStock": "साठा संपला"
+    },
     "validation": {
       "nameRequired": "श्रेणीचे नाव आवश्यक आहे"
     },

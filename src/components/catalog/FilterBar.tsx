@@ -117,31 +117,39 @@ export function FilterBar({ filters, categories, maxPrice, onFilterChange, onRes
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 {t('catalog.categories')}
               </label>
-              <select
-                multiple
-                value={filters.categories}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions, option => option.value);
-                  onFilterChange('categories', selected);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500"
-                size={4}
-              >
+              <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
                 {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.icon} {cat.name}
-                  </option>
+                  <label
+                    key={cat.id}
+                    className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={filters.categories.includes(cat.id)}
+                      onChange={(e) => {
+                        const newCategories = e.target.checked
+                          ? [...filters.categories, cat.id]
+                          : filters.categories.filter(id => id !== cat.id);
+                        onFilterChange('categories', newCategories);
+                      }}
+                      className="w-4 h-4 text-orange-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                    />
+                    <div
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: cat.color }}
+                    />
+                    <span className="text-sm text-gray-900 dark:text-white flex-1">
+                      {cat.name}
+                    </span>
+                  </label>
                 ))}
-              </select>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {t('catalog.holdCtrlToSelectMultiple')}
-              </p>
+              </div>
             </div>
 
             {/* Stock Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('catalog.stockStatus')}
+                {t('catalog.stockStatus.label')}
               </label>
               <select
                 value={filters.stockFilter}

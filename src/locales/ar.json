@@ -192,6 +192,7 @@
     "save": "حفظ",
     "noItemsFound": "لم يتم العثور على عناصر",
     "stockStatus": {
+      "label": "حالة المخزون",
       "inStock": "متوفر",
       "lowStock": "مخزون منخفض",
       "outOfStock": "نفد المخزون"

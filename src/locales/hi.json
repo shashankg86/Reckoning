@@ -132,6 +132,7 @@
     "save": "सेव करें",
     "noItemsFound": "कोई आइटम नहीं मिला",
     "stockStatus": {
+      "label": "स्टॉक स्थिति",
       "inStock": "स्टॉक में",
       "lowStock": "कम स्टॉक",
       "outOfStock": "स्टॉक खत्म"

@@ -297,6 +297,7 @@
     "save": "Save",
     "noItemsFound": "No items found",
     "stockStatus": {
+      "label": "Stock Status",
       "inStock": "In Stock",
       "lowStock": "Low Stock",
       "outOfStock": "Out of Stock"
