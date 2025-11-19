@@ -70,6 +70,36 @@
     "reports": "अहवाल",
     "settings": "सेटिंग्ज"
   },
+  "dashboard": {
+    "title": "डॅशबोर्ड",
+    "goodMorning": "सुप्रभात",
+    "todaysActivity": "आज तुमच्या स्टोअरमध्ये काय चालले आहे",
+    "todaysSales": "आजची विक्री",
+    "orders": "ऑर्डर",
+    "weeklyGrowth": "साप्ताहिक वाढ",
+    "averageOrder": "सरासरी ऑर्डर",
+    "perTransaction": "प्रति व्यवहार",
+    "today": "आज",
+    "activeItems": "सक्रिय आयटम",
+    "inCatalog": "कॅटलॉगमध्ये",
+    "fromYesterday": "कालपासून",
+    "greatProgress": "उत्कृष्ट प्रगती!",
+    "quickActions": "द्रुत क्रिया",
+    "recentTransactions": "अलीकडील व्यवहार",
+    "noTransactionsToday": "आज कोणतेही व्यवहार नाहीत",
+    "viewAll": "सर्व पहा",
+    "quickStats": "द्रुत आकडेवारी",
+    "itemsInCart": "कार्टमध्ये आयटम",
+    "totalInvoices": "एकूण बिले",
+    "storeType": "स्टोअरचा प्रकार",
+    "items": "आयटम",
+    "actions": {
+      "createInvoice": "बिल तयार करा",
+      "addItem": "आयटम जोडा",
+      "ocrImport": "OCR आयात",
+      "viewReports": "अहवाल पहा"
+    }
+  },
   "onboarding": {
     "welcome": "युनिव्हर्सल पीओएस मध्ये आपले स्वागत आहे",
     "letsSetup": "चला आपले स्टोअर सेट करूया",

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { usePOS } from '../contexts/POSContext';
 import {
   ArrowTrendingUpIcon,
   ChartBarIcon,
@@ -19,21 +20,45 @@ import { Card, MetricCard } from '../components/ui/Card';
 export function DashboardScreen() {
   const { t } = useTranslation();
   const { state } = useAuth();
+  const { state: posState } = usePOS();
   const navigate = useNavigate();
 
   const navigateToScreen = (path: string) => {
     navigate(path);
   };
 
-  // Sample data - in real app this would come from state/API
-  const todaysSales = 12450;
-  const todaysOrders = 23;
-  const weeklyGrowth = 8.5;
-  const recentTransactions = [
-    { id: '1', amount: 450, time: '10:30 AM', items: 3 },
-    { id: '2', amount: 1200, time: '10:15 AM', items: 7 },
-    { id: '3', amount: 350, time: '10:00 AM', items: 2 },
-  ];
+  // Calculate real metrics from POS data
+  const { todaysSales, todaysOrders, activeItems, averageOrderValue, recentTransactions, totalInvoices } = useMemo(() => {
+    // Calculate today's sales and orders from invoices
+    const sales = posState.invoices.reduce((sum, inv) => sum + inv.total, 0);
+    const orders = posState.invoices.length;
+
+    // Calculate average order value
+    const avgOrder = orders > 0 ? sales / orders : 0;
+
+    // Get active items count (items with stock > 0 or undefined stock)
+    const items = posState.items.filter(item => item.stock === undefined || item.stock > 0).length;
+
+    // Get recent 3 transactions
+    const recent = posState.invoices.slice(0, 3).map(inv => ({
+      id: inv.id,
+      amount: inv.total,
+      time: new Date(inv.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      items: inv.items.reduce((sum, item) => sum + item.quantity, 0)
+    }));
+
+    // Total invoices count (for now, same as today's since we only fetch today's)
+    const total = posState.invoices.length;
+
+    return {
+      todaysSales: sales,
+      todaysOrders: orders,
+      activeItems: items,
+      averageOrderValue: avgOrder,
+      recentTransactions: recent,
+      totalInvoices: total
+    };
+  }, [posState.invoices, posState.items]);
 
   const quickActions = [
     {
@@ -81,26 +106,23 @@ export function DashboardScreen() {
             title={t('dashboard.todaysSales')}
             value={`₹${todaysSales.toLocaleString('en-IN')}`}
             icon={<CurrencyRupeeIcon className="h-5 w-5" />}
-            trend="up"
-            trendValue={t('dashboard.fromYesterday', '+12.5% from yesterday')}
+            subtitle={`${todaysOrders} ${t('dashboard.orders').toLowerCase()}`}
           />
           <MetricCard
             title={t('dashboard.orders')}
             value={todaysOrders.toString()}
             icon={<ShoppingCartIcon className="h-5 w-5" />}
-            trend="up"
-            trendValue={t('dashboard.fromYesterday', '+3 from yesterday')}
+            subtitle={t('dashboard.today')}
           />
           <MetricCard
-            title={t('dashboard.weeklyGrowth')}
-            value={`+${weeklyGrowth}%`}
+            title={t('dashboard.averageOrder')}
+            value={`₹${Math.round(averageOrderValue).toLocaleString('en-IN')}`}
             icon={<ArrowTrendingUpIcon className="h-5 w-5" />}
-            trend="up"
-            trendValue={t('dashboard.greatProgress')}
+            subtitle={t('dashboard.perTransaction')}
           />
           <MetricCard
             title={t('dashboard.activeItems')}
-            value="24"
+            value={activeItems.toString()}
             icon={<CubeIcon className="h-5 w-5" />}
             subtitle={t('dashboard.inCatalog')}
           />
@@ -151,30 +173,36 @@ export function DashboardScreen() {
               </Button>
             </div>
             <div className="space-y-3">
-              {recentTransactions.map((transaction) => (
-                <div
-                  key={transaction.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                >
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
-                      <CurrencyRupeeIcon className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+              {recentTransactions.length > 0 ? (
+                recentTransactions.map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  >
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                        <CurrencyRupeeIcon className="h-4 w-4 text-orange-500 dark:text-orange-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          ₹{transaction.amount.toLocaleString('en-IN')}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {transaction.items} {t('dashboard.items')}
+                        </p>
+                      </div>
                     </div>
-                    <div className="ml-3">
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        ₹{transaction.amount}
-                      </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {transaction.items} {t('dashboard.items')}
-                      </p>
+                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                      <ClockIcon className="h-4 w-4 mr-1" />
+                      {transaction.time}
                     </div>
                   </div>
-                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                    <ClockIcon className="h-4 w-4 mr-1" />
-                    {transaction.time}
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  {t('dashboard.noTransactionsToday')}
                 </div>
-              ))}
+              )}
             </div>
           </Card>
 
@@ -188,7 +216,7 @@ export function DashboardScreen() {
                   {t('dashboard.itemsInCart')}
                 </span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  0
+                  {posState.cart.length}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -196,7 +224,7 @@ export function DashboardScreen() {
                   {t('dashboard.totalInvoices')}
                 </span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  156
+                  {totalInvoices}
                 </span>
               </div>
               <div className="flex justify-between">
