@@ -255,11 +255,26 @@
     "currency": "₹",
     "added": "जोडले",
     "change": "बदला",
-    "upload": "अपलोड करा"
+    "upload": "अपलोड करा",
+    "showing": "दर्शवित आहे",
+    "previous": "मागील",
+    "next": "पुढील",
+    "name": "नाव",
+    "description": "वर्णन"
   },
   "catalog": {
     "validation": {
       "nameRequired": "श्रेणीचे नाव आवश्यक आहे"
-    }
+    },
+    "categoriesSelected": "श्रेणी निवडल्या",
+    "itemsSelected": "आयटम निवडले",
+    "deleteSelected": "निवडलेले हटवा",
+    "deleteCategories": "श्रेणी हटवा",
+    "deleteItems": "आयटम हटवा",
+    "bulkDeleteConfirmation": "तुम्हाला खात्री आहे की तुम्ही {{count}} {{type}} हटवू इच्छिता? ही क्रिया पूर्ववत करता येणार नाही.",
+    "categoriesDeleted": "{{count}} श्रेणी यशस्वीरित्या हटवल्या",
+    "itemsDeleted": "{{count}} आयटम यशस्वीरित्या हटवले",
+    "itemDeleted": "आयटम यशस्वीरित्या हटवला",
+    "allChangesDiscarded": "सर्व बदल रद्द केले"
   }
 }

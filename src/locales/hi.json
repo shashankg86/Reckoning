@@ -138,7 +138,17 @@
     },
     "validation": {
       "nameRequired": "श्रेणी का नाम आवश्यक है"
-    }
+    },
+    "categoriesSelected": "श्रेणियाँ चयनित",
+    "itemsSelected": "आइटम चयनित",
+    "deleteSelected": "चयनित हटाएं",
+    "deleteCategories": "श्रेणियाँ हटाएं",
+    "deleteItems": "आइटम हटाएं",
+    "bulkDeleteConfirmation": "क्या आप वाकई {{count}} {{type}} को हटाना चाहते हैं? यह कार्रवाई पूर्ववत नहीं की जा सकती।",
+    "categoriesDeleted": "{{count}} श्रेणियाँ सफलतापूर्वक हटाई गईं",
+    "itemsDeleted": "{{count}} आइटम सफलतापूर्वक हटाए गए",
+    "itemDeleted": "आइटम सफलतापूर्वक हटाया गया",
+    "allChangesDiscarded": "सभी परिवर्तन रद्द किए गए"
   },
   "invoice": {
     "title": "बिल बनाएं",
@@ -301,7 +311,7 @@
     "loading": "लोड हो रहा है...",
     "noDataFound": "कोई डेटा नहीं मिला",
     "tryDifferentSearch": "अपने खोज शब्दों को समायोजित करने का प्रयास करें",
-    "showing": "दिखा रहे हैं",
+    "showing": "दिखा रहा है",
     "to": "से",
     "of": "का",
     "results": "परिणाम",
@@ -350,7 +360,11 @@
     "hoursAgo": "{count} घंटे पहले",
     "added": "जोड़ा गया",
     "change": "बदलें",
-    "upload": "अपलोड करें"
+    "upload": "अपलोड करें",
+    "previous": "पिछला",
+    "next": "अगला",
+    "name": "नाम",
+    "description": "विवरण"
   },
   "welcome": {
     "title": "वापस स्वागत है!",

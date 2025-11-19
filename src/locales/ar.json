@@ -198,7 +198,17 @@
     },
     "validation": {
       "nameRequired": "اسم الفئة مطلوب"
-    }
+    },
+    "categoriesSelected": "الفئات المحددة",
+    "itemsSelected": "العناصر المحددة",
+    "deleteSelected": "حذف المحدد",
+    "deleteCategories": "حذف الفئات",
+    "deleteItems": "حذف العناصر",
+    "bulkDeleteConfirmation": "هل أنت متأكد من حذف {{count}} {{type}}؟ لا يمكن التراجع عن هذا الإجراء.",
+    "categoriesDeleted": "تم حذف {{count}} فئات بنجاح",
+    "itemsDeleted": "تم حذف {{count}} عناصر بنجاح",
+    "itemDeleted": "تم حذف العنصر بنجاح",
+    "allChangesDiscarded": "تم تجاهل جميع التغييرات"
   },
   "invoice": {
     "title": "إنشاء فاتورة",
@@ -381,6 +391,11 @@
     "currency": "₹",
     "added": "تمت الإضافة",
     "change": "تغيير",
-    "upload": "رفع"
+    "upload": "رفع",
+    "showing": "عرض",
+    "previous": "السابق",
+    "next": "التالي",
+    "name": "الاسم",
+    "description": "الوصف"
   }
 }

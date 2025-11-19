@@ -66,10 +66,12 @@ export function CatalogScreen() {
   // Confirmation Dialog State
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
-    type: 'delete' | 'discard';
-    target: 'category' | 'item' | 'all';
+    type: 'delete' | 'discard' | 'bulkDelete';
+    target: 'category' | 'item' | 'all' | 'categories' | 'items';
     id?: string;
     name?: string;
+    ids?: string[];
+    count?: number;
   }>({
     isOpen: false,
     type: 'delete',
@@ -308,6 +310,16 @@ export function CatalogScreen() {
     });
   };
 
+  const handleBulkDeleteCategories = (categoryIds: string[]) => {
+    setConfirmDialog({
+      isOpen: true,
+      type: 'bulkDelete',
+      target: 'categories',
+      ids: categoryIds,
+      count: categoryIds.length
+    });
+  };
+
   const handleEditItem = (item: Item) => {
     setEditingItem(item);
     setShowEditItem(true);
@@ -336,6 +348,16 @@ export function CatalogScreen() {
     });
   };
 
+  const handleBulkDeleteItems = (itemIds: string[]) => {
+    setConfirmDialog({
+      isOpen: true,
+      type: 'bulkDelete',
+      target: 'items',
+      ids: itemIds,
+      count: itemIds.length
+    });
+  };
+
   const handleAddItemToCategory = (categoryId: string) => {
     setSelectedCategoryForItem(categoryId);
     setShowBulkAddItems(true);
@@ -344,14 +366,24 @@ export function CatalogScreen() {
   const handleConfirmDialog = async () => {
     if (confirmDialog.type === 'discard' && confirmDialog.target === 'all') {
       discardAll();
-      toast.success('All changes discarded');
+      toast.success(t('catalog.allChangesDiscarded'));
     } else if (confirmDialog.type === 'delete') {
       if (confirmDialog.target === 'category' && confirmDialog.id) {
         deleteCategory(confirmDialog.id);
-        toast.success('Category deleted (pending save)');
+        toast.success(t('catalog.categoryDeleted'));
       } else if (confirmDialog.target === 'item' && confirmDialog.id) {
         deleteItem(confirmDialog.id);
-        toast.success('Item deleted (pending save)');
+        toast.success(t('catalog.itemDeleted'));
+      }
+    } else if (confirmDialog.type === 'bulkDelete') {
+      if (confirmDialog.target === 'categories' && confirmDialog.ids) {
+        // Bulk delete categories
+        confirmDialog.ids.forEach(id => deleteCategory(id));
+        toast.success(t('catalog.categoriesDeleted', { count: confirmDialog.ids.length }));
+      } else if (confirmDialog.target === 'items' && confirmDialog.ids) {
+        // Bulk delete items
+        confirmDialog.ids.forEach(id => deleteItem(id));
+        toast.success(t('catalog.itemsDeleted', { count: confirmDialog.ids.length }));
       }
     }
     setConfirmDialog({ isOpen: false, type: 'delete', target: 'all' });
@@ -364,6 +396,26 @@ export function CatalogScreen() {
         message: `Are you sure you want to discard ${pendingChangesCount} pending changes? This action cannot be undone.`,
         confirmText: t('catalog.discardAll')
       };
+    } else if (confirmDialog.type === 'bulkDelete') {
+      if (confirmDialog.target === 'categories') {
+        return {
+          title: t('catalog.deleteCategories'),
+          message: t('catalog.bulkDeleteConfirmation', {
+            count: confirmDialog.count || 0,
+            type: t('catalog.categories').toLowerCase()
+          }),
+          confirmText: t('catalog.deleteSelected')
+        };
+      } else {
+        return {
+          title: t('catalog.deleteItems'),
+          message: t('catalog.bulkDeleteConfirmation', {
+            count: confirmDialog.count || 0,
+            type: t('catalog.items').toLowerCase()
+          }),
+          confirmText: t('catalog.deleteSelected')
+        };
+      }
     } else if (confirmDialog.target === 'category') {
       return {
         title: t('catalog.deleteCategory'),
@@ -462,6 +514,7 @@ export function CatalogScreen() {
                 itemCounts={itemCounts}
                 onEdit={handleEditCategory}
                 onDelete={handleDeleteCategory}
+                onBulkDelete={handleBulkDeleteCategories}
               />
             )}
 
@@ -471,6 +524,7 @@ export function CatalogScreen() {
                 categories={categories}
                 onEdit={handleEditItem}
                 onDelete={handleDeleteItem}
+                onBulkDelete={handleBulkDeleteItems}
               />
             )}
 

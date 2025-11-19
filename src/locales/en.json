@@ -370,7 +370,17 @@
     "noCategories": "No categories found",
     "previous": "Previous",
     "next": "Next",
-    "showing": "Showing"
+    "showing": "Showing",
+    "categoriesSelected": "categories selected",
+    "itemsSelected": "items selected",
+    "deleteSelected": "Delete Selected",
+    "deleteCategories": "Delete Categories",
+    "deleteItems": "Delete Items",
+    "bulkDeleteConfirmation": "Are you sure you want to delete {{count}} {{type}}? This action cannot be undone.",
+    "categoriesDeleted": "{{count}} categories deleted successfully",
+    "itemsDeleted": "{{count}} items deleted successfully",
+    "itemDeleted": "Item deleted successfully",
+    "allChangesDiscarded": "All changes discarded"
   },
   "invoice": {
     "title": "Create Invoice",
@@ -502,7 +512,11 @@
     "notConfigured": "❌ Not Configured",
     "added": "Added",
     "change": "Change",
-    "upload": "Upload"
+    "upload": "Upload",
+    "previous": "Previous",
+    "next": "Next",
+    "name": "Name",
+    "description": "Description"
   },
   "welcome": {
     "title": "Welcome back!",
