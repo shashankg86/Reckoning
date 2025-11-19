@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PencilIcon,
   TrashIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
   CubeIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
@@ -12,11 +14,15 @@ import type { Item } from '../../types/menu';
 import type { Category } from '../../types/menu';
 import { usePagination } from '../../hooks/usePagination';
 
+type SortField = 'name' | 'category' | 'sku' | 'price' | 'stock';
+type SortOrder = 'asc' | 'desc';
+
 interface ItemsTableProps {
   items: Item[];
   categories: Category[];
   onEdit: (item: Item) => void;
   onDelete: (itemId: string) => void;
+  onBulkDelete: (itemIds: string[]) => void;
   pageSize?: number;
 }
 
@@ -25,9 +31,52 @@ export function ItemsTable({
   categories,
   onEdit,
   onDelete,
+  onBulkDelete,
   pageSize = 10
 }: ItemsTableProps) {
   const { t } = useTranslation();
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+
+  // Sort items
+  const sortedItems = React.useMemo(() => {
+    return [...items].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'category': {
+          const catA = categories.find(c => c.id === a.category_id);
+          const catB = categories.find(c => c.id === b.category_id);
+          comparison = (catA?.name || '').localeCompare(catB?.name || '');
+          break;
+        }
+        case 'sku':
+          comparison = (a.sku || '').localeCompare(b.sku || '');
+          break;
+        case 'price':
+          comparison = parseFloat(a.price) - parseFloat(b.price);
+          break;
+        case 'stock':
+          comparison = (a.stock || 0) - (b.stock || 0);
+          break;
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [items, sortField, sortOrder, categories]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
 
   const {
     currentPage,
@@ -41,7 +90,41 @@ export function ItemsTable({
     startIndex,
     endIndex,
     totalItems
-  } = usePagination(items, pageSize);
+  } = usePagination(sortedItems, pageSize);
+
+  // Clear selection when page changes
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [currentPage]);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(paginatedItems.map(item => item.id));
+      setSelectedIds(allIds);
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectOne = (itemId: string, checked: boolean) => {
+    const newSelected = new Set(selectedIds);
+    if (checked) {
+      newSelected.add(itemId);
+    } else {
+      newSelected.delete(itemId);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size > 0) {
+      onBulkDelete(Array.from(selectedIds));
+      setSelectedIds(new Set());
+    }
+  };
+
+  const allSelected = paginatedItems.length > 0 && paginatedItems.every(item => selectedIds.has(item.id));
+  const someSelected = paginatedItems.some(item => selectedIds.has(item.id)) && !allSelected;
 
   // Helper to get category by ID
   const getCategoryById = (categoryId: string) => {
@@ -72,28 +155,105 @@ export function ItemsTable({
 
   return (
     <div className="space-y-4">
+      {/* Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center justify-between p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+          <span className="text-sm font-medium text-orange-900 dark:text-orange-100">
+            {selectedIds.size} {t('catalog.itemsSelected')}
+          </span>
+          <button
+            onClick={handleBulkDelete}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+          >
+            <TrashIcon className="h-4 w-4" />
+            {t('catalog.deleteSelected')}
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+              <th className="px-4 py-3 w-12">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={input => {
+                    if (input) input.indeterminate = someSelected;
+                  }}
+                  onChange={(e) => handleSelectAll(e.target.checked)}
+                  className="w-4 h-4 text-orange-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                />
+              </th>
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t('common.image')}
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('common.itemName')}
+              <th
+                className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('name')}
+              >
+                <div className="flex items-center gap-2">
+                  {t('common.itemName')}
+                  {sortField === 'name' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.category')}
+              <th
+                className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('category')}
+              >
+                <div className="flex items-center gap-2">
+                  {t('catalog.category')}
+                  {sortField === 'category' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.sku')}
+              <th
+                className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('sku')}
+              >
+                <div className="flex items-center gap-2">
+                  {t('catalog.sku')}
+                  {sortField === 'sku' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.price')}
+              <th
+                className="px-4 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('price')}
+              >
+                <div className="flex items-center justify-end gap-2">
+                  {t('catalog.price')}
+                  {sortField === 'price' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.stock')}
+              <th
+                className="px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('stock')}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  {t('catalog.stock')}
+                  {sortField === 'stock' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t('common.actions')}
@@ -103,7 +263,7 @@ export function ItemsTable({
           <tbody>
             {paginatedItems.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                   {t('catalog.noItemsFound')}
                 </td>
               </tr>
@@ -115,14 +275,26 @@ export function ItemsTable({
                 return (
                   <tr
                     key={item.id}
-                    className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    className={`border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                      selectedIds.has(item.id) ? 'bg-orange-50/50 dark:bg-orange-900/10' : ''
+                    }`}
                   >
+                    {/* Checkbox */}
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={(e) => handleSelectOne(item.id, e.target.checked)}
+                        className="w-4 h-4 text-orange-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                      />
+                    </td>
+
                     {/* Image */}
                     <td className="px-4 py-3">
-                      {item.image ? (
-                        <div className="w-12 h-12 rounded-lg overflow-hidden">
+                      {item.image_url ? (
+                        <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
                           <img
-                            src={item.image}
+                            src={item.image_url}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
@@ -154,13 +326,14 @@ export function ItemsTable({
                     {/* Category */}
                     <td className="px-4 py-3">
                       {category ? (
-                        <span
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white"
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white"
                           style={{ backgroundColor: category.color }}
                         >
-                          <span>{category.icon}</span>
+                          <div
+                            className="w-2 h-2 rounded-full bg-white/30"
+                          />
                           <span>{category.name}</span>
-                        </span>
+                        </div>
                       ) : (
                         <span className="text-sm text-gray-500 dark:text-gray-400">-</span>
                       )}
@@ -229,7 +402,7 @@ export function ItemsTable({
         <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
           {/* Results info */}
           <div className="text-sm text-gray-700 dark:text-gray-300">
-            {t('catalog.showing')} <span className="font-medium">{startIndex}</span> {t('common.to')}{' '}
+            {t('common.showing')} <span className="font-medium">{startIndex}</span> {t('common.to')}{' '}
             <span className="font-medium">{endIndex}</span> {t('common.of')}{' '}
             <span className="font-medium">{totalItems}</span> {t('common.results')}
           </div>
@@ -244,7 +417,7 @@ export function ItemsTable({
               className="flex items-center gap-1"
             >
               <ChevronLeftIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('catalog.previous')}</span>
+              <span className="hidden sm:inline">{t('common.previous')}</span>
             </Button>
 
             {/* Page numbers */}
@@ -294,7 +467,7 @@ export function ItemsTable({
               disabled={!hasNext}
               className="flex items-center gap-1"
             >
-              <span className="hidden sm:inline">{t('catalog.next')}</span>
+              <span className="hidden sm:inline">{t('common.next')}</span>
               <ChevronRightIcon className="h-4 w-4" />
             </Button>
           </div>

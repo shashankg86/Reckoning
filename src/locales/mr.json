@@ -133,7 +133,7 @@
   },
   "menuSetup": {
     "title": "मेनू सेटअप",
-    "createCategories": "तुमच्या मेनू श्रेण्या तयार करा",
+    "createCategories": "{{count}} श्रेण्या तयार करा",
     "categoriesDescription": "श्रेण्या तयार करून तुमचा मेनू व्यवस्थित करा. तुम्ही नंतर त्यांचे संपादन करू शकता.",
     "addCategory": "श्रेणी जोडा",
     "useDefaultCategories": "डीफॉल्ट श्रेण्या वापरा",
@@ -194,7 +194,6 @@
     "bulkCreateDescription": "एकाच वेळी अनेक श्रेण्या प्रविष्ट करा",
     "addAnotherCategory": "आणखी एक श्रेणी जोडा",
     "categoriesReady": "श्रेण्या तयार आहेत",
-    "createCategories": "{{count}} श्रेण्या तयार करा",
     "importFromExcel": "Excel/CSV मधून श्रेण्या आयात करा",
     "importFromExcelDescription": "तुमच्या श्रेण्यांसह फाइल अपलोड करा",
     "uploadFile": "तुमची फाइल अपलोड करा",
@@ -206,7 +205,18 @@
     "previewCategories": "श्रेण्यांचे पूर्वावलोकन करा",
     "uploadDifferentFile": "वेगळी फाइल अपलोड करा",
     "importCategories": "{{count}} श्रेण्या आयात करा",
-    "processingFile": "फाइल प्रक्रिया करत आहे..."
+    "processingFile": "फाइल प्रक्रिया करत आहे...",
+    "nameTooShort": "नाव किमान 2 वर्णांचे असावे",
+    "nameTooLong": "नाव खूप मोठे आहे (कमाल 50 वर्ण)",
+    "descriptionTooLong": "वर्णन खूप मोठे आहे (कमाल 500 वर्ण)",
+    "descriptionRequired": "वर्णन आवश्यक आहे",
+    "imageTooLarge": "प्रतिमा 5MB पेक्षा कमी असावी",
+    "uploadingImages": "{{count}} प्रतिमा अपलोड होत आहेत...",
+    "uploadingProgress": "प्रतिमा अपलोड होत आहेत: {{completed}}/{{total}}",
+    "uploadedImages": "{{count}} प्रतिमा यशस्वीरित्या अपलोड झाल्या",
+    "failedToUploadImages": "{{count}} प्रतिमा अपलोड करण्यात अयशस्वी",
+    "imageUploadFailed": "प्रतिमा अपलोड अयशस्वी",
+    "pleaseFixImageErrors": "कृपया सबमिट करण्यापूर्वी प्रतिमा त्रुटी दुरुस्त करा"
   },
   "common": {
     "loading": "लोड होत आहे...",
@@ -243,6 +253,38 @@
     "completing": "पूर्ण करत आहे...",
     "items": "आयटम",
     "cancel": "रद्द करा",
-    "currency": "₹"
+    "currency": "₹",
+    "added": "जोडले",
+    "change": "बदला",
+    "upload": "अपलोड करा",
+    "showing": "दर्शवित आहे",
+    "previous": "मागील",
+    "next": "पुढील",
+    "name": "नाव",
+    "description": "वर्णन"
+  },
+  "catalog": {
+    "stockStatus": {
+      "label": "साठा स्थिती",
+      "inStock": "साठा उपलब्ध",
+      "lowStock": "कमी साठा",
+      "outOfStock": "साठा संपला"
+    },
+    "validation": {
+      "nameRequired": "श्रेणीचे नाव आवश्यक आहे"
+    },
+    "searchCategories": "श्रेणी शोधा...",
+    "searchMenu": "मेनू शोधा...",
+    "categoriesSelected": "श्रेणी निवडल्या",
+    "itemsSelected": "आयटम निवडले",
+    "deleteSelected": "निवडलेले हटवा",
+    "deleteCategories": "श्रेणी हटवा",
+    "deleteItems": "आयटम हटवा",
+    "bulkDeleteConfirmation": "तुम्हाला खात्री आहे की तुम्ही {{count}} {{type}} हटवू इच्छिता? ही क्रिया पूर्ववत करता येणार नाही.",
+    "categoriesDeleted": "{{count}} श्रेणी यशस्वीरित्या हटवल्या",
+    "itemsDeleted": "{{count}} आयटम यशस्वीरित्या हटवले",
+    "itemDeleted": "आयटम यशस्वीरित्या हटवला",
+    "allChangesDiscarded": "सर्व बदल रद्द केले",
+    "image": "प्रतिमा"
   }
 }

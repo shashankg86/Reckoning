@@ -82,7 +82,7 @@ export function useCatalogState(storeId: string) {
         category_id: item.category_id,
         sku: item.sku,
         stock: item.stock,
-        image: item.image_url,
+        image_url: item.image_url,
         is_active: item.is_active,
         created_at: item.created_at
       }));
@@ -360,7 +360,7 @@ export function useCatalogState(storeId: string) {
           category_id: (item as any).category_id,
           sku: item.sku,
           stock: item.stock || 0,
-          image_url: item.image,
+          image_url: (item as any).image_url,
           description: (item as any).description
         }));
         await itemsAPI.bulkCreateItems(storeId, itemsToCreate);
@@ -376,7 +376,7 @@ export function useCatalogState(storeId: string) {
           category_id: (item as any).category_id,
           sku: item.sku,
           stock: item.stock,
-          image_url: item.image,
+          image_url: (item as any).image_url,
           description: (item as any).description
         }));
         await itemsAPI.bulkUpdateItems(updates);

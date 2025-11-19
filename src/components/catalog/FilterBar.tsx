@@ -69,7 +69,7 @@ export function FilterBar({ filters, categories, maxPrice, onFilterChange, onRes
       {/* Advanced Filters */}
       {showAdvanced && (
         <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Price Range */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -112,36 +112,10 @@ export function FilterBar({ filters, categories, maxPrice, onFilterChange, onRes
               </div>
             </div>
 
-            {/* Category Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('catalog.categories')}
-              </label>
-              <select
-                multiple
-                value={filters.categories}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions, option => option.value);
-                  onFilterChange('categories', selected);
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500"
-                size={4}
-              >
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.icon} {cat.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                {t('catalog.holdCtrlToSelectMultiple')}
-              </p>
-            </div>
-
             {/* Stock Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('catalog.stockStatus')}
+                {t('catalog.stockStatus.label')}
               </label>
               <select
                 value={filters.stockFilter}

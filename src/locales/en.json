@@ -212,12 +212,12 @@
     "categoryDeleted": "Category deleted",
     "itemAddedLocally": "Item added (will save on continue)",
     "itemUpdated": "Item updated",
-    "uploadingImages": "Uploading {{count}} image(s)...",
+    "uploadingImages": "Uploading {{count}} images...",
     "uploadingProgress": "Uploading images: {{completed}}/{{total}}",
-    "uploadedImages": "Uploaded {{count}} image(s)",
-    "failedToUploadImages": "Failed to upload {{count}} image(s)",
+    "uploadedImages": "Successfully uploaded {{count}} images",
+    "failedToUploadImages": "Failed to upload {{count}} images",
     "imageUploadFailed": "Image upload failed",
-    "imageTooLarge": "Image must be less than 1MB",
+    "imageTooLarge": "Image must be less than 5MB",
     "invalidImageType": "Invalid file type. Please upload JPEG, PNG, or WebP",
     "uploadImagePlaceholder": "Upload category image (optional)",
     "imageUploadHint": "If no image is uploaded, a colored square will be displayed",
@@ -235,7 +235,12 @@
     "description": "Description",
     "pleaseAddCategories": "Please add at least one category",
     "failedToSaveCategories": "Failed to save categories",
-    "failedToSaveItems": "Failed to save items"
+    "failedToSaveItems": "Failed to save items",
+    "nameTooShort": "Name must be at least 2 characters",
+    "nameTooLong": "Name is too long (max 50 characters)",
+    "descriptionTooLong": "Description is too long (max 500 characters)",
+    "descriptionRequired": "Description is required",
+    "pleaseFixImageErrors": "Please fix image errors before submitting"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -292,6 +297,7 @@
     "save": "Save",
     "noItemsFound": "No items found",
     "stockStatus": {
+      "label": "Stock Status",
       "inStock": "In Stock",
       "lowStock": "Low Stock",
       "outOfStock": "Out of Stock"
@@ -307,11 +313,13 @@
     "allCategories": "All Categories",
     "tryDifferentSearch": "Try adjusting your search or filters",
     "validation": {
-      "nameRequired": "Item name is required",
+      "nameRequired": "Category name is required",
       "priceInvalid": "Price must be greater than 0",
       "categoryRequired": "Category is required"
     },
     "searchCatalog": "Search categories and items...",
+    "searchCategories": "Search categories...",
+    "searchMenu": "Search menu...",
     "categories": "Categories",
     "allItems": "All Items",
     "fullMenu": "Full Menu",
@@ -362,12 +370,22 @@
     "addAnotherItem": "Add Another Item",
     "quickAddCategories": "Quick add multiple categories",
     "quickAddItems": "Quick add multiple items",
-    "icon": "Icon",
     "itemCount": "Item Count",
     "noCategories": "No categories found",
     "previous": "Previous",
     "next": "Next",
-    "showing": "Showing"
+    "showing": "Showing",
+    "categoriesSelected": "categories selected",
+    "itemsSelected": "items selected",
+    "deleteSelected": "Delete Selected",
+    "deleteCategories": "Delete Categories",
+    "deleteItems": "Delete Items",
+    "bulkDeleteConfirmation": "Are you sure you want to delete {{count}} {{type}}? This action cannot be undone.",
+    "categoriesDeleted": "{{count}} categories deleted successfully",
+    "itemsDeleted": "{{count}} items deleted successfully",
+    "itemDeleted": "Item deleted successfully",
+    "allChangesDiscarded": "All changes discarded",
+    "image": "Image"
   },
   "invoice": {
     "title": "Create Invoice",
@@ -496,7 +514,14 @@
     "justNow": "Just now",
     "hoursAgo": "{count} hours ago",
     "configured": "✅ Configured",
-    "notConfigured": "❌ Not Configured"
+    "notConfigured": "❌ Not Configured",
+    "added": "Added",
+    "change": "Change",
+    "upload": "Upload",
+    "previous": "Previous",
+    "next": "Next",
+    "name": "Name",
+    "description": "Description"
   },
   "welcome": {
     "title": "Welcome back!",

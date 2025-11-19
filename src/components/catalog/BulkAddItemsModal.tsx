@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm, useFieldArray } from 'react-hook-form';
+import toast from 'react-hot-toast';
 import {
   XMarkIcon,
   PlusIcon,
   TrashIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
+import { ImageUpload } from '../ui/ImageUpload';
 import type { Item, Category } from '../../types/menu';
 
 interface ItemFormData {
@@ -14,13 +17,19 @@ interface ItemFormData {
   sku: string;
   price: string;
   stock: string;
+  description: string;
+  imageFile?: File | null;
+}
+
+interface BulkItemsFormData {
+  items: ItemFormData[];
 }
 
 interface BulkAddItemsModalProps {
   isOpen: boolean;
   onClose: () => void;
   categories: Category[];
-  onBulkAdd: (items: Partial<Item>[]) => void;
+  onBulkAdd: (items: Partial<Item>[], imageFiles: (File | null)[]) => void;
   preselectedCategoryId?: string;
 }
 
@@ -29,7 +38,9 @@ const DEFAULT_ITEM: ItemFormData = {
   category_id: '',
   sku: '',
   price: '',
-  stock: '0'
+  stock: '0',
+  description: '',
+  imageFile: null
 };
 
 const MAX_ITEMS = 10;
@@ -42,36 +53,65 @@ export function BulkAddItemsModal({
   preselectedCategoryId
 }: BulkAddItemsModalProps) {
   const { t } = useTranslation();
-  const [items, setItems] = useState<ItemFormData[]>([
-    { ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }
-  ]);
+  const { control, register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<BulkItemsFormData>({
+    defaultValues: {
+      items: [{ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }],
+    },
+  });
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'items',
+  });
+  const [imageErrors, setImageErrors] = useState<{ [key: number]: string | null }>({});
+
+  useEffect(() => {
+    if (!isOpen) {
+      reset({ items: [{ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }] });
+      setImageErrors({});
+    }
+  }, [isOpen, preselectedCategoryId, reset]);
 
   const handleAddRow = () => {
-    if (items.length < MAX_ITEMS) {
-      setItems([...items, { ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }]);
+    if (fields.length < MAX_ITEMS) {
+      append({ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' });
     }
   };
 
   const handleRemoveRow = (index: number) => {
-    if (items.length > 1) {
-      setItems(items.filter((_, i) => i !== index));
+    if (fields.length > 1) {
+      remove(index);
+      const newImageErrors = { ...imageErrors };
+      delete newImageErrors[index];
+      setImageErrors(newImageErrors);
     }
   };
 
-  const handleChange = (index: number, field: keyof ItemFormData, value: any) => {
-    const updated = [...items];
-    updated[index] = { ...updated[index], [field]: value };
-    setItems(updated);
+  const handleImageChange = (index: number, file: File | null) => {
+    setValue(`items.${index}.imageFile`, file, { shouldValidate: true });
   };
 
-  const handleSubmit = () => {
-    // Validate
-    const validItems = items.filter(
+  const handleImageError = (index: number, error: string | null) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [index]: error
+    }));
+  };
+
+  const onSubmit = (data: BulkItemsFormData) => {
+    // Check for image errors
+    const hasImageErrors = Object.values(imageErrors).some(error => error !== null);
+    if (hasImageErrors) {
+      toast.error(t('menuSetup.pleaseFixImageErrors'));
+      return;
+    }
+
+    const validItems = data.items.filter(
       item =>
         item.name.trim() !== '' &&
         item.category_id !== '' &&
         item.price.trim() !== '' &&
-        parseFloat(item.price) > 0
+        parseFloat(item.price) > 0 &&
+        item.description.trim() !== ''
     );
 
     if (validItems.length === 0) {
@@ -82,34 +122,41 @@ export function BulkAddItemsModal({
     // Map to Item format
     const itemsToAdd = validItems.map(item => ({
       name: item.name.trim(),
-      description: '',
+      description: item.description.trim(),
       category_id: item.category_id,
       sku: item.sku.trim(),
       price: item.price,
-      stock: parseInt(item.stock) || 0
+      stock: parseInt(item.stock) || 0,
+      image_url: null // Will be set after upload
     }));
 
-    onBulkAdd(itemsToAdd);
-    handleClose();
-  };
+    // Extract image files
+    const imageFiles = validItems.map(item => item.imageFile || null);
 
-  const handleClose = () => {
-    setItems([{ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }]);
+    onBulkAdd(itemsToAdd, imageFiles);
     onClose();
   };
 
   if (!isOpen) return null;
+
+  const watchedItems = watch('items');
+  const validCount = watchedItems.filter(i => i.name?.trim() && i.category_id && i.price && parseFloat(i.price) > 0 && i.description?.trim()).length;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-5xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {t('catalog.bulkAddItems')}
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('catalog.bulkAddItems')}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {t('catalog.quickAddItems')} ({validCount}/{MAX_ITEMS})
+            </p>
+          </div>
           <button
-            onClick={handleClose}
+            onClick={onClose}
             className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
           >
             <XMarkIcon className="h-5 w-5" />
@@ -117,168 +164,224 @@ export function BulkAddItemsModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 overflow-y-auto p-6">
           <div className="space-y-4">
-            {/* Instructions */}
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {t('catalog.quickAddItems')} ({items.length}/{MAX_ITEMS})
-            </p>
-
-            {/* Table */}
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-12">
-                      #
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      {t('catalog.itemName')} *
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      {t('catalog.category')} *
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      {t('catalog.sku')}
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      {t('catalog.price')} *
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                      {t('catalog.stock')}
-                    </th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider w-20">
-                      {t('common.actions')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {items.map((item, index) => {
-                    const selectedCategory = categories.find(cat => cat.id === item.category_id);
-
-                    return (
-                      <tr key={index} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        {/* Index */}
-                        <td className="px-3 py-3 text-sm text-gray-500 dark:text-gray-400">
-                          {index + 1}
-                        </td>
-
-                        {/* Name Input */}
-                        <td className="px-3 py-3">
-                          <input
-                            type="text"
-                            value={item.name}
-                            onChange={(e) => handleChange(index, 'name', e.target.value)}
-                            placeholder={t('catalog.enterItemName')}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                          />
-                        </td>
-
-                        {/* Category Select */}
-                        <td className="px-3 py-3">
-                          <select
-                            value={item.category_id}
-                            onChange={(e) => handleChange(index, 'category_id', e.target.value)}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500"
-                          >
-                            <option value="">{t('menuSetup.selectCategory')}</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.icon} {category.name}
-                              </option>
-                            ))}
-                          </select>
-                          {selectedCategory && (
-                            <div className="mt-1">
-                              <span
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
-                                style={{ backgroundColor: selectedCategory.color }}
-                              >
-                                <span>{selectedCategory.icon}</span>
-                              </span>
-                            </div>
-                          )}
-                        </td>
-
-                        {/* SKU Input */}
-                        <td className="px-3 py-3">
-                          <input
-                            type="text"
-                            value={item.sku}
-                            onChange={(e) => handleChange(index, 'sku', e.target.value)}
-                            placeholder={t('catalog.enterSKU')}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                          />
-                        </td>
-
-                        {/* Price Input */}
-                        <td className="px-3 py-3">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.price}
-                            onChange={(e) => handleChange(index, 'price', e.target.value)}
-                            placeholder="0.00"
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                          />
-                        </td>
-
-                        {/* Stock Input */}
-                        <td className="px-3 py-3">
-                          <input
-                            type="number"
-                            min="0"
-                            value={item.stock}
-                            onChange={(e) => handleChange(index, 'stock', e.target.value)}
-                            placeholder="0"
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                          />
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-3 py-3 text-center">
-                          {items.length > 1 && (
-                            <button
-                              onClick={() => handleRemoveRow(index)}
-                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                              title={t('common.remove')}
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Add Row Button */}
-            {items.length < MAX_ITEMS && (
-              <button
-                onClick={handleAddRow}
-                className="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-orange-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors flex items-center justify-center gap-2"
+            {fields.map((field, index) => (
+              <div
+                key={field.id}
+                className="p-6 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 space-y-4"
               >
-                <PlusIcon className="h-4 w-4" />
-                {t('catalog.addAnotherItem')}
+                {/* Header with number and delete */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 bg-orange-500 text-white rounded-full font-semibold text-sm">
+                      {index + 1}
+                    </div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                      {watch(`items.${index}.name`) || t('catalog.itemName')}
+                    </h3>
+                  </div>
+                  {fields.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(index)}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      title={t('common.remove')}
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Form Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Left Column */}
+                  <div className="space-y-4">
+                    {/* Item Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('catalog.itemName')} *
+                      </label>
+                      <input
+                        {...register(`items.${index}.name`, {
+                          required: t('catalog.validation.nameRequired'),
+                          maxLength: { value: 200, message: t('menuSetup.nameTooLong') },
+                        })}
+                        type="text"
+                        placeholder={t('catalog.enterItemName')}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                          errors.items?.[index]?.name
+                            ? 'border-red-500 dark:border-red-400'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      />
+                      {errors.items?.[index]?.name && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {errors.items[index]?.name?.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('catalog.category')} *
+                      </label>
+                      <select
+                        {...register(`items.${index}.category_id`, {
+                          required: t('catalog.validation.categoryRequired'),
+                        })}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                          errors.items?.[index]?.category_id
+                            ? 'border-red-500 dark:border-red-400'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      >
+                        <option value="">{t('catalog.selectCategory')}</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.items?.[index]?.category_id && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {errors.items[index]?.category_id?.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Price & Stock */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          {t('catalog.price')} *
+                        </label>
+                        <input
+                          {...register(`items.${index}.price`, {
+                            required: t('catalog.validation.priceInvalid'),
+                            validate: (value) => parseFloat(value) > 0 || t('catalog.validation.priceInvalid'),
+                          })}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                            errors.items?.[index]?.price
+                              ? 'border-red-500 dark:border-red-400'
+                              : 'border-gray-300 dark:border-gray-600'
+                          }`}
+                        />
+                        {errors.items?.[index]?.price && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            {errors.items[index]?.price?.message}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          {t('catalog.stock')}
+                        </label>
+                        <input
+                          {...register(`items.${index}.stock`)}
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* SKU */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('catalog.sku')} ({t('common.optional')})
+                      </label>
+                      <input
+                        {...register(`items.${index}.sku`)}
+                        type="text"
+                        placeholder={t('catalog.enterSKU')}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column */}
+                  <div className="space-y-4">
+                    {/* Description */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('menuSetup.description')} *
+                      </label>
+                      <textarea
+                        {...register(`items.${index}.description`, {
+                          required: t('menuSetup.descriptionRequired'),
+                          maxLength: { value: 500, message: t('menuSetup.descriptionTooLong') },
+                        })}
+                        placeholder={t('menuSetup.itemDescriptionPlaceholder')}
+                        rows={4}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                          errors.items?.[index]?.description
+                            ? 'border-red-500 dark:border-red-400'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      />
+                      {errors.items?.[index]?.description && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {errors.items[index]?.description?.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Image Upload */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        {t('catalog.image')} ({t('common.optional')})
+                      </label>
+                      <ImageUpload
+                        value={watch(`items.${index}.imageFile`)}
+                        onChange={(file) => handleImageChange(index, file)}
+                        onError={(error) => handleImageError(index, error)}
+                        placeholder={t('menuSetup.uploadItemImagePlaceholder')}
+                        maxSizeMB={5}
+                      />
+                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        {t('menuSetup.itemImageUploadHint')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Add Another Button */}
+            {fields.length < MAX_ITEMS && (
+              <button
+                type="button"
+                onClick={handleAddRow}
+                className="w-full py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-orange-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors flex items-center justify-center gap-2"
+              >
+                <PlusIcon className="h-5 w-5" />
+                {t('menuSetup.addAnotherItem')}
               </button>
             )}
           </div>
-        </div>
 
-        {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex gap-3">
-          <Button variant="secondary" onClick={handleClose} className="flex-1">
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleSubmit} className="flex-1">
-            {t('catalog.addItemsCount', {
-              count: items.filter(i => i.name.trim() && i.category_id && i.price).length
-            })}
-          </Button>
-        </div>
+          {/* Footer Actions */}
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {validCount} {t('menuSetup.items')}
+            </div>
+            <div className="flex gap-3">
+              <Button type="button" variant="secondary" onClick={onClose}>
+                {t('common.cancel')}
+              </Button>
+              <Button type="submit" disabled={validCount === 0}>
+                {t('catalog.addItemsCount', { count: validCount })}
+              </Button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );

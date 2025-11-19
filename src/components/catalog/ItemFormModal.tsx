@@ -1,104 +1,99 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
 import { XMarkIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import type { Item } from '../../contexts/POSContext';
-import type { Category } from '../../types/menu';
+import { ImageUpload } from '../ui/ImageUpload';
+import type { Item, Category } from '../../types/menu';
+
+interface ItemFormData {
+  name: string;
+  price: string;
+  category: string;
+  category_id: string;
+  sku: string;
+  stock: string;
+  image_url: string;
+  description: string;
+}
 
 interface ItemFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (item: Omit<Item, 'id'> | Item) => Promise<void>;
+  onSave: (item: any, imageFile?: File | null) => Promise<void>;
   editingItem?: Item | null;
   categories: Category[];
 }
 
 export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories }: ItemFormModalProps) {
   const { t } = useTranslation();
-  const [formData, setFormData] = useState({
-    name: '',
-    price: '',
-    category: '',
-    categoryId: '',
-    sku: '',
-    stock: '',
-    image: '',
+  const { register, handleSubmit: handleFormSubmit, formState: { errors, isDirty }, reset, setValue, watch } = useForm<ItemFormData>({
+    defaultValues: {
+      name: '',
+      price: '',
+      category: '',
+      category_id: '',
+      sku: '',
+      stock: '',
+      image_url: '',
+      description: '',
+    },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (editingItem) {
-      setFormData({
-        name: editingItem.name || '',
-        price: editingItem.price?.toString() || '',
-        category: editingItem.category || '',
-        categoryId: (editingItem as any).categoryId || '',
-        sku: editingItem.sku || '',
-        stock: editingItem.stock?.toString() || '',
-        image: editingItem.image || '',
-      });
-    } else {
-      setFormData({
-        name: '',
-        price: '',
-        category: '',
-        categoryId: '',
-        sku: '',
-        stock: '',
-        image: '',
-      });
+    if (isOpen) {
+      setImageFile(null);
+      setImageError(null);
+      if (editingItem) {
+        const category = categories.find(c => c.id === editingItem.category_id);
+        reset({
+          name: editingItem.name || '',
+          price: editingItem.price?.toString() || '',
+          category: category?.name || '',
+          category_id: editingItem.category_id || '',
+          sku: editingItem.sku || '',
+          stock: editingItem.stock?.toString() || '',
+          image_url: editingItem.image_url || '',
+          description: editingItem.description || '',
+        });
+      } else {
+        reset({
+          name: '',
+          price: '',
+          category: '',
+          category_id: '',
+          sku: '',
+          stock: '',
+          image_url: '',
+          description: '',
+        });
+      }
     }
-    setErrors({});
-  }, [editingItem, isOpen]);
+  }, [editingItem, isOpen, reset, categories]);
 
-  const validate = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = t('catalog.validation.nameRequired');
-    }
-
-    if (!formData.price || parseFloat(formData.price) <= 0) {
-      newErrors.price = t('catalog.validation.priceInvalid');
-    }
-
-    if (!formData.category.trim() && !formData.categoryId) {
-      newErrors.category = t('catalog.validation.categoryRequired');
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validate()) {
-      return;
-    }
-
+  const onSubmit = async (data: ItemFormData) => {
     setIsSubmitting(true);
     try {
       const itemData: any = {
-        name: formData.name.trim(),
-        price: parseFloat(formData.price),
-        category: formData.category.trim() || 'Uncategorized',
-        sku: formData.sku.trim() || undefined,
-        stock: formData.stock ? parseInt(formData.stock, 10) : undefined,
-        image: formData.image.trim() || undefined,
+        name: data.name.trim(),
+        price: parseFloat(data.price),
+        category: data.category.trim() || 'Uncategorized',
+        category_id: data.category_id,
+        sku: data.sku.trim() || undefined,
+        stock: data.stock ? parseInt(data.stock, 10) : undefined,
+        image_url: data.image_url.trim() || undefined,
+        description: data.description?.trim() || undefined,
       };
-
-      if (formData.categoryId) {
-        itemData.categoryId = formData.categoryId;
-      }
 
       if (editingItem) {
         itemData.id = editingItem.id;
       }
 
-      await onSave(itemData);
+      await onSave(itemData, imageFile);
       onClose();
     } catch (error) {
       console.error('Error saving item:', error);
@@ -109,12 +104,12 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
 
   const handleCategoryChange = (categoryId: string) => {
     const category = categories.find((c) => c.id === categoryId);
-    setFormData({
-      ...formData,
-      categoryId,
-      category: category?.name || '',
-    });
+    setValue('category_id', categoryId, { shouldDirty: true });
+    setValue('category', category?.name || '', { shouldDirty: true });
   };
+
+  const imageValue = watch('image_url');
+  const hasFormChanged = isDirty || imageFile !== null;
 
   if (!isOpen) return null;
 
@@ -133,32 +128,43 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="p-6 space-y-4">
           {/* Item Name */}
           <div>
-            <Input
-              label={t('catalog.itemName')}
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('catalog.itemName')} *
+            </label>
+            <input
+              {...register('name', {
+                required: t('catalog.validation.nameRequired'),
+              })}
               placeholder={t('catalog.enterItemName')}
-              error={errors.name}
-              required
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name.message}</p>
+            )}
           </div>
 
           {/* Price */}
           <div>
-            <Input
-              label={t('catalog.price')}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('catalog.price')} *
+            </label>
+            <input
+              {...register('price', {
+                required: t('catalog.validation.priceInvalid'),
+                validate: (value) => parseFloat(value) > 0 || t('catalog.validation.priceInvalid'),
+              })}
               type="number"
               step="0.01"
               min="0"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
               placeholder="0.00"
-              error={errors.price}
-              required
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
+            {errors.price && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.price.message}</p>
+            )}
           </div>
 
           {/* Category */}
@@ -167,82 +173,91 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
               {t('catalog.category')} *
             </label>
             {categories.length > 0 ? (
-              <select
-                value={formData.categoryId}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">{t('catalog.selectCategory')}</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
+              <>
+                <input type="hidden" {...register('category_id', { required: t('catalog.validation.categoryRequired') })} />
+                <input type="hidden" {...register('category')} />
+                <select
+                  value={watch('category_id')}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">{t('catalog.selectCategory')}</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.category_id && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.category_id.message}</p>
+                )}
+              </>
             ) : (
-              <Input
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                placeholder={t('catalog.enterCategory')}
-                error={errors.category}
-              />
-            )}
-            {errors.category && (
-              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.category}</p>
+              <>
+                <input
+                  {...register('category', { required: t('catalog.validation.categoryRequired') })}
+                  placeholder={t('catalog.enterCategory')}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+                {errors.category && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.category.message}</p>
+                )}
+              </>
             )}
           </div>
 
           {/* SKU */}
           <div>
-            <Input
-              label={t('catalog.sku')}
-              value={formData.sku}
-              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('catalog.sku')}
+            </label>
+            <input
+              {...register('sku')}
               placeholder={t('catalog.enterSKU')}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
 
           {/* Stock */}
           <div>
-            <Input
-              label={t('catalog.stock')}
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('catalog.stock')}
+            </label>
+            <input
+              {...register('stock')}
               type="number"
               min="0"
-              value={formData.stock}
-              onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
               placeholder="0"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
 
-          {/* Image URL */}
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('catalog.imageURL')}
+              {t('common.description')}
             </label>
-            <div className="flex gap-2">
-              <Input
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder={t('catalog.enterImageURL')}
-                className="flex-1"
-              />
-              {formData.image && (
-                <div className="w-12 h-12 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 flex-shrink-0">
-                  <img
-                    src={formData.image}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '';
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {t('catalog.imageURLHint')}
-            </p>
+            <textarea
+              {...register('description')}
+              rows={3}
+              placeholder={t('catalog.enterDescription')}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+            />
+          </div>
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('catalog.image')} {t('common.optional')}
+            </label>
+            <ImageUpload
+              onImageSelect={setImageFile}
+              onError={setImageError}
+              existingImageUrl={editingItem?.image_url || undefined}
+            />
+            {imageError && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{imageError}</p>
+            )}
           </div>
 
           {/* Actions */}
@@ -259,9 +274,13 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
             <Button
               type="submit"
               className="flex-1"
-              disabled={isSubmitting}
+              disabled={isSubmitting || imageError !== null || !hasFormChanged}
             >
-              {isSubmitting ? t('common.saving') : t('catalog.save')}
+              {isSubmitting
+                ? t('common.saving')
+                : editingItem
+                ? t('common.update')
+                : t('catalog.save')}
             </Button>
           </div>
         </form>
