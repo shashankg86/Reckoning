@@ -25,12 +25,21 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
     stock: '',
     image: '',
   });
+  const [originalData, setOriginalData] = useState({
+    name: '',
+    price: '',
+    category: '',
+    categoryId: '',
+    sku: '',
+    stock: '',
+    image: '',
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (editingItem) {
-      setFormData({
+      const initialData = {
         name: editingItem.name || '',
         price: editingItem.price?.toString() || '',
         category: editingItem.category || '',
@@ -38,9 +47,20 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
         sku: editingItem.sku || '',
         stock: editingItem.stock?.toString() || '',
         image: editingItem.image || '',
-      });
+      };
+      setFormData(initialData);
+      setOriginalData(initialData);
     } else {
       setFormData({
+        name: '',
+        price: '',
+        category: '',
+        categoryId: '',
+        sku: '',
+        stock: '',
+        image: '',
+      });
+      setOriginalData({
         name: '',
         price: '',
         category: '',
@@ -115,6 +135,23 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
       category: category?.name || '',
     });
   };
+
+  // Check if form has changed
+  const hasFormChanged = editingItem
+    ? formData.name.trim() !== originalData.name.trim() ||
+      formData.price !== originalData.price ||
+      formData.category.trim() !== originalData.category.trim() ||
+      formData.categoryId !== originalData.categoryId ||
+      formData.sku.trim() !== originalData.sku.trim() ||
+      formData.stock !== originalData.stock ||
+      formData.image.trim() !== originalData.image.trim()
+    : formData.name.trim() !== '' ||
+      formData.price !== '' ||
+      formData.category.trim() !== '' ||
+      formData.categoryId !== '' ||
+      formData.sku.trim() !== '' ||
+      formData.stock !== '' ||
+      formData.image.trim() !== '';
 
   if (!isOpen) return null;
 
@@ -259,9 +296,13 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
             <Button
               type="submit"
               className="flex-1"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !hasFormChanged}
             >
-              {isSubmitting ? t('common.saving') : t('catalog.save')}
+              {isSubmitting
+                ? t('common.saving')
+                : editingItem
+                ? t('common.update')
+                : t('catalog.save')}
             </Button>
           </div>
         </form>

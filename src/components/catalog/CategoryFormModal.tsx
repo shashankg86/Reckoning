@@ -31,6 +31,11 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
     description: '',
     color: '#FF6B35',
   });
+  const [originalData, setOriginalData] = useState({
+    name: '',
+    description: '',
+    color: '#FF6B35',
+  });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,14 +43,21 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
 
   useEffect(() => {
     if (editingCategory) {
-      setFormData({
+      const initialData = {
         name: editingCategory.name || '',
         description: editingCategory.description || '',
         color: editingCategory.color || '#FF6B35',
-      });
+      };
+      setFormData(initialData);
+      setOriginalData(initialData);
       setImageFile(null);
     } else {
       setFormData({
+        name: '',
+        description: '',
+        color: '#FF6B35',
+      });
+      setOriginalData({
         name: '',
         description: '',
         color: '#FF6B35',
@@ -103,6 +115,17 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
       setIsSubmitting(false);
     }
   };
+
+  // Check if form has changed
+  const hasFormChanged = editingCategory
+    ? formData.name.trim() !== originalData.name.trim() ||
+      formData.description.trim() !== originalData.description.trim() ||
+      formData.color !== originalData.color ||
+      imageFile !== null
+    : formData.name.trim() !== '' ||
+      formData.description.trim() !== '' ||
+      formData.color !== '#FF6B35' ||
+      imageFile !== null;
 
   if (!isOpen) return null;
 
@@ -208,7 +231,11 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
             >
               {t('common.cancel')}
             </Button>
-            <Button type="submit" className="flex-1" disabled={isSubmitting || imageError !== null}>
+            <Button
+              type="submit"
+              className="flex-1"
+              disabled={isSubmitting || imageError !== null || !hasFormChanged}
+            >
               {isSubmitting
                 ? t('common.saving')
                 : editingCategory
