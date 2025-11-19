@@ -4,11 +4,16 @@ import {
   PencilIcon,
   TrashIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import type { Category } from '../../types/menu';
 import { usePagination } from '../../hooks/usePagination';
+
+type SortField = 'name' | 'description' | 'itemCount';
+type SortOrder = 'asc' | 'desc';
 
 interface CategoriesTableProps {
   categories: Category[];
@@ -29,6 +34,38 @@ export function CategoriesTable({
 }: CategoriesTableProps) {
   const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+
+  // Sort categories
+  const sortedCategories = React.useMemo(() => {
+    return [...categories].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'description':
+          comparison = (a.description || '').localeCompare(b.description || '');
+          break;
+        case 'itemCount':
+          comparison = (itemCounts[a.id] || 0) - (itemCounts[b.id] || 0);
+          break;
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [categories, sortField, sortOrder, itemCounts]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
 
   const {
     currentPage,
@@ -42,7 +79,7 @@ export function CategoriesTable({
     startIndex,
     endIndex,
     totalItems
-  } = usePagination(categories, pageSize);
+  } = usePagination(sortedCategories, pageSize);
 
   // Clear selection when page changes
   useEffect(() => {
@@ -115,14 +152,44 @@ export function CategoriesTable({
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t('catalog.image')}
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('common.name')}
+              <th
+                className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('name')}
+              >
+                <div className="flex items-center gap-2">
+                  {t('common.name')}
+                  {sortField === 'name' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('common.description')}
+              <th
+                className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('description')}
+              >
+                <div className="flex items-center gap-2">
+                  {t('common.description')}
+                  {sortField === 'description' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.itemCount')}
+              <th
+                className="px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('itemCount')}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  {t('catalog.itemCount')}
+                  {sortField === 'itemCount' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t('common.actions')}

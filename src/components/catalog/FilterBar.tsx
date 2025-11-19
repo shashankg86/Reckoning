@@ -69,7 +69,7 @@ export function FilterBar({ filters, categories, maxPrice, onFilterChange, onRes
       {/* Advanced Filters */}
       {showAdvanced && (
         <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Price Range */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -109,40 +109,6 @@ export function FilterBar({ filters, categories, maxPrice, onFilterChange, onRes
                   })}
                   className="w-full accent-orange-500"
                 />
-              </div>
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t('catalog.categories')}
-              </label>
-              <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
-                {categories.map(cat => (
-                  <label
-                    key={cat.id}
-                    className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={filters.categories.includes(cat.id)}
-                      onChange={(e) => {
-                        const newCategories = e.target.checked
-                          ? [...filters.categories, cat.id]
-                          : filters.categories.filter(id => id !== cat.id);
-                        onFilterChange('categories', newCategories);
-                      }}
-                      className="w-4 h-4 text-orange-600 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
-                    />
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: cat.color }}
-                    />
-                    <span className="text-sm text-gray-900 dark:text-white flex-1">
-                      {cat.name}
-                    </span>
-                  </label>
-                ))}
               </div>
             </div>
 

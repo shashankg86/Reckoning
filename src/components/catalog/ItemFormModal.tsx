@@ -4,23 +4,23 @@ import { useForm } from 'react-hook-form';
 import { XMarkIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import type { Item } from '../../contexts/POSContext';
-import type { Category } from '../../types/menu';
+import type { Item, Category } from '../../types/menu';
 
 interface ItemFormData {
   name: string;
   price: string;
   category: string;
-  categoryId: string;
+  category_id: string;
   sku: string;
   stock: string;
-  image: string;
+  image_url: string;
+  description: string;
 }
 
 interface ItemFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (item: Omit<Item, 'id'> | Item) => Promise<void>;
+  onSave: (item: any) => Promise<void>;
   editingItem?: Item | null;
   categories: Category[];
 }
@@ -32,10 +32,11 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
       name: '',
       price: '',
       category: '',
-      categoryId: '',
+      category_id: '',
       sku: '',
       stock: '',
-      image: '',
+      image_url: '',
+      description: '',
     },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,28 +44,31 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
   useEffect(() => {
     if (isOpen) {
       if (editingItem) {
+        const category = categories.find(c => c.id === editingItem.category_id);
         reset({
           name: editingItem.name || '',
           price: editingItem.price?.toString() || '',
-          category: editingItem.category || '',
-          categoryId: (editingItem as any).categoryId || '',
+          category: category?.name || '',
+          category_id: editingItem.category_id || '',
           sku: editingItem.sku || '',
           stock: editingItem.stock?.toString() || '',
-          image: editingItem.image || '',
+          image_url: editingItem.image_url || '',
+          description: editingItem.description || '',
         });
       } else {
         reset({
           name: '',
           price: '',
           category: '',
-          categoryId: '',
+          category_id: '',
           sku: '',
           stock: '',
-          image: '',
+          image_url: '',
+          description: '',
         });
       }
     }
-  }, [editingItem, isOpen, reset]);
+  }, [editingItem, isOpen, reset, categories]);
 
   const onSubmit = async (data: ItemFormData) => {
     setIsSubmitting(true);
@@ -73,14 +77,12 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
         name: data.name.trim(),
         price: parseFloat(data.price),
         category: data.category.trim() || 'Uncategorized',
+        category_id: data.category_id,
         sku: data.sku.trim() || undefined,
         stock: data.stock ? parseInt(data.stock, 10) : undefined,
-        image: data.image.trim() || undefined,
+        image_url: data.image_url.trim() || undefined,
+        description: data.description?.trim() || undefined,
       };
-
-      if (data.categoryId) {
-        itemData.categoryId = data.categoryId;
-      }
 
       if (editingItem) {
         itemData.id = editingItem.id;
@@ -97,11 +99,11 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
 
   const handleCategoryChange = (categoryId: string) => {
     const category = categories.find((c) => c.id === categoryId);
-    setValue('categoryId', categoryId, { shouldDirty: true });
+    setValue('category_id', categoryId, { shouldDirty: true });
     setValue('category', category?.name || '', { shouldDirty: true });
   };
 
-  const imageValue = watch('image');
+  const imageValue = watch('image_url');
 
   if (!isOpen) return null;
 
@@ -166,10 +168,10 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
             </label>
             {categories.length > 0 ? (
               <>
-                <input type="hidden" {...register('categoryId', { required: t('catalog.validation.categoryRequired') })} />
+                <input type="hidden" {...register('category_id', { required: t('catalog.validation.categoryRequired') })} />
                 <input type="hidden" {...register('category')} />
                 <select
-                  value={watch('categoryId')}
+                  value={watch('category_id')}
                   onChange={(e) => handleCategoryChange(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 >
@@ -180,8 +182,8 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
                     </option>
                   ))}
                 </select>
-                {errors.categoryId && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.categoryId.message}</p>
+                {errors.category_id && (
+                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.category_id.message}</p>
                 )}
               </>
             ) : (
@@ -231,7 +233,7 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
             </label>
             <div className="flex gap-2">
               <input
-                {...register('image')}
+                {...register('image_url')}
                 placeholder={t('catalog.enterImageURL')}
                 className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
@@ -252,6 +254,19 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {t('catalog.imageURLHint')}
             </p>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('common.description')}
+            </label>
+            <textarea
+              {...register('description')}
+              rows={3}
+              placeholder={t('catalog.enterDescription')}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+            />
           </div>
 
           {/* Actions */}
