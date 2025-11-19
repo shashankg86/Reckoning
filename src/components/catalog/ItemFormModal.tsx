@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { XMarkIcon, PhotoIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { ImageUpload } from '../ui/ImageUpload';
 import type { Item, Category } from '../../types/menu';
 
 interface ItemFormData {
@@ -20,7 +21,7 @@ interface ItemFormData {
 interface ItemFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (item: any) => Promise<void>;
+  onSave: (item: any, imageFile?: File | null) => Promise<void>;
   editingItem?: Item | null;
   categories: Category[];
 }
@@ -40,9 +41,13 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
     },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
+      setImageFile(null);
+      setImageError(null);
       if (editingItem) {
         const category = categories.find(c => c.id === editingItem.category_id);
         reset({
@@ -88,7 +93,7 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
         itemData.id = editingItem.id;
       }
 
-      await onSave(itemData);
+      await onSave(itemData, imageFile);
       onClose();
     } catch (error) {
       console.error('Error saving item:', error);
@@ -104,6 +109,7 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
   };
 
   const imageValue = watch('image_url');
+  const hasFormChanged = isDirty || imageFile !== null;
 
   if (!isOpen) return null;
 

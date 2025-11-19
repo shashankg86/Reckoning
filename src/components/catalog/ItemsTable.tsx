@@ -5,12 +5,17 @@ import {
   TrashIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
   CubeIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import type { Item } from '../../types/menu';
 import type { Category } from '../../types/menu';
 import { usePagination } from '../../hooks/usePagination';
+
+type SortField = 'name' | 'category' | 'sku' | 'price' | 'stock';
+type SortOrder = 'asc' | 'desc';
 
 interface ItemsTableProps {
   items: Item[];
@@ -31,6 +36,47 @@ export function ItemsTable({
 }: ItemsTableProps) {
   const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+
+  // Sort items
+  const sortedItems = React.useMemo(() => {
+    return [...items].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'category': {
+          const catA = categories.find(c => c.id === a.category_id);
+          const catB = categories.find(c => c.id === b.category_id);
+          comparison = (catA?.name || '').localeCompare(catB?.name || '');
+          break;
+        }
+        case 'sku':
+          comparison = (a.sku || '').localeCompare(b.sku || '');
+          break;
+        case 'price':
+          comparison = parseFloat(a.price) - parseFloat(b.price);
+          break;
+        case 'stock':
+          comparison = (a.stock || 0) - (b.stock || 0);
+          break;
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [items, sortField, sortOrder, categories]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
 
   const {
     currentPage,
@@ -44,7 +90,7 @@ export function ItemsTable({
     startIndex,
     endIndex,
     totalItems
-  } = usePagination(items, pageSize);
+  } = usePagination(sortedItems, pageSize);
 
   // Clear selection when page changes
   useEffect(() => {
@@ -144,20 +190,70 @@ export function ItemsTable({
               <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t('common.image')}
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('common.itemName')}
+              <th
+                className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('name')}
+              >
+                <div className="flex items-center gap-2">
+                  {t('common.itemName')}
+                  {sortField === 'name' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.category')}
+              <th
+                className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('category')}
+              >
+                <div className="flex items-center gap-2">
+                  {t('catalog.category')}
+                  {sortField === 'category' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.sku')}
+              <th
+                className="px-4 py-3 text-left text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('sku')}
+              >
+                <div className="flex items-center gap-2">
+                  {t('catalog.sku')}
+                  {sortField === 'sku' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.price')}
+              <th
+                className="px-4 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('price')}
+              >
+                <div className="flex items-center justify-end gap-2">
+                  {t('catalog.price')}
+                  {sortField === 'price' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200">
-                {t('catalog.stock')}
+              <th
+                className="px-4 py-3 text-center text-sm font-medium text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors select-none"
+                onClick={() => handleSort('stock')}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  {t('catalog.stock')}
+                  {sortField === 'stock' && (
+                    sortOrder === 'asc' ?
+                      <ChevronUpIcon className="h-4 w-4" /> :
+                      <ChevronDownIcon className="h-4 w-4" />
+                  )}
+                </div>
               </th>
               <th className="px-4 py-3 text-right text-sm font-medium text-gray-700 dark:text-gray-200">
                 {t('common.actions')}
