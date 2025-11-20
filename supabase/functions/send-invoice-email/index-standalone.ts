@@ -1,5 +1,6 @@
 // Supabase Edge Function to send invoice emails via Resend
 // Single-file version for manual dashboard deployment
+// CORS-safe version - always returns CORS headers
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
@@ -367,32 +368,72 @@ function generateInvoiceHTML(data: InvoiceEmailRequest): string {
 </html>`;
 }
 
+// Main serve handler with CORS protection
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // ALWAYS handle CORS preflight requests FIRST
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Wrap everything in try-catch to ensure CORS headers on all errors
   try {
+    console.log('Edge Function invoked:', req.method, req.url);
+
     // Get the Resend API key from environment secrets
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
-      throw new Error('RESEND_API_KEY is not configured in Edge Function secrets');
-    }
-
-    // Parse the request body
-    const invoiceData: InvoiceEmailRequest = await req.json();
-
-    // Validate required fields
-    if (!invoiceData.to || !invoiceData.invoiceNumber) {
+      console.error('RESEND_API_KEY not configured');
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: to, invoiceNumber' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          error: 'RESEND_API_KEY is not configured in Edge Function secrets',
+          success: false
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
       );
     }
 
+    // Parse the request body
+    let invoiceData: InvoiceEmailRequest;
+    try {
+      invoiceData = await req.json();
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid JSON in request body',
+          success: false
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Validate required fields
+    if (!invoiceData.to || !invoiceData.invoiceNumber) {
+      console.error('Missing required fields');
+      return new Response(
+        JSON.stringify({
+          error: 'Missing required fields: to, invoiceNumber',
+          success: false
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log('Generating invoice HTML for:', invoiceData.invoiceNumber);
+
     // Generate HTML email content
     const htmlContent = generateInvoiceHTML(invoiceData);
+
+    console.log('Calling Resend API...');
 
     // Send email via Resend API
     const resendResponse = await fetch('https://api.resend.com/emails', {
@@ -412,10 +453,21 @@ serve(async (req) => {
     if (!resendResponse.ok) {
       const errorData = await resendResponse.json();
       console.error('Resend API error:', errorData);
-      throw new Error(errorData.message || 'Failed to send email');
+      return new Response(
+        JSON.stringify({
+          error: errorData.message || 'Failed to send email via Resend',
+          success: false,
+          details: errorData
+        }),
+        {
+          status: resendResponse.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const result = await resendResponse.json();
+    console.log('Email sent successfully:', result);
 
     return new Response(
       JSON.stringify({ success: true, data: result }),
@@ -425,10 +477,11 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Edge Function error:', error);
+    // Catch ANY unhandled errors and still return CORS headers
+    console.error('Unhandled Edge Function error:', error);
     return new Response(
       JSON.stringify({
-        error: error.message || 'Failed to send invoice email',
+        error: error?.message || 'Internal server error',
         success: false
       }),
       {
