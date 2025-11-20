@@ -49,7 +49,7 @@ export const emailService = {
   async sendInvoiceEmail(data: InvoiceEmailData) {
     try {
       // Call the Supabase Edge Function to send the email
-      const { data: result, error } = await supabase.functions.invoke('send-invoice-email', {
+      const { data: result, error } = await supabase.functions.invoke('email-invoice', {
         body: data,
       });
 
