@@ -14,6 +14,7 @@ import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
 import type { CartItem } from '../../contexts/POSContext';
 import type { StoreTaxConfig } from '../../api/taxConfig';
+import type { InvoiceTaxOverride } from './InvoiceTaxModal';
 
 interface CustomerInfo {
   name: string;
@@ -24,9 +25,14 @@ interface CartPanelProps {
   cart: CartItem[];
   calculations: {
     subtotal: number;
+    serviceCharge: number;
+    serviceChargeRate: number;
     tax: number;
     taxRate: number;
     taxComponents: { name: string; amount: number; rate: number }[];
+    municipalityFee: number;
+    municipalityFeeRate: number;
+    customComponents: { name: string; rate: number; amount: number }[];
     discountAmount: number;
     total: number;
   };
@@ -37,6 +43,7 @@ interface CartPanelProps {
   taxRate: number;
   taxComponents: { name: string; amount: number; rate: number }[];
   taxConfig: StoreTaxConfig | null;
+  invoiceTaxOverride: InvoiceTaxOverride | null;
   onUpdateQuantity: (itemId: string, quantity: number) => void;
   onRemoveFromCart: (itemId: string) => void;
   onClearCart: () => void;
@@ -46,6 +53,7 @@ interface CartPanelProps {
   onDiscountTypeChange: (type: 'flat' | 'percentage') => void;
   onTaxRateChange: (rate: number | null) => void;
   onTaxConfigClick: () => void;
+  onInvoiceTaxClick: () => void;
   onHoldOrder: () => void;
   onShowHeldOrders: () => void;
   onPayment: () => void;
@@ -62,6 +70,7 @@ export function CartPanel({
   taxRate,
   taxComponents,
   taxConfig,
+  invoiceTaxOverride,
   onUpdateQuantity,
   onRemoveFromCart,
   onClearCart,
@@ -71,6 +80,7 @@ export function CartPanel({
   onDiscountTypeChange,
   onTaxRateChange,
   onTaxConfigClick,
+  onInvoiceTaxClick,
   onHoldOrder,
   onShowHeldOrders,
   onPayment,
@@ -243,14 +253,35 @@ export function CartPanel({
 
           {/* Totals */}
           <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-600">
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between items-center text-sm">
               <span className="text-gray-600 dark:text-gray-400">
                 {t('billing.subtotal')}
               </span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                ₹{calculations.subtotal.toLocaleString('en-IN')}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900 dark:text-white">
+                  ₹{calculations.subtotal.toLocaleString('en-IN')}
+                </span>
+                <button
+                  onClick={onInvoiceTaxClick}
+                  className="text-xs px-2 py-0.5 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 rounded hover:bg-orange-200 dark:hover:bg-orange-900/60 transition-colors"
+                  title={t('billing.customizeTax')}
+                >
+                  {t('billing.addTax')}
+                </button>
+              </div>
             </div>
+
+            {/* Service Charge */}
+            {calculations.serviceCharge > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  {t('billing.serviceCharge')} ({calculations.serviceChargeRate}%)
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  ₹{calculations.serviceCharge.toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
 
             {/* Tax Breakdown */}
             {taxConfig?.tax_enabled && taxComponents.length > 0 ? (
@@ -297,6 +328,34 @@ export function CartPanel({
                   ₹{calculations.tax.toLocaleString('en-IN')}
                 </span>
               </div>
+            )}
+
+            {/* Municipality Fee (Dubai) */}
+            {calculations.municipalityFee > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400">
+                  {t('billing.municipalityFee')} ({calculations.municipalityFeeRate}%)
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  ₹{calculations.municipalityFee.toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
+
+            {/* Custom Tax Components */}
+            {calculations.customComponents && calculations.customComponents.length > 0 && (
+              <>
+                {calculations.customComponents.map((component, index) => (
+                  <div key={index} className="flex justify-between text-sm">
+                    <span className="text-gray-600 dark:text-gray-400">
+                      {component.name} ({component.rate}%)
+                    </span>
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      ₹{component.amount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                ))}
+              </>
             )}
 
             {calculations.discountAmount > 0 && (

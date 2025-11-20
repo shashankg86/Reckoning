@@ -19,6 +19,7 @@ import { CartPanel } from '../components/billing/CartPanel';
 import { PaymentModal } from '../components/billing/PaymentModal';
 import { HoldOrdersModal } from '../components/billing/HoldOrdersModal';
 import { TaxConfigModal } from '../components/billing/TaxConfigModal';
+import { InvoiceTaxModal, type InvoiceTaxOverride } from '../components/billing/InvoiceTaxModal';
 import type { Item, CartItem } from '../contexts/POSContext';
 import { taxConfigAPI, type StoreTaxConfig } from '../api/taxConfig';
 import toast from 'react-hot-toast';
@@ -80,9 +81,11 @@ export function BillingScreen() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHoldOrdersModal, setShowHoldOrdersModal] = useState(false);
   const [showTaxConfigModal, setShowTaxConfigModal] = useState(false);
+  const [showInvoiceTaxModal, setShowInvoiceTaxModal] = useState(false);
 
   // Tax configuration
   const [taxConfig, setTaxConfig] = useState<StoreTaxConfig | null>(null);
+  const [invoiceTaxOverride, setInvoiceTaxOverride] = useState<InvoiceTaxOverride | null>(null);
 
   // Held orders
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
@@ -127,47 +130,96 @@ export function BillingScreen() {
       0
     );
 
-    // Calculate tax using tax configuration
+    // Service charge (if enabled in invoice override)
+    let serviceChargeAmount = 0;
+    if (invoiceTaxOverride?.serviceCharge?.enabled) {
+      serviceChargeAmount = (subtotal * invoiceTaxOverride.serviceCharge.rate) / 100;
+    }
+
+    // Base for tax calculation
+    let taxableAmount = subtotal;
+    const isDubai = taxConfig?.country === 'AE';
+
+    // In Dubai, VAT applies on service charge too (if configured)
+    if (isDubai && invoiceTaxOverride?.serviceCharge?.enabled && invoiceTaxOverride.serviceCharge.applyVatOnServiceCharge) {
+      taxableAmount += serviceChargeAmount;
+    }
+
+    // Calculate tax
     let taxData = { components: [] as { name: string; amount: number; rate: number }[], total: 0 };
     let taxRate = 0;
+    let taxEnabled = invoiceTaxOverride?.enabled ?? true;
 
-    if (taxConfig) {
-      // Use tax configuration
-      taxData = taxConfigAPI.calculateTax(subtotal, taxConfig);
-      taxRate = taxData.components.reduce((sum, comp) => sum + comp.rate, 0);
-    } else if (customTaxRate !== null) {
-      // Fallback to custom tax rate if no config
-      taxRate = customTaxRate;
-      taxData = {
-        components: [{ name: 'Tax', rate: taxRate, amount: (subtotal * taxRate) / 100 }],
-        total: (subtotal * taxRate) / 100
-      };
-    } else {
-      // Fallback to default tax rate based on store type
-      const storeType = authState.user?.store?.type;
-      taxRate = storeType === 'restaurant' || storeType === 'cafe' ? 5 : 18;
-      taxData = {
-        components: [{ name: 'Tax', rate: taxRate, amount: (subtotal * taxRate) / 100 }],
-        total: (subtotal * taxRate) / 100
-      };
+    if (taxEnabled) {
+      // Check for invoice-specific tax override first
+      if (invoiceTaxOverride?.customRate !== undefined) {
+        taxRate = invoiceTaxOverride.customRate;
+        taxData = {
+          components: [{ name: isDubai ? 'VAT' : 'GST', rate: taxRate, amount: (taxableAmount * taxRate) / 100 }],
+          total: (taxableAmount * taxRate) / 100
+        };
+      } else if (taxConfig) {
+        // Use tax configuration
+        taxData = taxConfigAPI.calculateTax(taxableAmount, taxConfig);
+        taxRate = taxData.components.reduce((sum, comp) => sum + comp.rate, 0);
+      } else if (customTaxRate !== null) {
+        // Fallback to custom tax rate
+        taxRate = customTaxRate;
+        taxData = {
+          components: [{ name: 'Tax', rate: taxRate, amount: (taxableAmount * taxRate) / 100 }],
+          total: (taxableAmount * taxRate) / 100
+        };
+      } else {
+        // Fallback to default tax rate based on store type
+        const storeType = authState.user?.store?.type;
+        taxRate = storeType === 'restaurant' || storeType === 'cafe' ? 5 : 18;
+        taxData = {
+          components: [{ name: 'Tax', rate: taxRate, amount: (taxableAmount * taxRate) / 100 }],
+          total: (taxableAmount * taxRate) / 100
+        };
+      }
     }
+
+    // Municipality fee (Dubai only)
+    let municipalityFeeAmount = 0;
+    if (invoiceTaxOverride?.municipalityFee?.enabled && isDubai) {
+      municipalityFeeAmount = (subtotal * invoiceTaxOverride.municipalityFee.rate) / 100;
+    }
+
+    // Custom tax components (from invoice override)
+    let customComponentsAmount = 0;
+    const customComponents = invoiceTaxOverride?.customComponents || [];
+    customComponents.forEach(comp => {
+      customComponentsAmount += (subtotal * comp.rate) / 100;
+    });
 
     // Calculate discount
     const discountAmount = discountType === 'percentage'
       ? (subtotal * discount) / 100
       : discount;
 
-    const total = Math.max(0, subtotal + taxData.total - discountAmount);
+    const total = Math.max(
+      0,
+      subtotal + serviceChargeAmount + taxData.total + municipalityFeeAmount + customComponentsAmount - discountAmount
+    );
 
     return {
       subtotal,
+      serviceCharge: serviceChargeAmount,
+      serviceChargeRate: invoiceTaxOverride?.serviceCharge?.rate || 0,
       tax: taxData.total,
       taxRate,
       taxComponents: taxData.components,
+      municipalityFee: municipalityFeeAmount,
+      municipalityFeeRate: invoiceTaxOverride?.municipalityFee?.rate || 0,
+      customComponents: customComponents.map(comp => ({
+        ...comp,
+        amount: (subtotal * comp.rate) / 100
+      })),
       discountAmount,
       total
     };
-  }, [posState.cart, discount, discountType, customTaxRate, authState.user?.store?.type, taxConfig]);
+  }, [posState.cart, discount, discountType, customTaxRate, authState.user?.store?.type, taxConfig, invoiceTaxOverride]);
 
   // Add item to cart
   const handleAddToCart = useCallback((item: Item) => {
@@ -444,6 +496,7 @@ export function BillingScreen() {
             taxRate={calculations.taxRate}
             taxComponents={calculations.taxComponents}
             taxConfig={taxConfig}
+            invoiceTaxOverride={invoiceTaxOverride}
             onUpdateQuantity={handleUpdateQuantity}
             onRemoveFromCart={handleRemoveFromCart}
             onClearCart={handleClearCart}
@@ -453,6 +506,7 @@ export function BillingScreen() {
             onDiscountTypeChange={setDiscountType}
             onTaxRateChange={setCustomTaxRate}
             onTaxConfigClick={() => setShowTaxConfigModal(true)}
+            onInvoiceTaxClick={() => setShowInvoiceTaxModal(true)}
             onHoldOrder={handleHoldOrder}
             onShowHeldOrders={() => setShowHoldOrdersModal(true)}
             onPayment={() => setShowPaymentModal(true)}
@@ -489,6 +543,21 @@ export function BillingScreen() {
           onConfigSaved={(config) => {
             setTaxConfig(config);
             setShowTaxConfigModal(false);
+          }}
+        />
+      )}
+
+      {/* Invoice Tax Customization Modal */}
+      {showInvoiceTaxModal && (
+        <InvoiceTaxModal
+          currentOverride={invoiceTaxOverride}
+          defaultTaxRate={calculations.taxRate}
+          subtotal={calculations.subtotal}
+          country={taxConfig?.country}
+          onClose={() => setShowInvoiceTaxModal(false)}
+          onApply={(override) => {
+            setInvoiceTaxOverride(override);
+            setShowInvoiceTaxModal(false);
           }}
         />
       )}
