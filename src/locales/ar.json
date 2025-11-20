@@ -363,8 +363,10 @@
     "pleaseFixImageErrors": "يرجى إصلاح أخطاء الصورة قبل الإرسال"
   },
   "common": {
+    "all": "الكل",
     "loading": "جاري التحميل...",
     "optional": "اختياري",
+    "left": "متبقي",
     "error": "خطأ",
     "success": "نجح",
     "warning": "تحذير",

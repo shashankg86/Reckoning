@@ -521,6 +521,7 @@
     }
   },
   "common": {
+    "all": "All",
     "loading": "Loading...",
     "optional": "Optional",
     "or": "or",
@@ -567,6 +568,7 @@
     "currency": "₹",
     "hello": "Hello",
     "units": "units",
+    "left": "left",
     "image": "Image",
     "actions": "Actions",
     "itemName": "Item Name",
