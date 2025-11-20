@@ -6,12 +6,14 @@ import {
   TrashIcon,
   UserIcon,
   ClockIcon,
-  ShoppingCartIcon
+  ShoppingCartIcon,
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
 import type { CartItem } from '../../contexts/POSContext';
+import type { StoreTaxConfig } from '../../api/taxConfig';
 
 interface CustomerInfo {
   name: string;
@@ -24,6 +26,7 @@ interface CartPanelProps {
     subtotal: number;
     tax: number;
     taxRate: number;
+    taxComponents: { name: string; amount: number; rate: number }[];
     discountAmount: number;
     total: number;
   };
@@ -32,6 +35,8 @@ interface CartPanelProps {
   discount: number;
   discountType: 'flat' | 'percentage';
   taxRate: number;
+  taxComponents: { name: string; amount: number; rate: number }[];
+  taxConfig: StoreTaxConfig | null;
   onUpdateQuantity: (itemId: string, quantity: number) => void;
   onRemoveFromCart: (itemId: string) => void;
   onClearCart: () => void;
@@ -40,6 +45,7 @@ interface CartPanelProps {
   onDiscountChange: (discount: number) => void;
   onDiscountTypeChange: (type: 'flat' | 'percentage') => void;
   onTaxRateChange: (rate: number | null) => void;
+  onTaxConfigClick: () => void;
   onHoldOrder: () => void;
   onShowHeldOrders: () => void;
   onPayment: () => void;
@@ -54,6 +60,8 @@ export function CartPanel({
   discount,
   discountType,
   taxRate,
+  taxComponents,
+  taxConfig,
   onUpdateQuantity,
   onRemoveFromCart,
   onClearCart,
@@ -62,6 +70,7 @@ export function CartPanel({
   onDiscountChange,
   onDiscountTypeChange,
   onTaxRateChange,
+  onTaxConfigClick,
   onHoldOrder,
   onShowHeldOrders,
   onPayment,
@@ -243,14 +252,52 @@ export function CartPanel({
               </span>
             </div>
 
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">
-                {t('billing.tax')} ({taxRate}%)
-              </span>
-              <span className="font-medium text-gray-900 dark:text-white">
-                ₹{calculations.tax.toLocaleString('en-IN')}
-              </span>
-            </div>
+            {/* Tax Breakdown */}
+            {taxConfig?.tax_enabled && taxComponents.length > 0 ? (
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                    {t('billing.taxBreakdown')}
+                    <button
+                      onClick={onTaxConfigClick}
+                      className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                      title={t('billing.configureTax')}
+                    >
+                      <Cog6ToothIcon className="h-3 w-3" />
+                    </button>
+                  </span>
+                  <span className="font-medium text-gray-900 dark:text-white">
+                    ₹{calculations.tax.toLocaleString('en-IN')}
+                  </span>
+                </div>
+                {taxComponents.map((component, index) => (
+                  <div key={index} className="flex justify-between text-xs pl-4">
+                    <span className="text-gray-500 dark:text-gray-500">
+                      {component.name} ({component.rate}%)
+                    </span>
+                    <span className="text-gray-600 dark:text-gray-400">
+                      ₹{component.amount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                  {t('billing.tax')} ({taxRate}%)
+                  <button
+                    onClick={onTaxConfigClick}
+                    className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+                    title={t('billing.configureTax')}
+                  >
+                    <Cog6ToothIcon className="h-3 w-3" />
+                  </button>
+                </span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  ₹{calculations.tax.toLocaleString('en-IN')}
+                </span>
+              </div>
+            )}
 
             {calculations.discountAmount > 0 && (
               <div className="flex justify-between text-sm">

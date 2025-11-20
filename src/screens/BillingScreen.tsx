@@ -18,7 +18,9 @@ import { ItemGrid } from '../components/billing/ItemGrid';
 import { CartPanel } from '../components/billing/CartPanel';
 import { PaymentModal } from '../components/billing/PaymentModal';
 import { HoldOrdersModal } from '../components/billing/HoldOrdersModal';
+import { TaxConfigModal } from '../components/billing/TaxConfigModal';
 import type { Item, CartItem } from '../contexts/POSContext';
+import { taxConfigAPI, type StoreTaxConfig } from '../api/taxConfig';
 import toast from 'react-hot-toast';
 
 type ViewMode = 'grid' | 'list';
@@ -54,6 +56,17 @@ export function BillingScreen() {
     loadItems(true); // Force reload to get latest stock
   }, []);
 
+  // Load tax configuration
+  useEffect(() => {
+    const loadTaxConfig = async () => {
+      if (authState.user?.store?.id) {
+        const config = await taxConfigAPI.getTaxConfig(authState.user.store.id);
+        setTaxConfig(config);
+      }
+    };
+    loadTaxConfig();
+  }, [authState.user?.store?.id]);
+
   // Pricing state
   const [discount, setDiscount] = useState(0);
   const [discountType, setDiscountType] = useState<DiscountType>('flat');
@@ -66,6 +79,10 @@ export function BillingScreen() {
   // Modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHoldOrdersModal, setShowHoldOrdersModal] = useState(false);
+  const [showTaxConfigModal, setShowTaxConfigModal] = useState(false);
+
+  // Tax configuration
+  const [taxConfig, setTaxConfig] = useState<StoreTaxConfig | null>(null);
 
   // Held orders
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
@@ -110,26 +127,47 @@ export function BillingScreen() {
       0
     );
 
-    // Get tax rate from store config or use custom
-    const storeType = authState.user?.store?.type;
-    let taxRate = customTaxRate ?? (storeType === 'restaurant' || storeType === 'cafe' ? 5 : 18);
-    const tax = (subtotal * taxRate) / 100;
+    // Calculate tax using tax configuration
+    let taxData = { components: [] as { name: string; amount: number; rate: number }[], total: 0 };
+    let taxRate = 0;
+
+    if (taxConfig) {
+      // Use tax configuration
+      taxData = taxConfigAPI.calculateTax(subtotal, taxConfig);
+      taxRate = taxData.components.reduce((sum, comp) => sum + comp.rate, 0);
+    } else if (customTaxRate !== null) {
+      // Fallback to custom tax rate if no config
+      taxRate = customTaxRate;
+      taxData = {
+        components: [{ name: 'Tax', rate: taxRate, amount: (subtotal * taxRate) / 100 }],
+        total: (subtotal * taxRate) / 100
+      };
+    } else {
+      // Fallback to default tax rate based on store type
+      const storeType = authState.user?.store?.type;
+      taxRate = storeType === 'restaurant' || storeType === 'cafe' ? 5 : 18;
+      taxData = {
+        components: [{ name: 'Tax', rate: taxRate, amount: (subtotal * taxRate) / 100 }],
+        total: (subtotal * taxRate) / 100
+      };
+    }
 
     // Calculate discount
     const discountAmount = discountType === 'percentage'
       ? (subtotal * discount) / 100
       : discount;
 
-    const total = Math.max(0, subtotal + tax - discountAmount);
+    const total = Math.max(0, subtotal + taxData.total - discountAmount);
 
     return {
       subtotal,
-      tax,
+      tax: taxData.total,
       taxRate,
+      taxComponents: taxData.components,
       discountAmount,
       total
     };
-  }, [posState.cart, discount, discountType, customTaxRate, authState.user?.store?.type]);
+  }, [posState.cart, discount, discountType, customTaxRate, authState.user?.store?.type, taxConfig]);
 
   // Add item to cart
   const handleAddToCart = useCallback((item: Item) => {
@@ -404,6 +442,8 @@ export function BillingScreen() {
             discount={discount}
             discountType={discountType}
             taxRate={calculations.taxRate}
+            taxComponents={calculations.taxComponents}
+            taxConfig={taxConfig}
             onUpdateQuantity={handleUpdateQuantity}
             onRemoveFromCart={handleRemoveFromCart}
             onClearCart={handleClearCart}
@@ -412,6 +452,7 @@ export function BillingScreen() {
             onDiscountChange={setDiscount}
             onDiscountTypeChange={setDiscountType}
             onTaxRateChange={setCustomTaxRate}
+            onTaxConfigClick={() => setShowTaxConfigModal(true)}
             onHoldOrder={handleHoldOrder}
             onShowHeldOrders={() => setShowHoldOrdersModal(true)}
             onPayment={() => setShowPaymentModal(true)}
@@ -436,6 +477,19 @@ export function BillingScreen() {
           onClose={() => setShowHoldOrdersModal(false)}
           onRecall={handleRecallOrder}
           onDelete={handleDeleteHeldOrder}
+        />
+      )}
+
+      {/* Tax Configuration Modal */}
+      {showTaxConfigModal && authState.user?.store?.id && (
+        <TaxConfigModal
+          storeId={authState.user.store.id}
+          currentConfig={taxConfig}
+          onClose={() => setShowTaxConfigModal(false)}
+          onConfigSaved={(config) => {
+            setTaxConfig(config);
+            setShowTaxConfigModal(false);
+          }}
         />
       )}
     </Layout>
