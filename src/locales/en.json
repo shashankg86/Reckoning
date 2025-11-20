@@ -357,7 +357,9 @@
     "emailInvalid": "Invalid email address",
     "phoneHintIndia": "Enter 10-digit mobile number",
     "phoneHintGeneral": "Enter valid phone number",
-    "proceedToPayment": "Proceed to Payment"
+    "proceedToPayment": "Proceed to Payment",
+    "invoiceEmailSent": "Invoice sent to {{email}}",
+    "emailSendFailed": "Failed to send invoice email"
   },
   "dashboard": {
     "title": "Dashboard",

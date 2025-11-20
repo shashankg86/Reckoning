@@ -24,6 +24,7 @@ import { CustomerDetailsModal } from '../components/billing/CustomerDetailsModal
 import type { Item, CartItem } from '../contexts/POSContext';
 import { taxConfigAPI, type StoreTaxConfig } from '../api/taxConfig';
 import toast from 'react-hot-toast';
+import { emailService } from '../services/emailService';
 
 type ViewMode = 'grid' | 'list';
 type DiscountType = 'flat' | 'percentage';
@@ -357,7 +358,7 @@ export function BillingScreen() {
   // Process payment
   const handlePayment = useCallback(async (paymentMethod: string, amountPaid?: number) => {
     try {
-      await handleCreateInvoice({
+      const result = await handleCreateInvoice({
         items: posState.cart,
         subtotal: calculations.subtotal,
         discount: calculations.discountAmount,
@@ -376,6 +377,48 @@ export function BillingScreen() {
         toast.success(t('billing.changeAmount', { amount: change.toFixed(2) }));
       }
 
+      // Send invoice email if customer email is provided
+      if (result && customer.email) {
+        try {
+          const store = authState.user?.store;
+          await emailService.sendInvoiceEmail({
+            to: customer.email,
+            invoiceNumber: result.invoice.id,
+            customerName: customer.name,
+            storeName: store?.name || 'Universal POS',
+            storePhone: store?.store_phone,
+            storeEmail: store?.store_email,
+            storeAddress: store?.store_address,
+            items: posState.cart.map(item => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              total: item.price * item.quantity
+            })),
+            subtotal: calculations.subtotal,
+            discount: calculations.discountAmount,
+            tax: calculations.tax,
+            serviceCharge: calculations.serviceCharge,
+            municipalityFee: calculations.municipalityFee,
+            total: calculations.total,
+            paymentMethod: paymentMethod.toUpperCase(),
+            date: new Date().toLocaleDateString('en-IN', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            }),
+            taxComponents: calculations.taxComponents
+          });
+          toast.success(t('billing.invoiceEmailSent', { email: customer.email }));
+        } catch (emailError) {
+          console.error('Email send error:', emailError);
+          // Don't fail the payment if email fails
+          toast.error(t('billing.emailSendFailed'));
+        }
+      }
+
       handleClearCart();
       setShowPaymentModal(false);
       toast.success(t('billing.invoiceCreated'));
@@ -383,7 +426,7 @@ export function BillingScreen() {
       console.error('Payment error:', error);
       toast.error(t('billing.paymentFailed'));
     }
-  }, [posState.cart, calculations, customer, handleCreateInvoice, handleClearCart, t]);
+  }, [posState.cart, calculations, customer, handleCreateInvoice, handleClearCart, authState.user?.store, t]);
 
   // Keyboard shortcuts
   useEffect(() => {

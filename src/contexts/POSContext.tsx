@@ -11,7 +11,18 @@ export type StoreType = 'restaurant' | 'cafe' | 'retail' | 'salon' | 'pharmacy' 
 export type PaymentMethod = 'cash' | 'upi' | 'razorpay';
 export type InvoiceStatus = 'paid' | 'pending' | 'cancelled';
 
-export interface Store { name: string; type: StoreType; language: Language; currency: Currency; theme: Theme; logoURL?: string; }
+export interface Store {
+  id?: string;
+  name: string;
+  type: StoreType;
+  language: Language;
+  currency: Currency;
+  theme: Theme;
+  logoURL?: string;
+  store_phone?: string;
+  store_email?: string;
+  store_address?: string;
+}
 export interface Item { id: string; name: string; price: number; category: string; image?: string; stock?: number; sku?: string; categoryId?: string; }
 export interface CartItem extends Item { quantity: number; }
 export interface CustomerDetails { name: string; phone: string; email: string; countryCode: string; }
@@ -240,7 +251,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
       dispatch({ type: 'CLEAR_CART' });
       await loadItems();
       toast.success('Invoice created successfully');
-    } catch (e) { console.error('Create invoice error:', e); toast.error('Failed to create invoice'); }
+
+      // Return the created invoice for further processing (e.g., email sending)
+      return { invoice: formatted, rawInvoice: created };
+    } catch (e) { console.error('Create invoice error:', e); toast.error('Failed to create invoice'); throw e; }
   };
 
   return (
