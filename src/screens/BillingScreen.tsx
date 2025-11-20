@@ -41,13 +41,18 @@ interface CustomerInfo {
 
 export function BillingScreen() {
   const { t } = useTranslation();
-  const { state: posState, dispatch, handleCreateInvoice } = usePOS();
+  const { state: posState, dispatch, handleCreateInvoice, loadItems } = usePOS();
   const { state: authState } = useAuth();
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  // Force reload items when billing screen mounts to ensure fresh stock data
+  useEffect(() => {
+    loadItems(true); // Force reload to get latest stock
+  }, []);
 
   // Pricing state
   const [discount, setDiscount] = useState(0);

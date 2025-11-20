@@ -59,8 +59,8 @@ function posReducer(state: POSState, action: POSAction): POSState {
 const POSContext = createContext<{
   state: POSState;
   dispatch: React.Dispatch<POSAction>;
-  loadItems: () => Promise<void>;
-  loadInvoices: () => Promise<void>;
+  loadItems: (forceReload?: boolean) => Promise<void>;
+  loadInvoices: (forceReload?: boolean) => Promise<void>;
   handleDeleteItem: (itemId: string) => Promise<void>;
   handleAddItem: (item: Omit<Item, 'id'>) => Promise<void>;
   handleUpdateItem: (item: Item) => Promise<void>;
@@ -77,10 +77,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const lastLoadRef = useRef({ itemsAt: 0, invoicesAt: 0 });
   const FRESH_MS = 60_000;
 
-  const loadItems = async () => {
+  const loadItems = async (forceReload = false) => {
     if (!storeId) return;
     const now = Date.now();
-    if (now - lastLoadRef.current.itemsAt < FRESH_MS) return;
+    // Skip freshness check if forceReload is true
+    if (!forceReload && now - lastLoadRef.current.itemsAt < FRESH_MS) return;
     lastLoadRef.current.itemsAt = now;
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
@@ -103,10 +104,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loadInvoices = async () => {
+  const loadInvoices = async (forceReload = false) => {
     if (!storeId) return;
     const now = Date.now();
-    if (now - lastLoadRef.current.invoicesAt < FRESH_MS) return;
+    // Skip freshness check if forceReload is true
+    if (!forceReload && now - lastLoadRef.current.invoicesAt < FRESH_MS) return;
     lastLoadRef.current.invoicesAt = now;
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
