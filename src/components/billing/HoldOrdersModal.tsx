@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   XMarkIcon,
   ClockIcon,
   TrashIcon,
   UserIcon,
-  ShoppingBagIcon
+  ShoppingBagIcon,
+  Squares2X2Icon,
+  ListBulletIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import type { CartItem } from '../../contexts/POSContext';
@@ -29,6 +31,7 @@ interface HoldOrdersModalProps {
 
 export function HoldOrdersModal({ heldOrders, onClose, onRecall, onDelete }: HoldOrdersModalProps) {
   const { t } = useTranslation();
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
   const formatTime = (date: Date) => {
     const now = new Date();
@@ -66,12 +69,37 @@ export function HoldOrdersModal({ heldOrders, onClose, onRecall, onDelete }: Hol
               ({heldOrders.length})
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-1.5 rounded transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-white dark:bg-gray-600 text-orange-500'
+                    : 'text-gray-600 dark:text-gray-400'
+                }`}
+              >
+                <Squares2X2Icon className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white dark:bg-gray-600 text-orange-500'
+                    : 'text-gray-600 dark:text-gray-400'
+                }`}
+              >
+                <ListBulletIcon className="h-4 w-4" />
+              </button>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -82,7 +110,68 @@ export function HoldOrdersModal({ heldOrders, onClose, onRecall, onDelete }: Hol
               <p className="text-lg font-medium">{t('billing.noHeldOrders')}</p>
               <p className="text-sm text-center mt-2">{t('billing.heldOrdersHint')}</p>
             </div>
+          ) : viewMode === 'grid' ? (
+            /* Grid View - Compact Cards */
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {heldOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:border-orange-300 dark:hover:border-orange-700 transition-colors"
+                >
+                  {/* Compact Order Header */}
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1 mb-1">
+                        <ClockIcon className="h-3 w-3 text-gray-400" />
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatTime(order.timestamp)}
+                        </span>
+                      </div>
+                      {order.customer && (
+                        <div className="flex items-center gap-1 mb-1">
+                          <UserIcon className="h-3 w-3 text-gray-400" />
+                          <span className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                            {order.customer.name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(t('billing.confirmDeleteHeldOrder'))) {
+                          onDelete(order.id);
+                        }
+                      }}
+                      className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors flex-shrink-0"
+                    >
+                      <TrashIcon className="h-3 w-3" />
+                    </button>
+                  </div>
+
+                  {/* Order Summary */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <ShoppingBagIcon className="h-3 w-3" />
+                      <span>{getTotalItems(order.items)} {t('billing.items')}</span>
+                    </div>
+                    <div className="text-sm font-bold text-orange-500">
+                      ₹{getTotalAmount(order.items).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+
+                  {/* Recall Button */}
+                  <Button
+                    size="sm"
+                    onClick={() => onRecall(order)}
+                    className="w-full bg-orange-500 hover:bg-orange-600 text-xs py-1.5"
+                  >
+                    {t('billing.recall')}
+                  </Button>
+                </div>
+              ))}
+            </div>
           ) : (
+            /* List View - Detailed Cards */
             <div className="space-y-3">
               {heldOrders.map((order) => (
                 <div

@@ -342,7 +342,22 @@
     "preview": "Preview",
     "gst": "GST",
     "vat": "VAT",
-    "addTax": "Add Tax"
+    "addTax": "Add Tax",
+    "customerDetails": "Customer Details",
+    "customerDetailsRequired": "Please provide customer information to proceed with payment",
+    "enterCustomerName": "Enter customer name",
+    "customerEmail": "Email Address",
+    "enterCustomerEmail": "Enter email address",
+    "enterPhone": "Enter phone number",
+    "nameRequired": "Name is required",
+    "nameMinLength": "Name must be at least 2 characters",
+    "phoneRequired": "Phone number is required",
+    "phoneInvalid": "Invalid phone number",
+    "emailRequired": "Email is required",
+    "emailInvalid": "Invalid email address",
+    "phoneHintIndia": "Enter 10-digit mobile number",
+    "phoneHintGeneral": "Enter valid phone number",
+    "proceedToPayment": "Proceed to Payment"
   },
   "dashboard": {
     "title": "Dashboard",

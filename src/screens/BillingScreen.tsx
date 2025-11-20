@@ -20,6 +20,7 @@ import { PaymentModal } from '../components/billing/PaymentModal';
 import { HoldOrdersModal } from '../components/billing/HoldOrdersModal';
 import { TaxConfigModal } from '../components/billing/TaxConfigModal';
 import { InvoiceTaxModal, type InvoiceTaxOverride } from '../components/billing/InvoiceTaxModal';
+import { CustomerDetailsModal } from '../components/billing/CustomerDetailsModal';
 import type { Item, CartItem } from '../contexts/POSContext';
 import { taxConfigAPI, type StoreTaxConfig } from '../api/taxConfig';
 import toast from 'react-hot-toast';
@@ -27,19 +28,18 @@ import toast from 'react-hot-toast';
 type ViewMode = 'grid' | 'list';
 type DiscountType = 'flat' | 'percentage';
 
-interface HeldOrder {
-  id: string;
-  items: CartItem[];
-  customer?: {
-    name: string;
-    phone: string;
-  };
-  timestamp: Date;
-}
-
 interface CustomerInfo {
   name: string;
   phone: string;
+  email: string;
+  countryCode: string;
+}
+
+interface HeldOrder {
+  id: string;
+  items: CartItem[];
+  customer?: CustomerInfo;
+  timestamp: Date;
 }
 
 export function BillingScreen() {
@@ -74,10 +74,16 @@ export function BillingScreen() {
   const [customTaxRate, setCustomTaxRate] = useState<number | null>(null);
 
   // Customer state
-  const [customer, setCustomer] = useState<CustomerInfo>({ name: '', phone: '' });
+  const [customer, setCustomer] = useState<CustomerInfo>({
+    name: '',
+    phone: '',
+    email: '',
+    countryCode: '+91' // Will be updated based on store country
+  });
   const [showCustomerForm, setShowCustomerForm] = useState(false);
 
   // Modal state
+  const [showCustomerDetailsModal, setShowCustomerDetailsModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showHoldOrdersModal, setShowHoldOrdersModal] = useState(false);
   const [showTaxConfigModal, setShowTaxConfigModal] = useState(false);
@@ -326,6 +332,28 @@ export function BillingScreen() {
     toast.success(t('billing.orderDeleted'));
   }, [t]);
 
+  // Handle payment button click - check if customer details are complete
+  const handlePaymentClick = useCallback(() => {
+    // Check if customer details are complete
+    const isCustomerComplete = customer.name.trim() && customer.phone.trim() && customer.email.trim();
+
+    if (!isCustomerComplete) {
+      // Show customer details modal first
+      setShowCustomerDetailsModal(true);
+    } else {
+      // Customer details are complete, proceed to payment
+      setShowPaymentModal(true);
+    }
+  }, [customer]);
+
+  // Handle customer details submission
+  const handleCustomerDetailsSubmit = useCallback((details: CustomerInfo) => {
+    setCustomer(details);
+    setShowCustomerDetailsModal(false);
+    // After customer details are saved, show payment modal
+    setShowPaymentModal(true);
+  }, []);
+
   // Process payment
   const handlePayment = useCallback(async (paymentMethod: string, amountPaid?: number) => {
     try {
@@ -509,11 +537,21 @@ export function BillingScreen() {
             onInvoiceTaxClick={() => setShowInvoiceTaxModal(true)}
             onHoldOrder={handleHoldOrder}
             onShowHeldOrders={() => setShowHoldOrdersModal(true)}
-            onPayment={() => setShowPaymentModal(true)}
+            onPayment={handlePaymentClick}
             heldOrdersCount={heldOrders.length}
           />
         </div>
       </div>
+
+      {/* Customer Details Modal */}
+      {showCustomerDetailsModal && (
+        <CustomerDetailsModal
+          currentDetails={customer}
+          defaultCountry={taxConfig?.country}
+          onClose={() => setShowCustomerDetailsModal(false)}
+          onSubmit={handleCustomerDetailsSubmit}
+        />
+      )}
 
       {/* Payment Modal */}
       {showPaymentModal && (
