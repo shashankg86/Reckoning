@@ -364,7 +364,8 @@ export function BillingScreen() {
         tax: calculations.tax,
         total: calculations.total,
         paymentMethod: paymentMethod as any,
-        customer: customer.name || customer.phone ? customer.name : undefined,
+        customer: customer.name, // Keep for backward compatibility
+        customerDetails: customer, // New structured customer data
         status: 'paid'
       });
 

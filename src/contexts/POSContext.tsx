@@ -12,9 +12,22 @@ export type PaymentMethod = 'cash' | 'upi' | 'razorpay';
 export type InvoiceStatus = 'paid' | 'pending' | 'cancelled';
 
 export interface Store { name: string; type: StoreType; language: Language; currency: Currency; theme: Theme; logoURL?: string; }
-export interface Item { id: string; name: string; price: number; category: string; image?: string; stock?: number; sku?: string; }
+export interface Item { id: string; name: string; price: number; category: string; image?: string; stock?: number; sku?: string; categoryId?: string; }
 export interface CartItem extends Item { quantity: number; }
-export interface Invoice { id: string; items: CartItem[]; subtotal: number; discount: number; tax: number; total: number; paymentMethod: PaymentMethod; date: Date; customer?: string; status: InvoiceStatus; }
+export interface CustomerDetails { name: string; phone: string; email: string; countryCode: string; }
+export interface Invoice {
+  id: string;
+  items: CartItem[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  paymentMethod: PaymentMethod;
+  date: Date;
+  customer?: string; // Legacy field for backward compatibility
+  customerDetails?: CustomerDetails; // New structured customer data
+  status: InvoiceStatus;
+}
 
 interface POSState { items: Item[]; cart: CartItem[]; invoices: Invoice[]; loading: boolean; }
 
@@ -196,8 +209,33 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const handleCreateInvoice = async (invoice: Omit<Invoice, 'id'>) => {
     if (!storeId) { toast.error('No store selected'); return; }
     try {
-      const created = await invoicesAPI.createInvoice(storeId, { customer_name: invoice.customer, items: invoice.items.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })), subtotal: invoice.subtotal, discount: invoice.discount, discount_type: 'flat', tax: invoice.tax, tax_rate: authState.user?.store?.type === 'restaurant' ? 5 : 18, total: invoice.total, payment_method: invoice.paymentMethod, notes: '' });
-      const formatted: Invoice = { id: created.invoice_number, items: invoice.items, subtotal: invoice.subtotal, discount: invoice.discount, tax: invoice.tax, total: invoice.total, paymentMethod: invoice.paymentMethod, date: new Date(created.created_at), customer: invoice.customer, status: 'paid' };
+      const created = await invoicesAPI.createInvoice(storeId, {
+        customer_name: invoice.customerDetails?.name || invoice.customer,
+        customer_phone: invoice.customerDetails?.phone,
+        customer_email: invoice.customerDetails?.email,
+        items: invoice.items.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        discount_type: 'flat',
+        tax: invoice.tax,
+        tax_rate: authState.user?.store?.type === 'restaurant' ? 5 : 18,
+        total: invoice.total,
+        payment_method: invoice.paymentMethod,
+        notes: ''
+      });
+      const formatted: Invoice = {
+        id: created.invoice_number,
+        items: invoice.items,
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        tax: invoice.tax,
+        total: invoice.total,
+        paymentMethod: invoice.paymentMethod,
+        date: new Date(created.created_at),
+        customer: invoice.customerDetails?.name || invoice.customer,
+        customerDetails: invoice.customerDetails,
+        status: 'paid'
+      };
       dispatch({ type: 'ADD_INVOICE', payload: formatted });
       dispatch({ type: 'CLEAR_CART' });
       await loadItems();

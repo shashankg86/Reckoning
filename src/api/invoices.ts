@@ -10,6 +10,7 @@ export interface InvoiceItemData {
 export interface InvoiceData {
   customer_name?: string;
   customer_phone?: string;
+  customer_email?: string;
   customer_id?: string;
   items: InvoiceItemData[];
   subtotal: number;
@@ -42,6 +43,7 @@ export const invoicesAPI = {
           customer_id: invoiceData.customer_id,
           customer_name: invoiceData.customer_name,
           customer_phone: invoiceData.customer_phone,
+          customer_email: invoiceData.customer_email,
           subtotal: invoiceData.subtotal,
           discount: invoiceData.discount,
           discount_type: invoiceData.discount_type,
