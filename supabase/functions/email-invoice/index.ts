@@ -397,7 +397,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: 'Universal POS <noreply@yourdomain.com>', // Update with your verified domain
+        from: 'onboarding@resend.dev', // Resend's free test domain (only sends to verified emails)
         to: [invoiceData.to],
         subject: `Invoice ${invoiceData.invoiceNumber} - ${invoiceData.storeName}`,
         html: htmlContent,

@@ -45,13 +45,18 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         createdAt: new Date(),
         lastLoginAt: new Date(),
       } as any;
-      return { ...state, user: provisionalUser, isAuthenticated: true };
+      // We have a session but not the full profile/store data yet.
+      // Keep loading true to prevent premature routing.
+      return { ...state, user: provisionalUser, isAuthenticated: true, isLoading: true };
     }
     case 'SET_ONBOARDED':
       return {
         ...state,
         isOnboarded: action.payload,
-        isLoading: false,
+        // Only stop loading if user is NOT onboarded (so they can see onboarding screen immediately).
+        // If they ARE onboarded, we need to wait for SET_USER to load the store data
+        // (which is required for the menu_setup_completed check in ProtectedRoute).
+        isLoading: action.payload ? state.isLoading : false,
       };
     case 'SET_USER':
       return {
