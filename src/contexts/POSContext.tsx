@@ -11,10 +11,34 @@ export type StoreType = 'restaurant' | 'cafe' | 'retail' | 'salon' | 'pharmacy' 
 export type PaymentMethod = 'cash' | 'upi' | 'razorpay';
 export type InvoiceStatus = 'paid' | 'pending' | 'cancelled';
 
-export interface Store { name: string; type: StoreType; language: Language; currency: Currency; theme: Theme; logoURL?: string; }
-export interface Item { id: string; name: string; price: number; category: string; image?: string; stock?: number; sku?: string; }
+export interface Store {
+  id?: string;
+  name: string;
+  type: StoreType;
+  language: Language;
+  currency: Currency;
+  theme: Theme;
+  logoURL?: string;
+  store_phone?: string;
+  store_email?: string;
+  store_address?: string;
+}
+export interface Item { id: string; name: string; price: number; category: string; image?: string; stock?: number; sku?: string; categoryId?: string; }
 export interface CartItem extends Item { quantity: number; }
-export interface Invoice { id: string; items: CartItem[]; subtotal: number; discount: number; tax: number; total: number; paymentMethod: PaymentMethod; date: Date; customer?: string; status: InvoiceStatus; }
+export interface CustomerDetails { name: string; phone: string; email: string; countryCode: string; }
+export interface Invoice {
+  id: string;
+  items: CartItem[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  paymentMethod: PaymentMethod;
+  date: Date;
+  customer?: string; // Legacy field for backward compatibility
+  customerDetails?: CustomerDetails; // New structured customer data
+  status: InvoiceStatus;
+}
 
 interface POSState { items: Item[]; cart: CartItem[]; invoices: Invoice[]; loading: boolean; }
 
@@ -59,8 +83,8 @@ function posReducer(state: POSState, action: POSAction): POSState {
 const POSContext = createContext<{
   state: POSState;
   dispatch: React.Dispatch<POSAction>;
-  loadItems: () => Promise<void>;
-  loadInvoices: () => Promise<void>;
+  loadItems: (forceReload?: boolean) => Promise<void>;
+  loadInvoices: (forceReload?: boolean) => Promise<void>;
   handleDeleteItem: (itemId: string) => Promise<void>;
   handleAddItem: (item: Omit<Item, 'id'>) => Promise<void>;
   handleUpdateItem: (item: Item) => Promise<void>;
@@ -77,10 +101,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const lastLoadRef = useRef({ itemsAt: 0, invoicesAt: 0 });
   const FRESH_MS = 60_000;
 
-  const loadItems = async () => {
+  const loadItems = async (forceReload = false) => {
     if (!storeId) return;
     const now = Date.now();
-    if (now - lastLoadRef.current.itemsAt < FRESH_MS) return;
+    // Skip freshness check if forceReload is true
+    if (!forceReload && now - lastLoadRef.current.itemsAt < FRESH_MS) return;
     lastLoadRef.current.itemsAt = now;
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
@@ -103,10 +128,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const loadInvoices = async () => {
+  const loadInvoices = async (forceReload = false) => {
     if (!storeId) return;
     const now = Date.now();
-    if (now - lastLoadRef.current.invoicesAt < FRESH_MS) return;
+    // Skip freshness check if forceReload is true
+    if (!forceReload && now - lastLoadRef.current.invoicesAt < FRESH_MS) return;
     lastLoadRef.current.invoicesAt = now;
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
@@ -194,13 +220,41 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const handleCreateInvoice = async (invoice: Omit<Invoice, 'id'>) => {
     if (!storeId) { toast.error('No store selected'); return; }
     try {
-      const created = await invoicesAPI.createInvoice(storeId, { customer_name: invoice.customer, items: invoice.items.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })), subtotal: invoice.subtotal, discount: invoice.discount, discount_type: 'flat', tax: invoice.tax, tax_rate: authState.user?.store?.type === 'restaurant' ? 5 : 18, total: invoice.total, payment_method: invoice.paymentMethod, notes: '' });
-      const formatted: Invoice = { id: created.invoice_number, items: invoice.items, subtotal: invoice.subtotal, discount: invoice.discount, tax: invoice.tax, total: invoice.total, paymentMethod: invoice.paymentMethod, date: new Date(created.created_at), customer: invoice.customer, status: 'paid' };
+      const created = await invoicesAPI.createInvoice(storeId, {
+        customer_name: invoice.customerDetails?.name || invoice.customer,
+        customer_phone: invoice.customerDetails?.phone,
+        customer_email: invoice.customerDetails?.email,
+        items: invoice.items.map(i => ({ id: i.id, name: i.name, quantity: i.quantity, price: i.price })),
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        discount_type: 'flat',
+        tax: invoice.tax,
+        tax_rate: authState.user?.store?.type === 'restaurant' ? 5 : 18,
+        total: invoice.total,
+        payment_method: invoice.paymentMethod,
+        notes: ''
+      });
+      const formatted: Invoice = {
+        id: created.invoice_number,
+        items: invoice.items,
+        subtotal: invoice.subtotal,
+        discount: invoice.discount,
+        tax: invoice.tax,
+        total: invoice.total,
+        paymentMethod: invoice.paymentMethod,
+        date: new Date(created.created_at),
+        customer: invoice.customerDetails?.name || invoice.customer,
+        customerDetails: invoice.customerDetails,
+        status: 'paid'
+      };
       dispatch({ type: 'ADD_INVOICE', payload: formatted });
       dispatch({ type: 'CLEAR_CART' });
       await loadItems();
       toast.success('Invoice created successfully');
-    } catch (e) { console.error('Create invoice error:', e); toast.error('Failed to create invoice'); }
+
+      // Return the created invoice for further processing (e.g., email sending)
+      return { invoice: formatted, rawInvoice: created };
+    } catch (e) { console.error('Create invoice error:', e); toast.error('Failed to create invoice'); throw e; }
   };
 
   return (

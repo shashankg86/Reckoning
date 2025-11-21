@@ -14,7 +14,7 @@ import { OnboardingScreen } from '../screens/OnboardingScreen';
 // App screens
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { CatalogScreen } from '../screens/CatalogScreen';
-import { InvoiceScreen } from '../screens/InvoiceScreen';
+import { BillingScreen } from '../screens/BillingScreen';
 import { OCRImportScreen } from '../screens/OCRImportScreen';
 import { ReportsScreen } from '../screens/ReportsScreen';
 import { MenuSetupScreen } from '../screens/menu-setup/MenuSetupScreen';
@@ -50,7 +50,8 @@ export function Router() {
         {/* Protected app routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardScreen /></ProtectedRoute>} />
         <Route path="/catalog" element={<ProtectedRoute><CatalogScreen /></ProtectedRoute>} />
-        <Route path="/invoice" element={<ProtectedRoute><InvoiceScreen /></ProtectedRoute>} />
+        <Route path="/invoice" element={<ProtectedRoute><BillingScreen /></ProtectedRoute>} />
+        <Route path="/billing" element={<ProtectedRoute><BillingScreen /></ProtectedRoute>} />
         <Route path="/ocr" element={<ProtectedRoute><OCRImportScreen /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><ReportsScreen /></ProtectedRoute>} />
         
