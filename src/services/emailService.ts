@@ -1,4 +1,3 @@
-import { supabase } from '../lib/supabase';
 
 /**
  * Email Service using Supabase Edge Functions + Resend
@@ -15,6 +14,8 @@ import { supabase } from '../lib/supabase';
  * ✅ Free tier: 3,000 emails/month via Resend
  * ✅ Easy to monitor and debug via Supabase Dashboard
  */
+
+import { supabase } from "../lib/supabaseClient";
 
 export interface InvoiceEmailData {
   to: string;
