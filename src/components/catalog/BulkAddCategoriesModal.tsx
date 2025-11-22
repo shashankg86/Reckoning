@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, useFieldArray } from 'react-hook-form';
 import toast from 'react-hot-toast';
@@ -112,7 +112,14 @@ export function BulkAddCategoriesModal({
       name: cat.name.trim(),
       description: cat.description.trim() || '',
       color: cat.color,
-      image_url: null // Will be set after upload
+      image_url: null, // Will be set after upload
+      icon: '',
+      sort_order: 0,
+      parent_id: null,
+      metadata: {},
+      is_active: true,
+      updated_at: new Date().toISOString(),
+      created_by: ''
     }));
 
     // Extract image files
@@ -194,11 +201,10 @@ export function BulkAddCategoriesModal({
                         })}
                         type="text"
                         placeholder={t('menuSetup.enterCategoryName')}
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                          errors.categories?.[index]?.name
-                            ? 'border-red-500 dark:border-red-400'
-                            : 'border-gray-300 dark:border-gray-600'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.categories?.[index]?.name
+                          ? 'border-red-500 dark:border-red-400'
+                          : 'border-gray-300 dark:border-gray-600'
+                          }`}
                       />
                       {errors.categories?.[index]?.name && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -218,11 +224,10 @@ export function BulkAddCategoriesModal({
                         })}
                         placeholder={t('menuSetup.enterCategoryDescription')}
                         rows={3}
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                          errors.categories?.[index]?.description
-                            ? 'border-red-500 dark:border-red-400'
-                            : 'border-gray-300 dark:border-gray-600'
-                        }`}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.categories?.[index]?.description
+                          ? 'border-red-500 dark:border-red-400'
+                          : 'border-gray-300 dark:border-gray-600'
+                          }`}
                       />
                       {errors.categories?.[index]?.description && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -242,11 +247,10 @@ export function BulkAddCategoriesModal({
                             key={color}
                             type="button"
                             onClick={() => setValue(`categories.${index}.color`, color)}
-                            className={`w-8 h-8 rounded-full border-2 transition-all ${
-                              watch(`categories.${index}.color`) === color
-                                ? 'border-gray-900 dark:border-white scale-110'
-                                : 'border-transparent hover:scale-105'
-                            }`}
+                            className={`w-8 h-8 rounded-full border-2 transition-all ${watch(`categories.${index}.color`) === color
+                              ? 'border-gray-900 dark:border-white scale-110'
+                              : 'border-transparent hover:scale-105'
+                              }`}
                             style={{ backgroundColor: color }}
                           />
                         ))}

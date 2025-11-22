@@ -1,18 +1,29 @@
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
+import { useTranslation } from 'react-i18next';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Router } from './components/Router';
 import { AuthProvider } from './contexts/AuthContext';
 import { POSProvider } from './contexts/POSContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import './lib/i18n';
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+});
+
 /**
  * Setup security headers and protections
  */
 function setupSecurityHeaders() {
   // Prevent iframe embedding (clickjacking protection)
-  if (window.self !== window.top) {
-    window.top = window.self.location;
+  if (window.self !== window.top && window.top) {
+    window.top.location.href = window.self.location.href;
   }
 
   // Prevent right-click in production (optional - for POS kiosk mode)
@@ -120,6 +131,13 @@ function setupUnloadHandler() {
 }
 
 function App() {
+  const { i18n } = useTranslation();
+
+  useEffect(() => {
+    document.documentElement.dir = i18n.dir();
+    document.documentElement.lang = i18n.language;
+  }, [i18n, i18n.language]);
+
   useEffect(() => {
     console.log('[App] Initializing application...');
 
@@ -139,46 +157,48 @@ function App() {
   }, []);
 
   return (
-    <AuthProvider>
-      <ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
         <POSProvider>
-          <Router />
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#363636',
-                color: '#fff',
-                fontSize: '14px',
-                padding: '12px 20px',
-                borderRadius: '8px',
-              },
-              success: {
-                duration: 3000,
-                iconTheme: {
-                  primary: '#4ade80',
-                  secondary: '#fff',
+          <ThemeProvider>
+            <Router />
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  background: '#363636',
+                  color: '#fff',
+                  fontSize: '14px',
+                  padding: '12px 20px',
+                  borderRadius: '8px',
                 },
-              },
-              error: {
-                duration: 5000,
-                iconTheme: {
-                  primary: '#ef4444',
-                  secondary: '#fff',
+                success: {
+                  duration: 3000,
+                  iconTheme: {
+                    primary: '#4ade80',
+                    secondary: '#fff',
+                  },
                 },
-              },
-              loading: {
-                iconTheme: {
-                  primary: '#3b82f6',
-                  secondary: '#fff',
+                error: {
+                  duration: 5000,
+                  iconTheme: {
+                    primary: '#ef4444',
+                    secondary: '#fff',
+                  },
                 },
-              },
-            }}
-          />
+                loading: {
+                  iconTheme: {
+                    primary: '#3b82f6',
+                    secondary: '#fff',
+                  },
+                },
+              }}
+            />
+          </ThemeProvider>
         </POSProvider>
-      </ThemeProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

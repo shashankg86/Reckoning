@@ -11,6 +11,7 @@ export interface User {
 }
 
 export interface Store {
+  id: string;
   name: string;
   type: StoreType;
   language: Language;
