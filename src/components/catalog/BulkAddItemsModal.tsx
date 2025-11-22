@@ -9,7 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { ImageUpload } from '../ui/ImageUpload';
-import type { Item, Category } from '../../types/menu';
+import type { Category } from '../../types/menu';
 
 interface ItemFormData {
   name: string;
@@ -29,21 +29,12 @@ interface BulkAddItemsModalProps {
   isOpen: boolean;
   onClose: () => void;
   categories: Category[];
-  onBulkAdd: (items: Partial<Item>[], imageFiles: (File | null)[]) => void;
+  onBulkAdd: (items: ItemData[], imageFiles: (File | null)[]) => void;
   preselectedCategoryId?: string;
 }
 
-const DEFAULT_ITEM: ItemFormData = {
-  name: '',
-  category_id: '',
-  sku: '',
-  price: '',
-  stock: '0',
-  description: '',
-  imageFile: null
-};
-
-const MAX_ITEMS = 10;
+import { CATALOG_LIMITS, DEFAULT_ITEM } from '../../constants/catalog';
+import type { ItemData } from '../../api/items';
 
 export function BulkAddItemsModal({
   isOpen,
@@ -58,6 +49,7 @@ export function BulkAddItemsModal({
       items: [{ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' }],
     },
   });
+
   const { fields, append, remove } = useFieldArray({
     control,
     name: 'items',
@@ -72,7 +64,7 @@ export function BulkAddItemsModal({
   }, [isOpen, preselectedCategoryId, reset]);
 
   const handleAddRow = () => {
-    if (fields.length < MAX_ITEMS) {
+    if (fields.length < CATALOG_LIMITS.MAX_BULK_ITEMS) {
       append({ ...DEFAULT_ITEM, category_id: preselectedCategoryId || '' });
     }
   };
@@ -119,15 +111,15 @@ export function BulkAddItemsModal({
       return;
     }
 
-    // Map to Item format
-    const itemsToAdd = validItems.map(item => ({
+    // Map to ItemData format
+    const itemsToAdd: ItemData[] = validItems.map(item => ({
       name: item.name.trim(),
       description: item.description.trim(),
       category_id: item.category_id,
       sku: item.sku.trim(),
-      price: item.price,
+      price: parseFloat(item.price),
       stock: parseInt(item.stock) || 0,
-      image_url: null // Will be set after upload
+      image_url: undefined // Will be set after upload
     }));
 
     // Extract image files
@@ -152,7 +144,7 @@ export function BulkAddItemsModal({
               {t('catalog.bulkAddItems')}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {t('catalog.quickAddItems')} ({validCount}/{MAX_ITEMS})
+              {t('catalog.quickAddItems')} ({validCount}/{CATALOG_LIMITS.MAX_BULK_ITEMS})
             </p>
           </div>
           <button
@@ -205,13 +197,13 @@ export function BulkAddItemsModal({
                       <input
                         {...register(`items.${index}.name`, {
                           required: t('catalog.validation.nameRequired'),
-                          maxLength: { value: 200, message: t('menuSetup.nameTooLong') },
+                          maxLength: { value: CATALOG_LIMITS.NAME_MAX_LENGTH, message: t('menuSetup.nameTooLong') },
                         })}
                         type="text"
                         placeholder={t('catalog.enterItemName')}
                         className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.items?.[index]?.name
-                            ? 'border-red-500 dark:border-red-400'
-                            : 'border-gray-300 dark:border-gray-600'
+                          ? 'border-red-500 dark:border-red-400'
+                          : 'border-gray-300 dark:border-gray-600'
                           }`}
                       />
                       {errors.items?.[index]?.name && (
@@ -231,8 +223,8 @@ export function BulkAddItemsModal({
                           required: t('catalog.validation.categoryRequired'),
                         })}
                         className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.items?.[index]?.category_id
-                            ? 'border-red-500 dark:border-red-400'
-                            : 'border-gray-300 dark:border-gray-600'
+                          ? 'border-red-500 dark:border-red-400'
+                          : 'border-gray-300 dark:border-gray-600'
                           }`}
                       >
                         <option value="">{t('catalog.selectCategory')}</option>
@@ -265,8 +257,8 @@ export function BulkAddItemsModal({
                           min="0"
                           placeholder="0.00"
                           className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.items?.[index]?.price
-                              ? 'border-red-500 dark:border-red-400'
-                              : 'border-gray-300 dark:border-gray-600'
+                            ? 'border-red-500 dark:border-red-400'
+                            : 'border-gray-300 dark:border-gray-600'
                             }`}
                         />
                         {errors.items?.[index]?.price && (
@@ -313,13 +305,13 @@ export function BulkAddItemsModal({
                       <textarea
                         {...register(`items.${index}.description`, {
                           required: t('menuSetup.descriptionRequired'),
-                          maxLength: { value: 500, message: t('menuSetup.descriptionTooLong') },
+                          maxLength: { value: CATALOG_LIMITS.ITEM_DESCRIPTION_MAX_LENGTH, message: t('menuSetup.descriptionTooLong') },
                         })}
                         placeholder={t('menuSetup.itemDescriptionPlaceholder')}
                         rows={4}
                         className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.items?.[index]?.description
-                            ? 'border-red-500 dark:border-red-400'
-                            : 'border-gray-300 dark:border-gray-600'
+                          ? 'border-red-500 dark:border-red-400'
+                          : 'border-gray-300 dark:border-gray-600'
                           }`}
                       />
                       {errors.items?.[index]?.description && (
@@ -339,7 +331,7 @@ export function BulkAddItemsModal({
                         onChange={(file) => handleImageChange(index, file)}
                         onError={(error) => handleImageError(index, error)}
                         placeholder={t('menuSetup.uploadItemImagePlaceholder')}
-                        maxSizeMB={5}
+                        maxSizeMB={CATALOG_LIMITS.IMAGE_MAX_SIZE_MB}
                       />
                       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                         {t('menuSetup.itemImageUploadHint')}
@@ -351,7 +343,7 @@ export function BulkAddItemsModal({
             ))}
 
             {/* Add Another Button */}
-            {fields.length < MAX_ITEMS && (
+            {fields.length < CATALOG_LIMITS.MAX_BULK_ITEMS && (
               <button
                 type="button"
                 onClick={handleAddRow}

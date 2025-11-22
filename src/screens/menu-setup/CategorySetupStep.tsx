@@ -18,9 +18,10 @@ import { useCatalogQueries } from '../../hooks/useCatalogQueries';
 import { categoriesAPI } from '../../api/categories';
 import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
 import { CategoryCard } from './components/CategoryCard';
-import { CategoryFormModal } from './components/CategoryFormModal';
-import { CategoryBulkCreateModal } from './components/CategoryBulkCreateModal';
+import { CategoryFormModal } from '../../components/catalog/CategoryFormModal';
+import { BulkAddCategoriesModal } from '../../components/catalog/BulkAddCategoriesModal';
 import type { Category, CreateCategoryData, UpdateCategoryData } from '../../types/menu';
+import { DEFAULT_CATEGORY_COLOR } from '../../constants/colors';
 
 interface CategorySetupStepProps {
   onNext: () => void;
@@ -126,7 +127,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       parent_id: null,
       metadata: {},
       description: data.description || null,
-      color: data.color || '#000000',
+      color: data.color || DEFAULT_CATEGORY_COLOR,
       icon: data.icon || '',
     };
 
@@ -197,12 +198,13 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
     setDeleteConfirm({ isOpen: false, category: null });
   };
 
-  const handleBulkCreate = (categories: CreateCategoryData[]) => {
+  const handleBulkCreate = (categories: CreateCategoryData[], imageFiles?: (File | null)[]) => {
     // Add all categories to local state only
     const newCategories: LocalCategory[] = categories.map((data, index) => ({
       ...data,
       id: `temp_${Date.now()}_${index}`,
       _isNew: true,
+      _imageFile: imageFiles?.[index] || null,
       is_active: true,
       store_id: storeId,
       sort_order: localCategories.length + index,
@@ -213,7 +215,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       parent_id: null,
       metadata: {},
       description: data.description || null,
-      color: data.color || '#000000',
+      color: data.color || DEFAULT_CATEGORY_COLOR,
       icon: data.icon || '',
     }));
 
@@ -576,26 +578,29 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
           setShowCategoryForm(false);
           setEditingCategory(null);
         }}
-        onSubmit={async (data, imageFile) => {
+        onSave={async (data, imageFile) => {
           if (editingCategory) {
             await handleUpdateCategory(data as UpdateCategoryData, imageFile);
           } else {
             await handleCreateCategory(data as CreateCategoryData, imageFile);
           }
         }}
-        category={editingCategory as Category | null}
-        title={
-          editingCategory ? t('menuSetup.editCategory') : t('menuSetup.createCategory')
-        }
-        availableParentCategories={activeCategories as Category[]}
+        editingCategory={editingCategory as Category | null}
       />
 
       {/* Bulk Create Modal */}
-      <CategoryBulkCreateModal
+      <BulkAddCategoriesModal
         isOpen={showBulkCreate}
         onClose={() => setShowBulkCreate(false)}
-        onSubmit={async (categories) => {
-          handleBulkCreate(categories);
+        onBulkAdd={async (categories, imageFiles) => {
+          // Adapt the data to match CreateCategoryData
+          const categoriesData: CreateCategoryData[] = categories.map(cat => ({
+            ...cat,
+            // Ensure optional fields are handled
+            description: cat.description || undefined,
+            image_url: cat.image_url || undefined,
+          }));
+          handleBulkCreate(categoriesData, imageFiles);
         }}
       />
 

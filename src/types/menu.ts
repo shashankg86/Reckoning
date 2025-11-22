@@ -71,6 +71,23 @@ export interface CategoryItem {
 }
 
 /**
+ * CategoryReference - minimal category data returned in item joins
+ */
+export interface CategoryReference {
+  id: string;
+  name: string;
+  color: string;
+}
+
+/**
+ * ItemWithCategory - Item with joined category data from API
+ * Used when fetching items with category relationship populated
+ */
+export interface ItemWithCategory extends Omit<Item, 'category_id'> {
+  category: CategoryReference;
+}
+
+/**
  * CreateCategoryData for creating new categories
  */
 export interface CreateCategoryData {

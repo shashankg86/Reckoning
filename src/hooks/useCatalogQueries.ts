@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { itemsAPI, ItemData, ItemFilter } from '../api/items';
 import { categoriesAPI } from '../api/categories';
 import { toast } from 'react-hot-toast';
@@ -87,9 +87,32 @@ export function useCatalogQueries(storeId: string) {
         },
     });
 
+    // Infinite Query for Items
+    const useInfiniteItems = (
+        filter?: ItemFilter,
+        limit: number = 20,
+        sortBy: 'name' | 'price' | 'stock' | 'created_at' = 'name',
+        sortOrder: 'asc' | 'desc' = 'asc'
+    ) => useInfiniteQuery({
+        queryKey: [...catalogKeys.items(storeId, filter), 'infinite', limit, sortBy, sortOrder],
+        queryFn: ({ pageParam = 1 }) => itemsAPI.getItems(storeId, filter, pageParam as number, limit, sortBy, sortOrder),
+        getNextPageParam: (lastPage: { data: any[]; count: number | null }, allPages: { data: any[]; count: number | null }[]) => {
+            const loadedCount = allPages.flatMap(p => p.data).length;
+            if (loadedCount < (lastPage.count || 0)) {
+                return allPages.length + 1;
+            }
+            return undefined;
+        },
+        initialPageParam: 1,
+        enabled: !!storeId,
+        placeholderData: keepPreviousData,
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    });
+
     return {
         categoriesQuery,
         useItems,
+        useInfiniteItems,
         createItemMutation,
         updateItemMutation,
     };

@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { ImageUpload } from '../ui/ImageUpload';
 import type { Category, CreateCategoryData, UpdateCategoryData } from '../../types/menu';
 
@@ -20,16 +19,8 @@ interface CategoryFormModalProps {
   editingCategory?: Category | null;
 }
 
-const PREDEFINED_COLORS = [
-  '#EF4444', // Red
-  '#F59E0B', // Orange
-  '#10B981', // Green
-  '#3B82F6', // Blue
-  '#6366F1', // Indigo
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#14B8A6', // Teal
-];
+import { PREDEFINED_COLORS, DEFAULT_CATEGORY_COLOR } from '../../constants/colors';
+import { CATALOG_LIMITS } from '../../constants/catalog';
 
 export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: CategoryFormModalProps) {
   const { t } = useTranslation();
@@ -37,7 +28,7 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
     defaultValues: {
       name: '',
       description: '',
-      color: '#FF6B35',
+      color: DEFAULT_CATEGORY_COLOR,
     },
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -50,13 +41,13 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
         reset({
           name: editingCategory.name || '',
           description: editingCategory.description || '',
-          color: editingCategory.color || '#FF6B35',
+          color: editingCategory.color || DEFAULT_CATEGORY_COLOR,
         });
       } else {
         reset({
           name: '',
           description: '',
-          color: '#FF6B35',
+          color: DEFAULT_CATEGORY_COLOR,
         });
       }
       setImageFile(null);
@@ -119,8 +110,8 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
             <input
               {...register('name', {
                 required: t('catalog.validation.nameRequired'),
-                minLength: { value: 2, message: t('menuSetup.nameTooShort') },
-                maxLength: { value: 50, message: t('menuSetup.nameTooLong') },
+                minLength: { value: CATALOG_LIMITS.NAME_MIN_LENGTH, message: t('menuSetup.nameTooShort') },
+                maxLength: { value: CATALOG_LIMITS.NAME_MAX_LENGTH, message: t('menuSetup.nameTooLong') },
               })}
               placeholder={t('menuSetup.enterCategoryName')}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -137,7 +128,7 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
             </label>
             <textarea
               {...register('description', {
-                maxLength: { value: 200, message: t('menuSetup.descriptionTooLong') },
+                maxLength: { value: CATALOG_LIMITS.DESCRIPTION_MAX_LENGTH, message: t('menuSetup.descriptionTooLong') },
               })}
               placeholder={t('menuSetup.enterCategoryDescription')}
               rows={3}
@@ -161,11 +152,10 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
                   key={color}
                   type="button"
                   onClick={() => setValue('color', color, { shouldDirty: true })}
-                  className={`w-8 h-8 rounded-full border-2 transition-all ${
-                    colorValue === color
-                      ? 'border-gray-900 dark:border-white scale-110'
-                      : 'border-transparent'
-                  }`}
+                  className={`w-8 h-8 rounded-full border-2 transition-all ${colorValue === color
+                    ? 'border-gray-900 dark:border-white scale-110'
+                    : 'border-transparent'
+                    }`}
                   style={{ backgroundColor: color }}
                 />
               ))}
@@ -188,7 +178,7 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
               onChange={setImageFile}
               onError={setImageError}
               placeholder={t('menuSetup.uploadImagePlaceholder')}
-              maxSizeMB={5}
+              maxSizeMB={CATALOG_LIMITS.IMAGE_MAX_SIZE_MB}
             />
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {t('menuSetup.imageUploadHint')}
@@ -214,8 +204,8 @@ export function CategoryFormModal({ isOpen, onClose, onSave, editingCategory }: 
               {isSubmitting
                 ? t('common.saving')
                 : editingCategory
-                ? t('common.update')
-                : t('common.create')}
+                  ? t('common.update')
+                  : t('common.create')}
             </Button>
           </div>
         </form>

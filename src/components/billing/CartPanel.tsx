@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { useTranslation } from 'react-i18next';
 import {
   MinusIcon,
@@ -12,31 +12,14 @@ import {
 import { Button } from '../ui/Button';
 import { Card } from '../ui/Card';
 import { Input } from '../ui/Input';
-import type { CartItem } from '../../contexts/POSContext';
-import type { StoreTaxConfig } from '../../api/taxConfig';
-import type { InvoiceTaxOverride } from './InvoiceTaxModal';
-
-interface CustomerInfo {
-  name: string;
-  phone: string;
-}
+import type { CartItem, CustomerDetails } from '../../types';
+import type { StoreTaxConfig, InvoiceTaxOverride } from '../../api/taxConfig';
+import type { TaxCalculationResult } from '../../hooks/useTaxCalculation';
 
 interface CartPanelProps {
   cart: CartItem[];
-  calculations: {
-    subtotal: number;
-    serviceCharge: number;
-    serviceChargeRate: number;
-    tax: number;
-    taxRate: number;
-    taxComponents: { name: string; amount: number; rate: number }[];
-    municipalityFee: number;
-    municipalityFeeRate: number;
-    customComponents: { name: string; rate: number; amount: number }[];
-    discountAmount: number;
-    total: number;
-  };
-  customer: CustomerInfo;
+  calculations: TaxCalculationResult;
+  customer: CustomerDetails;
   showCustomerForm: boolean;
   discount: number;
   discountType: 'flat' | 'percentage';
@@ -47,7 +30,7 @@ interface CartPanelProps {
   onUpdateQuantity: (itemId: string, quantity: number) => void;
   onRemoveFromCart: (itemId: string) => void;
   onClearCart: () => void;
-  onCustomerChange: (customer: CustomerInfo) => void;
+  onCustomerChange: (customer: CustomerDetails) => void;
   onToggleCustomerForm: () => void;
   onDiscountChange: (discount: number) => void;
   onDiscountTypeChange: (type: 'flat' | 'percentage') => void;
@@ -70,7 +53,7 @@ export function CartPanel({
   taxRate,
   taxComponents,
   taxConfig,
-  invoiceTaxOverride,
+  // invoiceTaxOverride - unused for now
   onUpdateQuantity,
   onRemoveFromCart,
   onClearCart,
@@ -78,7 +61,7 @@ export function CartPanel({
   onToggleCustomerForm,
   onDiscountChange,
   onDiscountTypeChange,
-  onTaxRateChange,
+  // onTaxRateChange - deprecated
   onTaxConfigClick,
   onInvoiceTaxClick,
   onHoldOrder,

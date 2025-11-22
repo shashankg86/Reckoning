@@ -23,8 +23,31 @@ export interface StoreTaxConfig {
   custom_tax_components?: TaxComponent[];
   tax_number?: string; // GST number, VAT number, etc.
   tax_inclusive?: boolean; // Prices include tax or not
+  service_charge_enabled: boolean;
+  service_charge_rate: number;
+  apply_vat_on_service_charge: boolean;
+  municipality_fee_enabled: boolean;
+  municipality_fee_rate: number;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface InvoiceTaxOverride {
+  enabled: boolean;
+  customRate?: number;
+  serviceCharge?: {
+    enabled: boolean;
+    rate: number;
+    applyVatOnServiceCharge?: boolean; // For Dubai: VAT applies on service charge
+  };
+  municipalityFee?: {
+    enabled: boolean;
+    rate: number;
+  };
+  customComponents?: {
+    name: string;
+    rate: number;
+  }[];
 }
 
 // Predefined tax presets for different countries
@@ -151,7 +174,7 @@ export const taxConfigAPI = {
       }
 
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Get tax config error:', error);
       return null;
     }
@@ -181,9 +204,9 @@ export const taxConfigAPI = {
 
       if (error) throw error;
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upsert tax config error:', error);
-      throw new Error(error.message || 'Failed to save tax configuration');
+      throw new Error(error instanceof Error ? error.message : 'Failed to save tax configuration');
     }
   },
 
@@ -230,8 +253,11 @@ export const taxConfigAPI = {
       amount: (subtotal * component.rate) / 100
     }));
 
-    const total = components.reduce((sum, c) => sum + c.amount, 0);
+    const totalTax = components.reduce((sum, comp) => sum + comp.amount, 0);
 
-    return { components, total };
+    return {
+      components,
+      total: totalTax
+    };
   }
 };

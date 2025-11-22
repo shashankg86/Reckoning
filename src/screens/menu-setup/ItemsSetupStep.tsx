@@ -18,8 +18,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useCatalogQueries } from '../../hooks/useCatalogQueries';
 import { itemsAPI, ItemData, ItemFilter } from '../../api/items';
 import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
-import { ItemFormModal } from './components/ItemFormModal';
-import { ItemBulkCreateModal } from './components/ItemBulkCreateModal';
+import { ItemFormModal } from '../../components/catalog/ItemFormModal';
+import { BulkAddItemsModal } from '../../components/catalog/BulkAddItemsModal';
+import type { Item } from '../../types/menu';
 
 // Local item with change tracking
 type DBItem = ItemData & { id: string };
@@ -33,6 +34,11 @@ interface LocalItem extends DBItem {
 }
 
 const LOCAL_ITEMS_KEY = 'menu_setup_pending_items';
+
+interface ItemsSetupStepProps {
+  onBack: () => void;
+  onComplete: () => void;
+}
 
 export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const { t } = useTranslation();
@@ -79,8 +85,6 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   useEffect(() => {
     setPage(1);
   }, [searchQuery, selectedCategoryFilter]);
-
-
 
   // Initialize localItems from localStorage
   useEffect(() => {
@@ -209,19 +213,28 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
       }
     });
 
+    // Also remove from selection if selected
+    if (selectedItems.has(itemId)) {
+      const newSelection = new Set(selectedItems);
+      newSelection.delete(itemId);
+      setSelectedItems(newSelection);
+    }
+
     toast.success(t('menuSetup.itemDeleted'));
     setDeleteConfirm({ isOpen: false });
   };
 
-  const handleBulkCreate = async (itemsData: ItemData[]) => {
-    const newItems: LocalItem[] = itemsData.map((data, index) => ({
+  const handleBulkCreate = (items: ItemData[], imageFiles?: (File | null)[]) => {
+    const newItems: LocalItem[] = items.map((data, index) => ({
       ...data,
       id: `temp_${Date.now()}_${index}`,
       _isNew: true,
+      _imageFile: imageFiles?.[index] || null,
+      is_active: true,
     }));
 
     setLocalItems((prev) => [...prev, ...newItems]);
-    toast.success(`${t('menuSetup.added')} ${itemsData.length} ${t('menuSetup.itemsLocally')}`);
+    toast.success(`${t('menuSetup.added')} ${items.length} ${t('menuSetup.itemsLocally')}`);
     setShowBulkCreate(false);
   };
 
@@ -666,19 +679,17 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
           setShowItemForm(false);
           setEditingItem(null);
         }}
-        onSubmit={editingItem ? handleUpdateItem : handleCreateItem}
-        item={editingItem}
-        title={editingItem ? 'Edit Item' : 'Add Item'}
-        availableCategories={categories}
-        defaultCategoryId={selectedCategoryFilter}
+        onSave={editingItem ? handleUpdateItem : handleCreateItem}
+        editingItem={editingItem as unknown as Item}
+        categories={categories}
       />
 
-      <ItemBulkCreateModal
+      <BulkAddItemsModal
         isOpen={showBulkCreate}
         onClose={() => setShowBulkCreate(false)}
-        onSubmit={handleBulkCreate}
-        availableCategories={categories}
-        defaultCategoryId={selectedCategoryFilter}
+        onBulkAdd={handleBulkCreate}
+        categories={categories}
+        preselectedCategoryId={selectedCategoryFilter}
       />
 
       {/* Delete Confirmation Dialog */}
