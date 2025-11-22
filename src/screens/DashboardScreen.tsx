@@ -1,8 +1,3 @@
-import React, { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { usePOS } from '../contexts/POSContext';
 import {
   ArrowTrendingUpIcon,
   ChartBarIcon,
@@ -16,49 +11,32 @@ import {
 import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
 import { Card, MetricCard } from '../components/ui/Card';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { usePOS } from '../contexts/POSContext';
+import { useDashboardAnalytics } from '../hooks/useDashboardAnalytics';
 
 export function DashboardScreen() {
   const { t } = useTranslation();
   const { state } = useAuth();
   const { state: posState } = usePOS();
   const navigate = useNavigate();
+  const storeId = state.user?.store?.id;
+
+  // Fetch dashboard analytics
+  const {
+    stats,
+    activeItems,
+    recentTransactions,
+    totalInvoices,
+    loading,
+    error
+  } = useDashboardAnalytics(storeId);
 
   const navigateToScreen = (path: string) => {
     navigate(path);
   };
-
-  // Calculate real metrics from POS data
-  const { todaysSales, todaysOrders, activeItems, averageOrderValue, recentTransactions, totalInvoices } = useMemo(() => {
-    // Calculate today's sales and orders from invoices
-    const sales = posState.invoices.reduce((sum, inv) => sum + inv.total, 0);
-    const orders = posState.invoices.length;
-
-    // Calculate average order value
-    const avgOrder = orders > 0 ? sales / orders : 0;
-
-    // Get active items count (items with stock > 0 or undefined stock)
-    const items = posState.items.filter(item => item.stock === undefined || item.stock > 0).length;
-
-    // Get recent 3 transactions
-    const recent = posState.invoices.slice(0, 3).map(inv => ({
-      id: inv.id,
-      amount: inv.total,
-      time: new Date(inv.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      items: inv.items.reduce((sum, item) => sum + item.quantity, 0)
-    }));
-
-    // Total invoices count (for now, same as today's since we only fetch today's)
-    const total = posState.invoices.length;
-
-    return {
-      todaysSales: sales,
-      todaysOrders: orders,
-      activeItems: items,
-      averageOrderValue: avgOrder,
-      recentTransactions: recent,
-      totalInvoices: total
-    };
-  }, [posState.invoices, posState.items]);
 
   const quickActions = [
     {
@@ -100,33 +78,55 @@ export function DashboardScreen() {
           </p>
         </div>
 
-        {/* Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <MetricCard
-            title={t('dashboard.todaysSales')}
-            value={`₹${todaysSales.toLocaleString('en-IN')}`}
-            icon={<CurrencyRupeeIcon className="h-5 w-5" />}
-            subtitle={`${todaysOrders} ${t('dashboard.orders').toLowerCase()}`}
-          />
-          <MetricCard
-            title={t('dashboard.orders')}
-            value={todaysOrders.toString()}
-            icon={<ShoppingCartIcon className="h-5 w-5" />}
-            subtitle={t('dashboard.today')}
-          />
-          <MetricCard
-            title={t('dashboard.averageOrder')}
-            value={`₹${Math.round(averageOrderValue).toLocaleString('en-IN')}`}
-            icon={<ArrowTrendingUpIcon className="h-5 w-5" />}
-            subtitle={t('dashboard.perTransaction')}
-          />
-          <MetricCard
-            title={t('dashboard.activeItems')}
-            value={activeItems.toString()}
-            icon={<CubeIcon className="h-5 w-5" />}
-            subtitle={t('dashboard.inCatalog')}
-          />
-        </div>
+        {/* Error State */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-red-800 dark:text-red-200">{error}</p>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 animate-pulse">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-4"></div>
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <MetricCard
+                title={t('dashboard.todaysSales')}
+                value={`₹${stats.sales.toLocaleString('en-IN')}`}
+                icon={<CurrencyRupeeIcon className="h-5 w-5" />}
+                subtitle={`${stats.orders} ${t('dashboard.orders').toLowerCase()}`}
+              />
+              <MetricCard
+                title={t('dashboard.orders')}
+                value={stats.orders.toString()}
+                icon={<ShoppingCartIcon className="h-5 w-5" />}
+                subtitle={t('dashboard.today')}
+              />
+              <MetricCard
+                title={t('dashboard.averageOrder')}
+                value={`₹${Math.round(stats.averageOrder).toLocaleString('en-IN')}`}
+                icon={<ArrowTrendingUpIcon className="h-5 w-5" />}
+                subtitle={t('dashboard.perTransaction')}
+              />
+              <MetricCard
+                title={t('dashboard.activeItems')}
+                value={activeItems.toString()}
+                icon={<CubeIcon className="h-5 w-5" />}
+                subtitle={t('dashboard.inCatalog')}
+              />
+            </div>
+          </>
+        )}
 
         {/* Quick Actions */}
         <div className="mb-8">
@@ -173,7 +173,16 @@ export function DashboardScreen() {
               </Button>
             </div>
             <div className="space-y-3">
-              {recentTransactions.length > 0 ? (
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg animate-pulse">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/3 mb-2"></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded w-1/4"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : recentTransactions.length > 0 ? (
                 recentTransactions.map((transaction) => (
                   <div
                     key={transaction.id}
@@ -224,7 +233,7 @@ export function DashboardScreen() {
                   {t('dashboard.totalInvoices')}
                 </span>
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {totalInvoices}
+                  {loading ? '...' : totalInvoices}
                 </span>
               </div>
               <div className="flex justify-between">

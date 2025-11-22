@@ -1,15 +1,14 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   MagnifyingGlassIcon,
   Squares2X2Icon,
   ListBulletIcon,
-  ClockIcon,
-  UserIcon,
-  XMarkIcon
+  XMarkIcon,
+  ShoppingCartIcon,
+  ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 import { Layout } from '../components/layout/Layout';
-import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { usePOS } from '../contexts/POSContext';
@@ -19,63 +18,59 @@ import { CartPanel } from '../components/billing/CartPanel';
 import { PaymentModal } from '../components/billing/PaymentModal';
 import { HoldOrdersModal } from '../components/billing/HoldOrdersModal';
 import { TaxConfigModal } from '../components/billing/TaxConfigModal';
-import { InvoiceTaxModal, type InvoiceTaxOverride } from '../components/billing/InvoiceTaxModal';
+import { InvoiceTaxModal } from '../components/billing/InvoiceTaxModal';
 import { CustomerDetailsModal } from '../components/billing/CustomerDetailsModal';
-import type { Item, CartItem } from '../contexts/POSContext';
-import { taxConfigAPI, type StoreTaxConfig } from '../api/taxConfig';
+import type { Item, CartItem, CustomerDetails } from '../types';
+import { taxConfigAPI, type StoreTaxConfig, type InvoiceTaxOverride } from '../api/taxConfig';
 import toast from 'react-hot-toast';
 import { emailService } from '../services/emailService';
+import { useCatalogQueries } from '../hooks/useCatalogQueries';
+import { useTaxCalculation } from '../hooks/useTaxCalculation';
 
 type ViewMode = 'grid' | 'list';
 type DiscountType = 'flat' | 'percentage';
-
-interface CustomerInfo {
-  name: string;
-  phone: string;
-  email: string;
-  countryCode: string;
-}
+type MobileTab = 'menu' | 'cart';
 
 interface HeldOrder {
   id: string;
   items: CartItem[];
-  customer?: CustomerInfo;
+  customer?: {
+    name: string;
+    phone: string;
+  };
   timestamp: Date;
 }
 
 export function BillingScreen() {
   const { t } = useTranslation();
-  const { state: posState, dispatch, handleCreateInvoice, loadItems } = usePOS();
+  const { state: posState, dispatch, handleCreateInvoice } = usePOS();
   const { state: authState } = useAuth();
+  const storeId = authState.user?.store?.id;
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-
-  // Force reload items when billing screen mounts to ensure fresh stock data
-  useEffect(() => {
-    loadItems(true); // Force reload to get latest stock
-  }, []);
+  const [mobileTab, setMobileTab] = useState<MobileTab>('menu');
 
   // Load tax configuration
+  const [taxConfig, setTaxConfig] = useState<StoreTaxConfig | null>(null);
   useEffect(() => {
     const loadTaxConfig = async () => {
-      if (authState.user?.store?.id) {
-        const config = await taxConfigAPI.getTaxConfig(authState.user.store.id);
+      if (storeId) {
+        const config = await taxConfigAPI.getTaxConfig(storeId);
         setTaxConfig(config);
       }
     };
     loadTaxConfig();
-  }, [authState.user?.store?.id]);
+  }, [storeId]);
 
   // Pricing state
   const [discount, setDiscount] = useState(0);
   const [discountType, setDiscountType] = useState<DiscountType>('flat');
-  const [customTaxRate, setCustomTaxRate] = useState<number | null>(null);
 
   // Customer state
-  const [customer, setCustomer] = useState<CustomerInfo>({
+  const [customer, setCustomer] = useState<CustomerDetails>({
     name: '',
     phone: '',
     email: '',
@@ -90,143 +85,76 @@ export function BillingScreen() {
   const [showTaxConfigModal, setShowTaxConfigModal] = useState(false);
   const [showInvoiceTaxModal, setShowInvoiceTaxModal] = useState(false);
 
-  // Tax configuration
-  const [taxConfig, setTaxConfig] = useState<StoreTaxConfig | null>(null);
+  // Invoice Tax Override
   const [invoiceTaxOverride, setInvoiceTaxOverride] = useState<InvoiceTaxOverride | null>(null);
 
   // Held orders
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
 
-  // Get categories from items
-  const categories = useMemo(() => {
-    const categoryMap = new Map<string, string>();
-    posState.items.forEach(item => {
-      if (item.category && !categoryMap.has(item.category)) {
-        categoryMap.set(item.category, item.category);
-      }
-    });
-    return Array.from(categoryMap.values());
-  }, [posState.items]);
+  // Data Fetching
+  // Debounce search term
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  // Filter items by search and category
-  const filteredItems = useMemo(() => {
-    let items = posState.items;
+  // Data Fetching
+  const { useInfiniteItems, categoriesQuery } = useCatalogQueries(storeId || '');
 
-    // Filter by category
-    if (selectedCategory !== 'all') {
-      items = items.filter(item => item.category === selectedCategory);
-    }
+  // Categories
+  const categories = useMemo(() => categoriesQuery.data || [], [categoriesQuery.data]);
 
-    // Filter by search term
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      items = items.filter(item =>
-        item.name.toLowerCase().includes(term) ||
-        item.sku?.toLowerCase().includes(term) ||
-        item.category?.toLowerCase().includes(term)
-      );
-    }
+  // Items with Server-Side Filtering
+  const {
+    data: itemsResult,
+    isLoading: itemsLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useInfiniteItems(
+    {
+      category_id: selectedCategory === 'all' ? undefined : selectedCategory,
+      search: debouncedSearchTerm,
+      is_active: true
+    },
+    50, // limit per page
+    'name', // sortBy
+    'asc' // sortOrder
+  );
 
-    return items;
-  }, [posState.items, selectedCategory, searchTerm]);
+  const catalogItems = useMemo(() =>
+    itemsResult?.pages.flatMap(page => page.data) || [],
+    [itemsResult?.pages]
+  );
 
-  // Calculate totals
-  const calculations = useMemo(() => {
-    const subtotal = posState.cart.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+  // No client-side filtering needed anymore
+  const filteredItems = catalogItems;
 
-    // Service charge (if enabled in invoice override)
-    let serviceChargeAmount = 0;
-    if (invoiceTaxOverride?.serviceCharge?.enabled) {
-      serviceChargeAmount = (subtotal * invoiceTaxOverride.serviceCharge.rate) / 100;
-    }
 
-    // Base for tax calculation
-    let taxableAmount = subtotal;
-    const isDubai = taxConfig?.country === 'AE';
 
-    // In Dubai, VAT applies on service charge too (if configured)
-    if (isDubai && invoiceTaxOverride?.serviceCharge?.enabled && invoiceTaxOverride.serviceCharge.applyVatOnServiceCharge) {
-      taxableAmount += serviceChargeAmount;
-    }
+  // Calculate totals using hook
+  const subtotal = useMemo(() =>
+    posState.cart.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    [posState.cart]
+  );
 
-    // Calculate tax
-    let taxData = { components: [] as { name: string; amount: number; rate: number }[], total: 0 };
-    let taxRate = 0;
-    let taxEnabled = invoiceTaxOverride?.enabled ?? true;
+  // Derive country from currency if not explicitly available
+  const storeCountry = useMemo(() => {
+    const currency = authState.user?.store?.currency;
+    if (currency === 'INR') return 'IN';
+    if (currency === 'AED') return 'AE';
+    return 'IN'; // Default to India
+  }, [authState.user?.store?.currency]);
 
-    if (taxEnabled) {
-      // Check for invoice-specific tax override first
-      if (invoiceTaxOverride?.customRate !== undefined) {
-        taxRate = invoiceTaxOverride.customRate;
-        taxData = {
-          components: [{ name: isDubai ? 'VAT' : 'GST', rate: taxRate, amount: (taxableAmount * taxRate) / 100 }],
-          total: (taxableAmount * taxRate) / 100
-        };
-      } else if (taxConfig) {
-        // Use tax configuration
-        taxData = taxConfigAPI.calculateTax(taxableAmount, taxConfig);
-        taxRate = taxData.components.reduce((sum, comp) => sum + comp.rate, 0);
-      } else if (customTaxRate !== null) {
-        // Fallback to custom tax rate
-        taxRate = customTaxRate;
-        taxData = {
-          components: [{ name: 'Tax', rate: taxRate, amount: (taxableAmount * taxRate) / 100 }],
-          total: (taxableAmount * taxRate) / 100
-        };
-      } else {
-        // Fallback to default tax rate based on store type
-        const storeType = authState.user?.store?.type;
-        taxRate = storeType === 'restaurant' || storeType === 'cafe' ? 5 : 18;
-        taxData = {
-          components: [{ name: 'Tax', rate: taxRate, amount: (taxableAmount * taxRate) / 100 }],
-          total: (taxableAmount * taxRate) / 100
-        };
-      }
-    }
-
-    // Municipality fee (Dubai only)
-    let municipalityFeeAmount = 0;
-    if (invoiceTaxOverride?.municipalityFee?.enabled && isDubai) {
-      municipalityFeeAmount = (subtotal * invoiceTaxOverride.municipalityFee.rate) / 100;
-    }
-
-    // Custom tax components (from invoice override)
-    let customComponentsAmount = 0;
-    const customComponents = invoiceTaxOverride?.customComponents || [];
-    customComponents.forEach(comp => {
-      customComponentsAmount += (subtotal * comp.rate) / 100;
-    });
-
-    // Calculate discount
-    const discountAmount = discountType === 'percentage'
-      ? (subtotal * discount) / 100
-      : discount;
-
-    const total = Math.max(
-      0,
-      subtotal + serviceChargeAmount + taxData.total + municipalityFeeAmount + customComponentsAmount - discountAmount
-    );
-
-    return {
-      subtotal,
-      serviceCharge: serviceChargeAmount,
-      serviceChargeRate: invoiceTaxOverride?.serviceCharge?.rate || 0,
-      tax: taxData.total,
-      taxRate,
-      taxComponents: taxData.components,
-      municipalityFee: municipalityFeeAmount,
-      municipalityFeeRate: invoiceTaxOverride?.municipalityFee?.rate || 0,
-      customComponents: customComponents.map(comp => ({
-        ...comp,
-        amount: (subtotal * comp.rate) / 100
-      })),
-      discountAmount,
-      total
-    };
-  }, [posState.cart, discount, discountType, customTaxRate, authState.user?.store?.type, taxConfig, invoiceTaxOverride]);
+  const calculations = useTaxCalculation({
+    subtotal,
+    storeCountry,
+    taxConfig,
+    discount,
+    discountType,
+    invoiceTaxOverride
+  });
 
   // Add item to cart
   const handleAddToCart = useCallback((item: Item) => {
@@ -246,6 +174,8 @@ export function BillingScreen() {
     }
 
     dispatch({ type: 'ADD_TO_CART', payload: item });
+    // Optional: Switch to cart tab on mobile when adding item? 
+    // setMobileTab('cart'); 
   }, [posState.cart, dispatch, t]);
 
   // Update quantity
@@ -254,7 +184,7 @@ export function BillingScreen() {
       dispatch({ type: 'REMOVE_FROM_CART', payload: itemId });
     } else {
       // Check stock
-      const item = posState.items.find(i => i.id === itemId);
+      const item = catalogItems.find(i => i.id === itemId);
       if (item?.stock !== undefined && quantity > item.stock) {
         toast.error(t('billing.insufficientStock', { available: item.stock }));
         return;
@@ -265,7 +195,7 @@ export function BillingScreen() {
         payload: { id: itemId, quantity },
       });
     }
-  }, [posState.items, dispatch, t]);
+  }, [catalogItems, dispatch, t]);
 
   // Remove item from cart
   const handleRemoveFromCart = useCallback((itemId: string) => {
@@ -276,7 +206,7 @@ export function BillingScreen() {
   const handleClearCart = useCallback(() => {
     dispatch({ type: 'CLEAR_CART' });
     setDiscount(0);
-    setCustomer({ name: '', phone: '' });
+    setCustomer({ name: '', phone: '', email: '', countryCode: '+91' });
     setShowCustomerForm(false);
   }, [dispatch]);
 
@@ -290,7 +220,7 @@ export function BillingScreen() {
     const heldOrder: HeldOrder = {
       id: Date.now().toString(),
       items: [...posState.cart],
-      customer: customer.name || customer.phone ? { ...customer } : undefined,
+      customer: customer.name || customer.phone ? { name: customer.name, phone: customer.phone } : undefined,
       timestamp: new Date()
     };
 
@@ -317,7 +247,12 @@ export function BillingScreen() {
     });
 
     if (order.customer) {
-      setCustomer(order.customer);
+      setCustomer({
+        name: order.customer.name,
+        phone: order.customer.phone,
+        email: '',
+        countryCode: '+91'
+      });
       setShowCustomerForm(true);
     }
 
@@ -348,7 +283,7 @@ export function BillingScreen() {
   }, [customer]);
 
   // Handle customer details submission
-  const handleCustomerDetailsSubmit = useCallback((details: CustomerInfo) => {
+  const handleCustomerDetailsSubmit = useCallback((details: CustomerDetails) => {
     setCustomer(details);
     setShowCustomerDetailsModal(false);
     // After customer details are saved, show payment modal
@@ -363,10 +298,14 @@ export function BillingScreen() {
         subtotal: calculations.subtotal,
         discount: calculations.discountAmount,
         tax: calculations.tax,
+        taxRate: calculations.taxRate,
+        serviceCharge: calculations.serviceCharge,
+        municipalityFee: calculations.municipalityFee,
         total: calculations.total,
-        paymentMethod: paymentMethod as any,
-        customer: customer.name, // Keep for backward compatibility
-        customerDetails: customer, // New structured customer data
+        paymentMethod: paymentMethod as 'cash' | 'card' | 'upi',
+        customer: customer.name,
+        customerDetails: customer,
+        date: new Date(),
         status: 'paid'
       });
 
@@ -467,9 +406,35 @@ export function BillingScreen() {
 
   return (
     <Layout title={t('billing.title')}>
-      <div className="h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-4 p-4 overflow-hidden">
-        {/* Left Panel - Items */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="h-[calc(100vh-4rem)] flex flex-col lg:flex-row gap-4 p-4 overflow-hidden relative">
+
+        {/* Mobile Tab Switcher */}
+        <div className="lg:hidden flex w-full bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 mb-2">
+          <button
+            onClick={() => setMobileTab('menu')}
+            className={`flex-1 py-3 text-center font-medium text-sm flex items-center justify-center gap-2 ${mobileTab === 'menu'
+              ? 'text-orange-500 border-b-2 border-orange-500'
+              : 'text-gray-500 dark:text-gray-400'
+              }`}
+          >
+            <ArchiveBoxIcon className="h-5 w-5" />
+            Menu
+          </button>
+          <button
+            onClick={() => setMobileTab('cart')}
+            className={`flex-1 py-3 text-center font-medium text-sm flex items-center justify-center gap-2 ${mobileTab === 'cart'
+              ? 'text-orange-500 border-b-2 border-orange-500'
+              : 'text-gray-500 dark:text-gray-400'
+              }`}
+          >
+            <ShoppingCartIcon className="h-5 w-5" />
+            Cart ({posState.cart.length})
+          </button>
+        </div>
+
+        {/* Left Panel - Items (Menu) */}
+        <div className={`flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300 ${mobileTab === 'menu' ? 'block' : 'hidden lg:flex'
+          }`}>
           <Card className="flex-1 flex flex-col overflow-hidden">
             {/* Search and Filters */}
             <div className="p-4 border-b border-gray-200 dark:border-gray-700 space-y-3">
@@ -494,49 +459,45 @@ export function BillingScreen() {
               </div>
 
               {/* Categories and View Toggle */}
-              <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
                 <button
                   onClick={() => setSelectedCategory('all')}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                    selectedCategory === 'all'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${selectedCategory === 'all'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
                 >
                   {t('common.all')}
                 </button>
                 {categories.map(category => (
                   <button
-                    key={category}
-                    onClick={() => setSelectedCategory(category)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                      selectedCategory === category
-                        ? 'bg-orange-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
+                    key={category.id}
+                    onClick={() => setSelectedCategory(category.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${selectedCategory === category.id
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
                   >
-                    {category}
+                    {category.name}
                   </button>
                 ))}
 
-                <div className="ml-auto flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                <div className="ml-auto flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1 hidden sm:flex">
                   <button
                     onClick={() => setViewMode('grid')}
-                    className={`p-1.5 rounded transition-colors ${
-                      viewMode === 'grid'
-                        ? 'bg-white dark:bg-gray-600 text-orange-500'
-                        : 'text-gray-600 dark:text-gray-400'
-                    }`}
+                    className={`p-1.5 rounded transition-colors ${viewMode === 'grid'
+                      ? 'bg-white dark:bg-gray-600 text-orange-500'
+                      : 'text-gray-600 dark:text-gray-400'
+                      }`}
                   >
                     <Squares2X2Icon className="h-4 w-4" />
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`p-1.5 rounded transition-colors ${
-                      viewMode === 'list'
-                        ? 'bg-white dark:bg-gray-600 text-orange-500'
-                        : 'text-gray-600 dark:text-gray-400'
-                    }`}
+                    className={`p-1.5 rounded transition-colors ${viewMode === 'list'
+                      ? 'bg-white dark:bg-gray-600 text-orange-500'
+                      : 'text-gray-600 dark:text-gray-400'
+                      }`}
                   >
                     <ListBulletIcon className="h-4 w-4" />
                   </button>
@@ -546,18 +507,28 @@ export function BillingScreen() {
 
             {/* Items Grid/List */}
             <div className="flex-1 overflow-y-auto p-4">
-              <ItemGrid
-                items={filteredItems}
-                viewMode={viewMode}
-                onAddToCart={handleAddToCart}
-                cart={posState.cart}
-              />
+              {itemsLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+                </div>
+              ) : (
+                <ItemGrid
+                  items={filteredItems}
+                  viewMode={viewMode}
+                  onAddToCart={handleAddToCart}
+                  cart={posState.cart}
+                  onLoadMore={fetchNextPage}
+                  hasNextPage={hasNextPage}
+                  isFetchingNextPage={isFetchingNextPage}
+                />
+              )}
             </div>
           </Card>
         </div>
 
         {/* Right Panel - Cart */}
-        <div className="w-full lg:w-96 flex flex-col min-h-0">
+        <div className={`w-full lg:w-96 flex flex-col min-h-0 transition-all duration-300 ${mobileTab === 'cart' ? 'block' : 'hidden lg:flex'
+          }`}>
           <CartPanel
             cart={posState.cart}
             calculations={calculations}
@@ -565,7 +536,7 @@ export function BillingScreen() {
             showCustomerForm={showCustomerForm}
             discount={discount}
             discountType={discountType}
-            taxRate={calculations.taxRate}
+            taxRate={0} // Handled by taxComponents now
             taxComponents={calculations.taxComponents}
             taxConfig={taxConfig}
             invoiceTaxOverride={invoiceTaxOverride}
@@ -576,7 +547,7 @@ export function BillingScreen() {
             onToggleCustomerForm={() => setShowCustomerForm(!showCustomerForm)}
             onDiscountChange={setDiscount}
             onDiscountTypeChange={setDiscountType}
-            onTaxRateChange={setCustomTaxRate}
+            onTaxRateChange={() => { }} // Deprecated
             onTaxConfigClick={() => setShowTaxConfigModal(true)}
             onInvoiceTaxClick={() => setShowInvoiceTaxModal(true)}
             onHoldOrder={handleHoldOrder}
@@ -633,7 +604,7 @@ export function BillingScreen() {
       {showInvoiceTaxModal && (
         <InvoiceTaxModal
           currentOverride={invoiceTaxOverride}
-          defaultTaxRate={calculations.taxRate}
+          defaultTaxRate={0}
           subtotal={calculations.subtotal}
           country={taxConfig?.country}
           onClose={() => setShowInvoiceTaxModal(false)}

@@ -28,19 +28,8 @@ interface BulkAddCategoriesModalProps {
   onBulkAdd: (categories: Omit<Category, 'id' | 'store_id' | 'created_at'>[], imageFiles: (File | null)[]) => void;
 }
 
-const DEFAULT_CATEGORY: CategoryFormData = {
-  name: '',
-  description: '',
-  color: '#FF6B35',
-  imageFile: null
-};
-
-const PREDEFINED_COLORS = [
-  '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
-  '#6366F1', '#8B5CF6', '#EC4899', '#14B8A6'
-];
-
-const MAX_CATEGORIES = 10;
+import { PREDEFINED_COLORS, DEFAULT_CATEGORY_COLOR } from '../../constants/colors';
+import { CATALOG_LIMITS, DEFAULT_CATEGORY } from '../../constants/catalog';
 
 export function BulkAddCategoriesModal({
   isOpen,
@@ -50,7 +39,7 @@ export function BulkAddCategoriesModal({
   const { t } = useTranslation();
   const { control, register, handleSubmit, formState: { errors }, setValue, watch, reset } = useForm<BulkCategoriesFormData>({
     defaultValues: {
-      categories: [{ ...DEFAULT_CATEGORY }],
+      categories: [{ ...DEFAULT_CATEGORY, color: DEFAULT_CATEGORY_COLOR }],
     },
   });
   const { fields, append, remove } = useFieldArray({
@@ -61,14 +50,14 @@ export function BulkAddCategoriesModal({
 
   useEffect(() => {
     if (!isOpen) {
-      reset({ categories: [{ ...DEFAULT_CATEGORY }] });
+      reset({ categories: [{ ...DEFAULT_CATEGORY, color: DEFAULT_CATEGORY_COLOR }] });
       setImageErrors({});
     }
   }, [isOpen, reset]);
 
   const handleAddRow = () => {
-    if (fields.length < MAX_CATEGORIES) {
-      append({ ...DEFAULT_CATEGORY });
+    if (fields.length < CATALOG_LIMITS.MAX_BULK_CATEGORIES) {
+      append({ ...DEFAULT_CATEGORY, color: DEFAULT_CATEGORY_COLOR });
     }
   };
 
@@ -144,7 +133,7 @@ export function BulkAddCategoriesModal({
               {t('catalog.bulkAddCategories')}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {t('menuSetup.bulkCreateDescription')} ({validCount}/{MAX_CATEGORIES})
+              {t('menuSetup.bulkCreateDescription')} ({validCount}/{CATALOG_LIMITS.MAX_BULK_CATEGORIES})
             </p>
           </div>
           <button
@@ -196,8 +185,8 @@ export function BulkAddCategoriesModal({
                       </label>
                       <input
                         {...register(`categories.${index}.name`, {
-                          minLength: { value: 2, message: t('menuSetup.nameTooShort') },
-                          maxLength: { value: 50, message: t('menuSetup.nameTooLong') },
+                          minLength: { value: CATALOG_LIMITS.NAME_MIN_LENGTH, message: t('menuSetup.nameTooShort') },
+                          maxLength: { value: CATALOG_LIMITS.NAME_MAX_LENGTH, message: t('menuSetup.nameTooLong') },
                         })}
                         type="text"
                         placeholder={t('menuSetup.enterCategoryName')}
@@ -220,7 +209,7 @@ export function BulkAddCategoriesModal({
                       </label>
                       <textarea
                         {...register(`categories.${index}.description`, {
-                          maxLength: { value: 200, message: t('menuSetup.descriptionTooLong') },
+                          maxLength: { value: CATALOG_LIMITS.DESCRIPTION_MAX_LENGTH, message: t('menuSetup.descriptionTooLong') },
                         })}
                         placeholder={t('menuSetup.enterCategoryDescription')}
                         rows={3}
@@ -258,7 +247,7 @@ export function BulkAddCategoriesModal({
                       <input
                         {...register(`categories.${index}.color`)}
                         type="text"
-                        placeholder="#FF6B35"
+                        placeholder={DEFAULT_CATEGORY_COLOR}
                         className="mt-2 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
                       />
                     </div>
@@ -274,7 +263,7 @@ export function BulkAddCategoriesModal({
                       onChange={(file) => handleImageChange(index, file)}
                       onError={(error) => handleImageError(index, error)}
                       placeholder={t('menuSetup.uploadImagePlaceholder')}
-                      maxSizeMB={5}
+                      maxSizeMB={CATALOG_LIMITS.IMAGE_MAX_SIZE_MB}
                     />
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                       {t('menuSetup.imageUploadHint')}
@@ -300,7 +289,7 @@ export function BulkAddCategoriesModal({
             ))}
 
             {/* Add Another Button */}
-            {fields.length < MAX_CATEGORIES && (
+            {fields.length < CATALOG_LIMITS.MAX_BULK_CATEGORIES && (
               <button
                 type="button"
                 onClick={handleAddRow}

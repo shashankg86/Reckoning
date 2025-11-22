@@ -8,24 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-
-export interface InvoiceTaxOverride {
-  enabled: boolean;
-  customRate?: number;
-  serviceCharge?: {
-    enabled: boolean;
-    rate: number;
-    applyVatOnServiceCharge?: boolean; // For Dubai: VAT applies on service charge
-  };
-  municipalityFee?: {
-    enabled: boolean;
-    rate: number;
-  };
-  customComponents?: {
-    name: string;
-    rate: number;
-  }[];
-}
+import type { InvoiceTaxOverride } from '../../api/taxConfig';
 
 interface InvoiceTaxModalProps {
   currentOverride: InvoiceTaxOverride | null;
@@ -201,14 +184,12 @@ export function InvoiceTaxModal({
             </div>
             <button
               onClick={() => setTaxEnabled(!taxEnabled)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                taxEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${taxEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                }`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  taxEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${taxEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
               />
             </button>
           </div>
@@ -258,14 +239,12 @@ export function InvoiceTaxModal({
               </div>
               <button
                 onClick={() => setServiceChargeEnabled(!serviceChargeEnabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  serviceChargeEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
-                }`}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${serviceChargeEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    serviceChargeEnabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${serviceChargeEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
                 />
               </button>
             </div>
@@ -317,14 +296,12 @@ export function InvoiceTaxModal({
                 </div>
                 <button
                   onClick={() => setMunicipalityFeeEnabled(!municipalityFeeEnabled)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    municipalityFeeEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${municipalityFeeEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      municipalityFeeEnabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${municipalityFeeEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
                   />
                 </button>
               </div>

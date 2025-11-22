@@ -1,17 +1,18 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { PlusIcon, CubeIcon } from '@heroicons/react/24/outline';
-import { Button } from '../ui/Button';
-import type { Item, CartItem } from '../../contexts/POSContext';
+import type { Item, CartItem } from '../../types';
 
 interface ItemGridProps {
   items: Item[];
   viewMode: 'grid' | 'list';
   onAddToCart: (item: Item) => void;
   cart: CartItem[];
+  onLoadMore?: () => void;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
 }
 
-export function ItemGrid({ items, viewMode, onAddToCart, cart }: ItemGridProps) {
+export function ItemGrid({ items, viewMode, onAddToCart, cart, onLoadMore, hasNextPage, isFetchingNextPage }: ItemGridProps) {
   const { t } = useTranslation();
 
   if (items.length === 0) {
@@ -26,86 +27,98 @@ export function ItemGrid({ items, viewMode, onAddToCart, cart }: ItemGridProps) 
 
   if (viewMode === 'grid') {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-        {items.map(item => {
-          const cartItem = cart.find(ci => ci.id === item.id);
-          const isOutOfStock = item.stock !== undefined && item.stock <= 0;
-          const isLowStock = item.stock !== undefined && item.stock > 0 && item.stock <= 5;
+      <div className="pb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {items.map(item => {
+            const cartItem = cart.find(ci => ci.id === item.id);
+            const isOutOfStock = item.stock !== undefined && item.stock <= 0;
+            const isLowStock = item.stock !== undefined && item.stock > 0 && item.stock <= 5;
 
-          return (
-            <button
-              key={item.id}
-              onClick={() => !isOutOfStock && onAddToCart(item)}
-              disabled={isOutOfStock}
-              className={`group relative p-3 rounded-lg border transition-all ${
-                isOutOfStock
+            return (
+              <button
+                key={item.id}
+                onClick={() => !isOutOfStock && onAddToCart(item)}
+                disabled={isOutOfStock}
+                className={`group relative p-3 rounded-lg border transition-all ${isOutOfStock
                   ? 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed'
                   : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-orange-500 hover:shadow-md active:scale-95'
-              }`}
-            >
-              {/* Image or Placeholder */}
-              <div className="aspect-square mb-2 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
-                {item.image ? (
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <CubeIcon className="h-12 w-12 text-gray-400" />
-                  </div>
-                )}
-              </div>
-
-              {/* Item Info */}
-              <div className="text-left">
-                <h3 className="font-medium text-sm text-gray-900 dark:text-white truncate">
-                  {item.name}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {item.category}
-                </p>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-lg font-bold text-orange-500">
-                    ₹{item.price.toLocaleString('en-IN')}
-                  </span>
-                  {!isOutOfStock && (
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-500 text-white group-hover:scale-110 transition-transform">
-                      <PlusIcon className="h-4 w-4" />
+                  }`}
+              >
+                {/* Image or Placeholder */}
+                <div className="aspect-square mb-2 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <CubeIcon className="h-12 w-12 text-gray-400" />
                     </div>
                   )}
                 </div>
-              </div>
 
-              {/* Stock Badge */}
-              {isOutOfStock && (
-                <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                  {t('billing.outOfStock')}
+                {/* Item Info */}
+                <div className="text-left">
+                  <h3 className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                    {item.name}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {item.category.name}
+                  </p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-lg font-bold text-orange-500">
+                      ₹{item.price.toLocaleString('en-IN')}
+                    </span>
+                    {!isOutOfStock && (
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-500 text-white group-hover:scale-110 transition-transform">
+                        <PlusIcon className="h-4 w-4" />
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              {isLowStock && !isOutOfStock && (
-                <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                  {item.stock} {t('common.left')}
-                </div>
-              )}
 
-              {/* Cart Quantity Badge */}
-              {cartItem && cartItem.quantity > 0 && (
-                <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs w-6 h-6 rounded-full font-bold flex items-center justify-center">
-                  {cartItem.quantity}
-                </div>
-              )}
+                {/* Stock Badge */}
+                {isOutOfStock && (
+                  <div className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                    {t('billing.outOfStock')}
+                  </div>
+                )}
+                {isLowStock && !isOutOfStock && (
+                  <div className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                    {item.stock} {t('common.left')}
+                  </div>
+                )}
+
+                {/* Cart Quantity Badge */}
+                {cartItem && cartItem.quantity > 0 && (
+                  <div className="absolute top-2 left-2 bg-orange-500 text-white text-xs w-6 h-6 rounded-full font-bold flex items-center justify-center">
+                    {cartItem.quantity}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {hasNextPage && (
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => onLoadMore?.()}
+              disabled={isFetchingNextPage}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+            >
+              {isFetchingNextPage ? t('common.loading') : t('common.loadMore')}
             </button>
-          );
-        })}
+          </div>
+        )}
       </div>
     );
   }
 
   // List view
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 pb-4">
       {items.map(item => {
         const cartItem = cart.find(ci => ci.id === item.id);
         const isOutOfStock = item.stock !== undefined && item.stock <= 0;
@@ -116,17 +129,16 @@ export function ItemGrid({ items, viewMode, onAddToCart, cart }: ItemGridProps) 
             key={item.id}
             onClick={() => !isOutOfStock && onAddToCart(item)}
             disabled={isOutOfStock}
-            className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${
-              isOutOfStock
-                ? 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed'
-                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-orange-500 hover:shadow-md active:scale-[0.99]'
-            }`}
+            className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all ${isOutOfStock
+              ? 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed'
+              : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-orange-500 hover:shadow-md active:scale-[0.99]'
+              }`}
           >
             {/* Image */}
             <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
-              {item.image ? (
+              {item.image_url ? (
                 <img
-                  src={item.image}
+                  src={item.image_url}
                   alt={item.name}
                   className="w-full h-full object-cover"
                 />
@@ -143,7 +155,7 @@ export function ItemGrid({ items, viewMode, onAddToCart, cart }: ItemGridProps) 
                 {item.name}
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                {item.category}
+                {item.category.name}
                 {item.sku && ` • ${item.sku}`}
               </p>
               <div className="flex items-center gap-2 mt-1">
@@ -179,6 +191,17 @@ export function ItemGrid({ items, viewMode, onAddToCart, cart }: ItemGridProps) 
           </button>
         );
       })}
+      {hasNextPage && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => onLoadMore?.()}
+            disabled={isFetchingNextPage}
+            className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+          >
+            {isFetchingNextPage ? t('common.loading') : t('common.loadMore')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
