@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
@@ -15,27 +15,20 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { CachedImage } from '../../components/ui/CachedImage';
 import { useAuth } from '../../contexts/AuthContext';
-import { useItems } from '../../hooks/useItems';
-import { useCategories } from '../../hooks/useCategories';
-import { itemsAPI } from '../../api/items';
+import { useCatalogQueries } from '../../hooks/useCatalogQueries';
+import { itemsAPI, ItemData, ItemFilter } from '../../api/items';
 import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
 import { ItemFormModal } from './components/ItemFormModal';
 import { ItemBulkCreateModal } from './components/ItemBulkCreateModal';
-import type { ItemData } from '../../api/items';
-import type { Category } from '../../types/menu';
-
-interface ItemsSetupStepProps {
-  onBack: () => void;
-  onComplete: () => void;
-}
 
 // Local item with change tracking
-interface LocalItem extends ItemData {
-  id: string;
+type DBItem = ItemData & { id: string };
+
+interface LocalItem extends DBItem {
   _isNew?: boolean;
   _isModified?: boolean;
   _isDeleted?: boolean;
-  _originalData?: any;
+  _originalData?: DBItem;
   _imageFile?: File | null;
 }
 
@@ -44,20 +37,37 @@ const LOCAL_ITEMS_KEY = 'menu_setup_pending_items';
 export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const { t } = useTranslation();
   const { state: authState } = useAuth();
-  const storeId = (authState.user as any)?.store?.id;
+  const storeId = authState.user?.store?.id || '';
 
-  const { items: existingItems, loading: loadingItems } = useItems({ autoLoad: true });
-  const { categories, loading: loadingCategories } = useCategories({
-    autoLoad: true,
-    filter: { is_active: true }
-  });
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  // Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
+
+  // React Query
+  const { categoriesQuery, useItems } = useCatalogQueries(storeId);
+
+  const apiFilters: ItemFilter = useMemo(() => ({
+    search: searchQuery,
+    category_id: selectedCategoryFilter || undefined,
+    is_active: true
+  }), [searchQuery, selectedCategoryFilter]);
+
+  const itemsQuery = useItems(apiFilters, page);
+  const dbItems = useMemo(() => itemsQuery.data?.data || [], [itemsQuery.data?.data]);
+  const totalItems = itemsQuery.data?.count || 0;
+  const totalPages = Math.ceil(totalItems / limit);
+
+  const categories = categoriesQuery.data || [];
+  const loading = itemsQuery.isLoading || categoriesQuery.isLoading;
 
   const [localItems, setLocalItems] = useState<LocalItem[]>([]);
   const [showItemForm, setShowItemForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
   const [editingItem, setEditingItem] = useState<LocalItem | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; item?: LocalItem }>({
     isOpen: false,
@@ -65,57 +75,63 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Reset page when filters change
   useEffect(() => {
-    if (existingItems.length > 0) {
-      try {
-        const stored = localStorage.getItem(LOCAL_ITEMS_KEY);
-        const pendingItems = stored ? (JSON.parse(stored) as LocalItem[]) : [];
+    setPage(1);
+  }, [searchQuery, selectedCategoryFilter]);
 
-        const dbItems = existingItems.map((item) => ({
-          ...item,
-          _originalData: item,
-        }));
 
-        const mergedItems = [...dbItems];
 
-        pendingItems.forEach((pending) => {
-          if (pending._isNew) {
-            mergedItems.push(pending);
-          } else if (pending._isModified || pending._isDeleted) {
-            const index = mergedItems.findIndex((i) => i.id === pending.id);
-            if (index !== -1) {
-              mergedItems[index] = pending;
-            }
-          }
-        });
-
-        setLocalItems(mergedItems);
-      } catch (error) {
-        console.error('Failed to merge items with localStorage:', error);
-        setLocalItems(
-          existingItems.map((item) => ({
-            ...item,
-            _originalData: item,
-          }))
-        );
-      }
+  // Initialize localItems from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem(LOCAL_ITEMS_KEY);
+    if (stored) {
+      setLocalItems(JSON.parse(stored));
     }
-  }, [existingItems]);
+  }, []);
 
+  // Persist localItems
   useEffect(() => {
     if (localItems.length > 0) {
-      try {
-        const pendingChanges = localItems.filter((item) => item._isNew || item._isModified || item._isDeleted);
-        if (pendingChanges.length > 0) {
-          localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(pendingChanges));
-        } else {
-          localStorage.removeItem(LOCAL_ITEMS_KEY);
-        }
-      } catch (error) {
-        console.error('Failed to persist pending items to localStorage:', error);
+      const pendingChanges = localItems.filter((item) => item._isNew || item._isModified || item._isDeleted);
+      if (pendingChanges.length > 0) {
+        localStorage.setItem(LOCAL_ITEMS_KEY, JSON.stringify(pendingChanges));
+      } else {
+        localStorage.removeItem(LOCAL_ITEMS_KEY);
       }
     }
   }, [localItems]);
+
+  // Compute displayed items
+  const displayedItems = useMemo(() => {
+    // Start with DB items
+    let display: LocalItem[] = (dbItems as DBItem[]).map((item) => ({
+      ...item,
+      _originalData: item,
+    }));
+
+    // Apply local changes
+    // 1. Update existing items
+    display = display.map((item) => {
+      const local = localItems.find(l => l.id === item.id);
+      return local ? local : item;
+    });
+
+    // 2. Add new items (that match filters)
+    const newItems = localItems.filter(l => l._isNew && !l._isDeleted);
+    const filteredNewItems = newItems.filter(item => {
+      const matchesCategory = !selectedCategoryFilter || item.category_id === selectedCategoryFilter;
+      const matchesSearch = !searchQuery ||
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+
+    // Combine: New items at top, then DB items
+    // Remove deleted items
+    return [...filteredNewItems, ...display].filter(item => !item._isDeleted);
+  }, [dbItems, localItems, selectedCategoryFilter, searchQuery]);
+
 
   const handleCreateItem = async (itemData: ItemData, imageFile?: File | null) => {
     const newItem: LocalItem = {
@@ -141,26 +157,32 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
       await imageCache.set(editingItem.id, imageFile);
     }
 
-    setLocalItems((prev) =>
-      prev.map((item) => {
-        if (item.id === editingItem.id) {
-          if (item._isNew) {
+    setLocalItems((prev) => {
+      // Check if item exists in localItems
+      const exists = prev.find(i => i.id === editingItem.id);
+
+      if (exists) {
+        return prev.map((item) => {
+          if (item.id === editingItem.id) {
             return {
               ...item,
               ...itemData,
               _imageFile: imageFile !== undefined ? imageFile : item._imageFile,
+              _isModified: !item._isNew, // Only mark modified if not new
             };
           }
-          return {
-            ...item,
-            ...itemData,
-            _imageFile: imageFile !== undefined ? imageFile : item._imageFile,
-            _isModified: true,
-          };
-        }
-        return item;
-      })
-    );
+          return item;
+        });
+      } else {
+        // Item is from DB, add to localItems as modified
+        return [...prev, {
+          ...editingItem,
+          ...itemData,
+          _imageFile: imageFile || null,
+          _isModified: true
+        }];
+      }
+    });
 
     toast.success(t('menuSetup.itemUpdated'));
     setEditingItem(null);
@@ -169,20 +191,23 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
 
   const handleDeleteItem = () => {
     if (!deleteConfirm.item) return;
+    const itemId = deleteConfirm.item.id;
 
-    setLocalItems((prev) =>
-      prev
-        .map((item) => {
-          if (item.id === deleteConfirm.item!.id) {
-            if (item._isNew) {
-              return null;
-            }
-            return { ...item, _isDeleted: true };
-          }
-          return item;
-        })
-        .filter(Boolean) as LocalItem[]
-    );
+    setLocalItems((prev) => {
+      const exists = prev.find(i => i.id === itemId);
+      if (exists) {
+        if (exists._isNew) {
+          // Remove completely
+          return prev.filter(i => i.id !== itemId);
+        } else {
+          // Mark deleted
+          return prev.map(i => i.id === itemId ? { ...i, _isDeleted: true } : i);
+        }
+      } else {
+        // Add as deleted
+        return [...prev, { ...deleteConfirm.item!, _isDeleted: true }];
+      }
+    });
 
     toast.success(t('menuSetup.itemDeleted'));
     setDeleteConfirm({ isOpen: false });
@@ -201,19 +226,27 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   };
 
   const handleBulkDelete = () => {
-    setLocalItems((prev) =>
-      prev
-        .map((item) => {
-          if (selectedItems.has(item.id)) {
-            if (item._isNew) {
-              return null;
-            }
-            return { ...item, _isDeleted: true };
+    setLocalItems((prev) => {
+      const newLocalItems = [...prev];
+
+      selectedItems.forEach(itemId => {
+        const existsIndex = newLocalItems.findIndex(i => i.id === itemId);
+        if (existsIndex !== -1) {
+          if (newLocalItems[existsIndex]._isNew) {
+            newLocalItems.splice(existsIndex, 1);
+          } else {
+            newLocalItems[existsIndex]._isDeleted = true;
           }
-          return item;
-        })
-        .filter(Boolean) as LocalItem[]
-    );
+        } else {
+          // Find in displayed items to get data
+          const item = displayedItems.find(i => i.id === itemId);
+          if (item) {
+            newLocalItems.push({ ...item, _isDeleted: true });
+          }
+        }
+      });
+      return newLocalItems;
+    });
 
     toast.success(`${t('menuSetup.deleted')} ${selectedItems.size} ${t('menuSetup.items')}`);
     setSelectedItems(new Set());
@@ -231,39 +264,12 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   };
 
   const toggleSelectAll = () => {
-    if (selectedItems.size === filteredItems.length) {
+    if (selectedItems.size === displayedItems.length) {
       setSelectedItems(new Set());
     } else {
-      setSelectedItems(new Set(filteredItems.map((item) => item.id)));
+      setSelectedItems(new Set(displayedItems.map((item) => item.id)));
     }
   };
-
-  // Filter out deleted items
-  const activeItems = localItems.filter((item) => !item._isDeleted);
-
-  // LOCAL FILTERING - No API calls!
-  const filteredItems = activeItems.filter((item) => {
-    const matchesSearch =
-      !searchQuery ||
-      (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.sku || '').toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesCategory =
-      !selectedCategoryFilter || item.category_id === selectedCategoryFilter;
-
-    return matchesSearch && matchesCategory;
-  });
-
-  // Group items by category
-  const itemsByCategory = filteredItems.reduce((acc, item) => {
-    const catId = item.category_id || 'uncategorized';
-    if (!acc[catId]) {
-      acc[catId] = [];
-    }
-    acc[catId].push(item);
-    return acc;
-  }, {} as Record<string, LocalItem[]>);
 
   const getCategoryName = (categoryId: string | null | undefined) => {
     if (!categoryId) return 'Uncategorized';
@@ -373,9 +379,10 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
 
       localStorage.removeItem(LOCAL_ITEMS_KEY);
       onComplete();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to sync items:', error);
-      toast.error(error.message || t('menuSetup.failedToSaveItems'));
+      const errorMessage = error instanceof Error ? error.message : t('menuSetup.failedToSaveItems');
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -384,8 +391,6 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   const pendingChanges = localItems.filter(
     (item) => item._isNew || item._isModified || item._isDeleted
   ).length;
-
-  const loading = loadingItems || loadingCategories;
 
   return (
     <div className="space-y-6">
@@ -446,7 +451,7 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
                 <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                   <input
                     type="checkbox"
-                    checked={selectedItems.size === filteredItems.length && filteredItems.length > 0}
+                    checked={selectedItems.size === displayedItems.length && displayedItems.length > 0}
                     onChange={toggleSelectAll}
                     className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                   />
@@ -493,13 +498,13 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
       </Card>
 
       {/* Items List */}
-      {loading && activeItems.length === 0 ? (
+      {loading && displayedItems.length === 0 ? (
         <Card className="p-12">
           <div className="text-center text-gray-500 dark:text-gray-400">
             {t('common.loading')}
           </div>
         </Card>
-      ) : filteredItems.length === 0 ? (
+      ) : displayedItems.length === 0 ? (
         <Card className="p-12">
           <div className="text-center">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
@@ -514,123 +519,126 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
         </Card>
       ) : (
         <div className="space-y-6">
-          {Object.entries(itemsByCategory).map(([categoryId, categoryItems]) => {
-            const categoryName = getCategoryName(categoryId === 'uncategorized' ? null : categoryId);
-            const categoryColor = getCategoryColor(categoryId === 'uncategorized' ? null : categoryId);
+          {/* Flat List for Pagination */}
+          <div className="space-y-2">
+            {displayedItems.map((item) => {
+              const categoryName = getCategoryName(item.category_id);
+              const categoryColor = getCategoryColor(item.category_id);
 
-            return (
-              <div key={categoryId}>
-                {/* Category Header */}
-                <div className="flex items-center gap-2 mb-3">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: categoryColor }}
+              return (
+                <div key={item.id} className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedItems.has(item.id)}
+                    onChange={() => toggleItemSelection(item.id)}
+                    className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
                   />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {categoryName}
-                  </h3>
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    ({categoryItems.length} {categoryItems.length === 1 ? 'item' : 'items'})
-                  </span>
-                </div>
-
-                {/* Items in Category */}
-                <div className="space-y-2">
-                  {categoryItems.map((item) => {
-                    return (
-                      <div key={item.id} className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedItems.has(item.id)}
-                          onChange={() => toggleItemSelection(item.id)}
-                          className="h-5 w-5 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                        />
-                        <Card className="flex-1 p-4 flex items-center gap-3 hover:shadow-md transition-shadow relative">
-                          {item.image_url || item.id ? (
-                            <CachedImage
-                              cacheId={item.id}
-                              fallbackUrl={item.image_url}
-                              alt={item.name}
-                              className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-16 h-16 rounded-lg bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
-                              <svg
-                                className="w-8 h-8 text-gray-400 dark:text-gray-500"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                />
-                              </svg>
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-gray-900 dark:text-white">
-                              {item.name}
-                            </h4>
-                            {/* CATEGORY BADGE */}
-                            <span
-                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                              style={{
-                                backgroundColor: `${categoryColor}20`,
-                                color: categoryColor,
-                              }}
-                            >
-                              {categoryName}
-                            </span>
-                            {/* STATUS BADGE */}
-                            {(item._isNew || item._isModified) && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
-                                {item._isNew ? t('menuSetup.new') : t('menuSetup.modified')}
-                              </span>
-                            )}
-                          </div>
-                          {item.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                              {item.description}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
-                            <span className="font-semibold text-orange-600 dark:text-orange-400">
-                              {t('common.currency')}
-                              {item.price.toFixed(2)}
-                            </span>
-                            {item.sku && <span>{t('menuSetup.sku')}: {item.sku}</span>}
-                            {item.stock !== undefined && <span>{t('menuSetup.stock')}: {item.stock}</span>}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingItem(item);
-                              setShowItemForm(true);
-                            }}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400"
-                          >
-                            <PencilIcon className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm({ isOpen: true, item })}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                          >
-                            <TrashIcon className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </Card>
+                  <Card className="flex-1 p-4 flex items-center gap-3 hover:shadow-md transition-shadow relative">
+                    {item.image_url || item.id ? (
+                      <CachedImage
+                        cacheId={item.id}
+                        fallbackUrl={item.image_url}
+                        alt={item.name}
+                        className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+                        <svg
+                          className="w-8 h-8 text-gray-400 dark:text-gray-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold text-gray-900 dark:text-white">
+                          {item.name}
+                        </h4>
+                        {/* CATEGORY BADGE */}
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                          style={{
+                            backgroundColor: `${categoryColor}20`,
+                            color: categoryColor,
+                          }}
+                        >
+                          {categoryName}
+                        </span>
+                        {/* STATUS BADGE */}
+                        {(item._isNew || item._isModified) && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+                            {item._isNew ? t('menuSetup.new') : t('menuSetup.modified')}
+                          </span>
+                        )}
+                      </div>
+                      {item.description && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          {item.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        <span className="font-semibold text-orange-600 dark:text-orange-400">
+                          {t('common.currency')}
+                          {item.price.toFixed(2)}
+                        </span>
+                        {item.sku && <span>{t('menuSetup.sku')}: {item.sku}</span>}
+                        {item.stock !== undefined && <span>{t('menuSetup.stock')}: {item.stock}</span>}
+                      </div>
                     </div>
-                    );
-                  })}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingItem(item);
+                          setShowItemForm(true);
+                        }}
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:text-orange-600 dark:hover:text-orange-400"
+                      >
+                        <PencilIcon className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm({ isOpen: true, item })}
+                        className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                      >
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </Card>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center space-x-4 mt-6">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                {t('common.previous')}
+              </button>
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+              >
+                {t('common.next')}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

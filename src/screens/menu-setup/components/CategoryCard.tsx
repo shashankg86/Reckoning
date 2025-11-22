@@ -1,4 +1,3 @@
-import React from 'react';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { Button } from '../../../components/ui/Button';
 import { CachedImage } from '../../../components/ui/CachedImage';
@@ -25,17 +24,15 @@ export function CategoryCard({
 }: CategoryCardProps) {
   return (
     <div
-      className={`bg-white dark:bg-gray-800 rounded-lg border-2 ${
-        isDragging
-          ? 'border-orange-500 shadow-lg'
-          : 'border-gray-200 dark:border-gray-700'
-      } p-4 cursor-move transition-all hover:shadow-md ${
-        isSubcategory ? 'ml-8' : ''
-      }`}
+      className={`bg-white dark:bg-gray-800 rounded-lg border-2 ${isDragging
+        ? 'border-orange-500 shadow-lg'
+        : 'border-gray-200 dark:border-gray-700'
+        } p-4 cursor-move transition-all hover:shadow-md ${isSubcategory ? 'ml-8' : ''
+        }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center space-x-3 flex-1">
-          {category.image_url || category.id ? (
+          {category.image_url ? (
             <CachedImage
               cacheId={category.id}
               fallbackUrl={category.image_url}

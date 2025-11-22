@@ -17,7 +17,7 @@ export interface Category {
   image_url: string | null;
   sort_order: number;
   parent_id: string | null;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -81,7 +81,7 @@ export interface CreateCategoryData {
   image_url?: string | null;
   sort_order?: number;
   parent_id?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -95,7 +95,7 @@ export interface UpdateCategoryData {
   image_url?: string | null;
   sort_order?: number;
   parent_id?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   is_active?: boolean;
 }
 
@@ -166,7 +166,7 @@ export interface ReorderCategoryPayload {
 export interface BulkCategoryOperation {
   action: 'activate' | 'deactivate' | 'delete' | 'reorder';
   category_ids: string[];
-  data?: any;
+  data?: unknown;
 }
 
 /**

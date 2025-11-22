@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
-import { XMarkIcon, PhotoIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
 import { ImageUpload } from '../ui/ImageUpload';
 import type { Item, Category } from '../../types/menu';
 
@@ -108,7 +107,6 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
     setValue('category', category?.name || '', { shouldDirty: true });
   };
 
-  const imageValue = watch('image_url');
   const hasFormChanged = isDirty || imageFile !== null;
 
   if (!isOpen) return null;
@@ -251,9 +249,9 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
               {t('catalog.image')} {t('common.optional')}
             </label>
             <ImageUpload
-              onImageSelect={setImageFile}
+              onChange={setImageFile}
               onError={setImageError}
-              existingImageUrl={editingItem?.image_url || undefined}
+              value={imageFile || editingItem?.image_url}
             />
             {imageError && (
               <p className="mt-1 text-sm text-red-600 dark:text-red-400">{imageError}</p>
@@ -279,8 +277,8 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
               {isSubmitting
                 ? t('common.saving')
                 : editingItem
-                ? t('common.update')
-                : t('catalog.save')}
+                  ? t('common.update')
+                  : t('catalog.save')}
             </Button>
           </div>
         </form>

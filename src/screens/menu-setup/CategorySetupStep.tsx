@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import {
@@ -14,7 +14,7 @@ import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCategories } from '../../hooks/useCategories';
+import { useCatalogQueries } from '../../hooks/useCatalogQueries';
 import { categoriesAPI } from '../../api/categories';
 import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
 import { CategoryCard } from './components/CategoryCard';
@@ -41,9 +41,12 @@ const LOCAL_CATEGORIES_KEY = 'menu_setup_pending_categories';
 export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const { t } = useTranslation();
   const { state: authState } = useAuth();
-  const storeId = (authState.user as any)?.store?.id;
+  const storeId = authState.user?.store?.id || '';
 
-  const { categories: existingCategories, loading: loadingExisting } = useCategories({ autoLoad: true });
+  const { categoriesQuery } = useCatalogQueries(storeId);
+  const existingCategories = useMemo(() => categoriesQuery.data || [], [categoriesQuery.data]);
+  const loadingExisting = categoriesQuery.isLoading;
+
   const [localCategories, setLocalCategories] = useState<LocalCategory[]>([]);
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
@@ -63,12 +66,10 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
         const stored = localStorage.getItem(LOCAL_CATEGORIES_KEY);
         const pendingCategories = stored ? (JSON.parse(stored) as LocalCategory[]) : [];
 
-        const dbCategories = existingCategories.map((cat) => ({
+        const mergedCategories: LocalCategory[] = existingCategories.map((cat) => ({
           ...cat,
           _originalData: cat,
         }));
-
-        const mergedCategories = [...dbCategories];
 
         pendingCategories.forEach((pending) => {
           if (pending._isNew) {
@@ -85,7 +86,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       } catch (error) {
         console.error('Failed to merge categories with localStorage:', error);
         setLocalCategories(
-          existingCategories.map((cat) => ({
+          existingCategories.map((cat: Category) => ({
             ...cat,
             _originalData: cat,
           }))
@@ -119,7 +120,14 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       store_id: storeId,
       sort_order: localCategories.length,
       created_at: new Date().toISOString(),
+      created_by: authState.user?.uid || '',
       updated_at: new Date().toISOString(),
+      image_url: null,
+      parent_id: null,
+      metadata: {},
+      description: data.description || null,
+      color: data.color || '#000000',
+      icon: data.icon || '',
     };
 
     if (imageFile) {
@@ -199,7 +207,14 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       store_id: storeId,
       sort_order: localCategories.length + index,
       created_at: new Date().toISOString(),
+      created_by: authState.user?.uid || '',
       updated_at: new Date().toISOString(),
+      image_url: null,
+      parent_id: null,
+      metadata: {},
+      description: data.description || null,
+      color: data.color || '#000000',
+      icon: data.icon || '',
     }));
 
     setLocalCategories((prev) => [...prev, ...newCategories]);
@@ -337,7 +352,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       if (toCreate.length > 0) {
         const categoriesData: CreateCategoryData[] = toCreate.map((cat) => ({
           name: cat.name,
-          description: cat.description,
+          description: cat.description || undefined,
           color: cat.color,
           icon: cat.icon,
           image_url: cat.image_url,
@@ -356,9 +371,10 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
 
       localStorage.removeItem(LOCAL_CATEGORIES_KEY);
       onNext();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to sync categories:', error);
-      toast.error(error.message || t('menuSetup.failedToSaveCategories'));
+      const errorMessage = error instanceof Error ? error.message : t('menuSetup.failedToSaveCategories');
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -519,11 +535,11 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
                     <div className="flex-1">
                       <CategoryCard
                         category={categoryWithPreview as Category}
-                        onEdit={(cat) => {
+                        onEdit={() => {
                           setEditingCategory(category);
                           setShowCategoryForm(true);
                         }}
-                        onDelete={(cat) =>
+                        onDelete={() =>
                           setDeleteConfirm({ isOpen: true, category: category })
                         }
                         isSubcategory={!!category.parent_id}
@@ -560,7 +576,13 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
           setShowCategoryForm(false);
           setEditingCategory(null);
         }}
-        onSubmit={editingCategory ? handleUpdateCategory : handleCreateCategory}
+        onSubmit={async (data, imageFile) => {
+          if (editingCategory) {
+            await handleUpdateCategory(data as UpdateCategoryData, imageFile);
+          } else {
+            await handleCreateCategory(data as CreateCategoryData, imageFile);
+          }
+        }}
         category={editingCategory as Category | null}
         title={
           editingCategory ? t('menuSetup.editCategory') : t('menuSetup.createCategory')
@@ -572,7 +594,9 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       <CategoryBulkCreateModal
         isOpen={showBulkCreate}
         onClose={() => setShowBulkCreate(false)}
-        onSubmit={handleBulkCreate}
+        onSubmit={async (categories) => {
+          handleBulkCreate(categories);
+        }}
       />
 
       {/* Delete Single Confirmation */}

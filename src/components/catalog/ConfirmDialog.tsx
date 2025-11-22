@@ -1,4 +1,3 @@
-import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ExclamationTriangleIcon,
@@ -7,7 +6,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 
-export type ConfirmDialogType = 'delete' | 'discard' | 'warning';
+export type ConfirmDialogType = 'delete' | 'discard' | 'warning' | 'bulkDelete';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -41,6 +40,7 @@ export function ConfirmDialog({
   const getIcon = () => {
     switch (type) {
       case 'delete':
+      case 'bulkDelete':
         return (
           <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
             <TrashIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
@@ -65,6 +65,7 @@ export function ConfirmDialog({
   const getConfirmButtonClass = () => {
     switch (type) {
       case 'delete':
+      case 'bulkDelete':
         return 'bg-red-600 hover:bg-red-700 text-white';
       case 'discard':
         return 'bg-amber-600 hover:bg-amber-700 text-white';
@@ -80,43 +81,43 @@ export function ConfirmDialog({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md p-6">
         <div className="space-y-4">
-        {/* Icon */}
-        <div className="flex justify-center">
-          {getIcon()}
-        </div>
+          {/* Icon */}
+          <div className="flex justify-center">
+            {getIcon()}
+          </div>
 
-        {/* Title */}
-        <div className="text-center">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {title}
-          </h3>
-        </div>
+          {/* Title */}
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {title}
+            </h3>
+          </div>
 
-        {/* Message */}
-        <div className="text-center">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {message}
-          </p>
-        </div>
+          {/* Message */}
+          <div className="text-center">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {message}
+            </p>
+          </div>
 
-        {/* Action Buttons */}
-        <div className="flex gap-3 pt-2">
-          <Button
-            variant="secondary"
-            onClick={onClose}
-            disabled={isLoading}
-            className="flex-1"
-          >
-            {cancelText || t('common.cancel')}
-          </Button>
-          <button
-            onClick={handleConfirm}
-            disabled={isLoading}
-            className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getConfirmButtonClass()}`}
-          >
-            {isLoading ? t('common.saving') : (confirmText || t('common.confirm'))}
-          </button>
-        </div>
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="secondary"
+              onClick={onClose}
+              disabled={isLoading}
+              className="flex-1"
+            >
+              {cancelText || t('common.cancel')}
+            </Button>
+            <button
+              onClick={handleConfirm}
+              disabled={isLoading}
+              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getConfirmButtonClass()}`}
+            >
+              {isLoading ? t('common.saving') : (confirmText || t('common.confirm'))}
+            </button>
+          </div>
         </div>
       </div>
     </div>

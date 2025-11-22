@@ -22,19 +22,29 @@ export interface ItemFilter {
   min_price?: number;
   max_price?: number;
   tags?: string[];
+  stock_status?: 'all' | 'in-stock' | 'low-stock' | 'out-of-stock';
 }
 
 export const itemsAPI = {
-  async getItems(storeId: string, filter?: ItemFilter) {
+  async getItems(
+    storeId: string,
+    filter?: ItemFilter,
+    page: number = 1,
+    limit: number = 20,
+    sortBy: 'name' | 'price' | 'stock' | 'created_at' = 'created_at',
+    sortOrder: 'asc' | 'desc' = 'desc'
+  ) {
     try {
       let query = supabase
         .from('items')
         .select(`
           *,
           category:categories(id, name, color)
-        `)
-        .eq('store_id', storeId)
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' })
+        .eq('store_id', storeId);
+
+      // Sorting
+      query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
       if (filter?.is_active !== undefined) {
         query = query.eq('is_active', filter.is_active);
@@ -64,10 +74,30 @@ export const itemsAPI = {
         query = query.contains('tags', filter.tags);
       }
 
-      const { data, error } = await query;
+      // Stock Filter
+      if (filter?.stock_status) {
+        switch (filter.stock_status) {
+          case 'in-stock':
+            query = query.gt('stock', 5);
+            break;
+          case 'low-stock':
+            query = query.gt('stock', 0).lte('stock', 5);
+            break;
+          case 'out-of-stock':
+            query = query.eq('stock', 0);
+            break;
+        }
+      }
+
+      // Pagination
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      query = query.range(from, to);
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
-      return data;
+      return { data, count };
     } catch (error: any) {
       console.error('Get items error:', error);
       throw new Error(error.message || 'Failed to get items');
@@ -282,7 +312,7 @@ export const itemsAPI = {
           sku: item.sku || null,
           low_stock_threshold: item.low_stock_threshold || null,
           is_active: item.is_active !== false,
-          created_by: user.data.user.id,
+          created_by: user.data.user?.id,
         };
       });
 

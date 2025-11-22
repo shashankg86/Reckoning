@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useForm, useFieldArray } from 'react-hook-form';
 import toast from 'react-hot-toast';
@@ -209,11 +209,10 @@ export function BulkAddItemsModal({
                         })}
                         type="text"
                         placeholder={t('catalog.enterItemName')}
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                          errors.items?.[index]?.name
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.items?.[index]?.name
                             ? 'border-red-500 dark:border-red-400'
                             : 'border-gray-300 dark:border-gray-600'
-                        }`}
+                          }`}
                       />
                       {errors.items?.[index]?.name && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -231,11 +230,10 @@ export function BulkAddItemsModal({
                         {...register(`items.${index}.category_id`, {
                           required: t('catalog.validation.categoryRequired'),
                         })}
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                          errors.items?.[index]?.category_id
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.items?.[index]?.category_id
                             ? 'border-red-500 dark:border-red-400'
                             : 'border-gray-300 dark:border-gray-600'
-                        }`}
+                          }`}
                       >
                         <option value="">{t('catalog.selectCategory')}</option>
                         {categories.map((category) => (
@@ -266,11 +264,10 @@ export function BulkAddItemsModal({
                           step="0.01"
                           min="0"
                           placeholder="0.00"
-                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                            errors.items?.[index]?.price
+                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.items?.[index]?.price
                               ? 'border-red-500 dark:border-red-400'
                               : 'border-gray-300 dark:border-gray-600'
-                          }`}
+                            }`}
                         />
                         {errors.items?.[index]?.price && (
                           <p className="mt-1 text-sm text-red-600 dark:text-red-400">
@@ -320,11 +317,10 @@ export function BulkAddItemsModal({
                         })}
                         placeholder={t('menuSetup.itemDescriptionPlaceholder')}
                         rows={4}
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                          errors.items?.[index]?.description
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 ${errors.items?.[index]?.description
                             ? 'border-red-500 dark:border-red-400'
                             : 'border-gray-300 dark:border-gray-600'
-                        }`}
+                          }`}
                       />
                       {errors.items?.[index]?.description && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">

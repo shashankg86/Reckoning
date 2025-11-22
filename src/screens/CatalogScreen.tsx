@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from '../components/layout/Layout';
 import { FilterBar } from '../components/catalog/FilterBar';
 import { SearchBar } from '../components/catalog/SearchBar';
@@ -15,9 +16,11 @@ import { CategoryFormModal } from '../components/catalog/CategoryFormModal';
 import { ItemFormModal } from '../components/catalog/ItemFormModal';
 import { useCatalogState } from '../hooks/useCatalogState';
 import { useCatalogFilters } from '../hooks/useCatalogFilters';
+import { useCatalogQueries, catalogKeys } from '../hooks/useCatalogQueries';
 import { useAuth } from '../contexts/AuthContext';
 import { storageService, STORAGE_PATHS } from '../lib/storage';
 import type { Category, Item } from '../types/menu';
+import type { ItemFilter } from '../api/items';
 
 type TabView = 'categories' | 'items' | 'fullMenu';
 
@@ -25,14 +28,55 @@ export function CatalogScreen() {
   const { t } = useTranslation();
   const { state: authState } = useAuth();
   const storeId = (authState.user as any)?.store?.id;
+  const queryClient = useQueryClient();
 
-  // State Management
+  // UI State
+  const [currentTab, setCurrentTab] = useState<TabView>('categories');
+  const [page, setPage] = useState(1);
+  const limit = 20;
+
+  // Filters
+  const {
+    filters,
+    updateFilter,
+    resetFilters,
+    filterCategories,
+    getMaxPrice
+  } = useCatalogFilters();
+
+  // Map UI filters to API filters
+  const apiFilters: ItemFilter = useMemo(() => ({
+    search: filters.search,
+    min_price: filters.priceRange.min,
+    max_price: filters.priceRange.max,
+    category_id: filters.categories.length > 0 ? filters.categories[0] : undefined, // API currently supports single category filter
+    stock_status: filters.stockFilter === 'all' ? undefined : filters.stockFilter,
+    is_active: true // Default to active items
+  }), [filters]);
+
+  // Data Fetching (React Query)
+  const { categoriesQuery, useItems } = useCatalogQueries(storeId);
+
+  const itemsQuery = useItems(
+    apiFilters,
+    page,
+    limit,
+    filters.sortBy,
+    filters.sortOrder
+  );
+
+  const dbCategories = categoriesQuery.data || [];
+  const dbItems = itemsQuery.data?.data || [];
+  const totalItems = itemsQuery.data?.count || 0;
+  const totalPages = Math.ceil(totalItems / limit);
+
+  // State Management (Local + Pending Changes)
   const {
     categories,
     items,
     itemCounts,
     pendingChanges,
-    loading,
+    loading: stateLoading,
     saveAll,
     discardAll,
     addCategory,
@@ -41,27 +85,12 @@ export function CatalogScreen() {
     addItem,
     updateItem,
     deleteItem,
-    loadData
-  } = useCatalogState(storeId);
+  } = useCatalogState(storeId, dbCategories, dbItems);
 
-  const {
-    filters,
-    updateFilter,
-    resetFilters,
-    filterCategories,
-    filterItems,
-    getMaxPrice
-  } = useCatalogFilters();
+  const loading = categoriesQuery.isLoading || itemsQuery.isLoading || stateLoading;
 
-  // UI State
-  const [currentTab, setCurrentTab] = useState<TabView>('categories');
+  // UI State for Modals
   const [showBulkAddCategories, setShowBulkAddCategories] = useState(false);
-
-  // Reset filters when switching tabs
-  const handleTabChange = (tab: TabView) => {
-    setCurrentTab(tab);
-    resetFilters();
-  };
   const [showBulkAddItems, setShowBulkAddItems] = useState(false);
   const [showEditCategory, setShowEditCategory] = useState(false);
   const [showEditItem, setShowEditItem] = useState(false);
@@ -69,6 +98,13 @@ export function CatalogScreen() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [selectedCategoryForItem, setSelectedCategoryForItem] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
+
+  // Reset filters when switching tabs
+  const handleTabChange = (tab: TabView) => {
+    setCurrentTab(tab);
+    resetFilters();
+    setPage(1);
+  };
 
   // Confirmation Dialog State
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -98,14 +134,14 @@ export function CatalogScreen() {
     );
   }, [pendingChanges]);
 
-  // Filter and sort data
+  // Filter categories locally (since we fetch all)
   const filteredCategories = useMemo(() => {
     return filterCategories(categories);
   }, [categories, filterCategories]);
 
-  const filteredItems = useMemo(() => {
-    return filterItems(items);
-  }, [items, filterItems]);
+  // Items are already filtered by server, but we need to merge pending changes
+  // The `items` from useCatalogState already includes pending changes merged with `dbItems`
+  // So we just use `items` directly.
 
   const maxPrice = useMemo(() => {
     return getMaxPrice(items);
@@ -116,6 +152,10 @@ export function CatalogScreen() {
     try {
       setIsSaving(true);
       await saveAll();
+
+      // Invalidate queries to refetch fresh data
+      await queryClient.invalidateQueries({ queryKey: catalogKeys.all });
+
       toast.success(t('catalog.allChangesSaved'));
     } catch (error) {
       console.error('Save failed:', error);
@@ -535,31 +575,28 @@ export function CatalogScreen() {
           <nav className="-mb-px flex space-x-8">
             <button
               onClick={() => handleTabChange('categories')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                currentTab === 'categories'
-                  ? 'border-orange-500 text-orange-600 dark:text-orange-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${currentTab === 'categories'
+                ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
             >
               {t('catalog.categories')}
             </button>
             <button
               onClick={() => handleTabChange('items')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                currentTab === 'items'
-                  ? 'border-orange-500 text-orange-600 dark:text-orange-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${currentTab === 'items'
+                ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
             >
               {t('catalog.allItems')}
             </button>
             <button
               onClick={() => handleTabChange('fullMenu')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-                currentTab === 'fullMenu'
-                  ? 'border-orange-500 text-orange-600 dark:text-orange-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
-              }`}
+              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${currentTab === 'fullMenu'
+                ? 'border-orange-500 text-orange-600 dark:text-orange-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
             >
               {t('catalog.fullMenu')}
             </button>
@@ -567,7 +604,7 @@ export function CatalogScreen() {
         </div>
 
         {/* Tab Content */}
-        {loading ? (
+        {loading && !items.length ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
           </div>
@@ -584,19 +621,44 @@ export function CatalogScreen() {
             )}
 
             {currentTab === 'items' && (
-              <ItemsTable
-                items={filteredItems}
-                categories={categories}
-                onEdit={handleEditItem}
-                onDelete={handleDeleteItem}
-                onBulkDelete={handleBulkDeleteItems}
-              />
+              <>
+                <ItemsTable
+                  items={items}
+                  categories={categories}
+                  onEdit={handleEditItem}
+                  onDelete={handleDeleteItem}
+                  onBulkDelete={handleBulkDeleteItems}
+                />
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center space-x-4 mt-6">
+                    <button
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      {t('common.previous')}
+                    </button>
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                    >
+                      {t('common.next')}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
 
             {currentTab === 'fullMenu' && (
               <FullMenuView
                 categories={filteredCategories}
-                items={filteredItems}
+                items={items}
                 onEditCategory={handleEditCategory}
                 onDeleteCategory={handleDeleteCategory}
                 onEditItem={handleEditItem}

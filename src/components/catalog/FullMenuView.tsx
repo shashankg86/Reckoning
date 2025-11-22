@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ChevronDownIcon,
@@ -9,6 +9,7 @@ import {
   PlusIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
+import { CachedImage } from '../ui/CachedImage';
 import type { Category, Item } from '../../types/menu';
 import { usePagination } from '../../hooks/usePagination';
 
@@ -146,12 +147,23 @@ export function FullMenuView({
                       )}
                     </button>
 
-                    {/* Category Icon */}
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
-                      style={{ backgroundColor: category.color }}
-                    >
-                      <span className="text-xl">{category.icon}</span>
+                    {/* Category Icon/Image */}
+                    <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden">
+                      {category.image_url ? (
+                        <CachedImage
+                          cacheId={category.id}
+                          fallbackUrl={category.image_url}
+                          alt={category.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-full h-full flex items-center justify-center text-white"
+                          style={{ backgroundColor: category.color }}
+                        >
+                          <span className="text-xl">{category.icon}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Category Name & Description */}
@@ -251,22 +263,23 @@ export function FullMenuView({
                                 >
                                   {/* Image */}
                                   <td className="px-4 py-3">
-                                    {item.image ? (
-                                      <div className="w-10 h-10 rounded-lg overflow-hidden">
-                                        <img
-                                          src={item.image}
+                                    <div className="w-10 h-10 rounded-lg overflow-hidden">
+                                      {item.image_url ? (
+                                        <CachedImage
+                                          cacheId={item.id}
+                                          fallbackUrl={item.image_url}
                                           alt={item.name}
                                           className="w-full h-full object-cover"
                                         />
-                                      </div>
-                                    ) : (
-                                      <div
-                                        className="w-10 h-10 rounded-lg flex items-center justify-center"
-                                        style={{ backgroundColor: category.color }}
-                                      >
-                                        <CubeIcon className="h-5 w-5 text-white" />
-                                      </div>
-                                    )}
+                                      ) : (
+                                        <div
+                                          className="w-full h-full flex items-center justify-center"
+                                          style={{ backgroundColor: category.color }}
+                                        >
+                                          <CubeIcon className="h-5 w-5 text-white" />
+                                        </div>
+                                      )}
+                                    </div>
                                   </td>
 
                                   {/* Name */}
@@ -388,11 +401,10 @@ export function FullMenuView({
                 <button
                   key={page}
                   onClick={() => goToPage(page)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                    page === currentPage
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${page === currentPage
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
                 >
                   {page}
                 </button>

@@ -24,11 +24,9 @@ const initialPendingChanges: PendingChanges = {
   items: { toAdd: [], toUpdate: [], toDelete: [] }
 };
 
-export function useCatalogState(storeId: string) {
-  const [dbCategories, setDbCategories] = useState<Category[]>([]);
-  const [dbItems, setDbItems] = useState<any[]>([]);
+export function useCatalogState(storeId: string, dbCategories: Category[] = [], dbItems: any[] = []) {
   const [pendingChanges, setPendingChanges] = useState<PendingChanges>(initialPendingChanges);
-  const [loading, setLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -60,49 +58,6 @@ export function useCatalogState(storeId: string) {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [pendingChanges]);
-
-  // Load data from database
-  const loadData = useCallback(async () => {
-    if (!storeId) return;
-
-    setLoading(true);
-    try {
-      const [categories, items] = await Promise.all([
-        categoriesAPI.getCategories(storeId, { is_active: true }),
-        itemsAPI.getItems(storeId)
-      ]);
-
-      // Map items to ensure proper structure
-      const mappedItems = items.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        price: item.price,
-        category: typeof item.category === 'string' ? item.category : item.category?.name || 'Uncategorized',
-        category_id: item.category_id,
-        sku: item.sku,
-        stock: item.stock,
-        image_url: item.image_url,
-        is_active: item.is_active,
-        created_at: item.created_at
-      }));
-
-      setDbCategories(categories);
-      setDbItems(mappedItems);
-    } catch (error) {
-      console.error('Failed to load catalog data:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  }, [storeId]);
-
-  // Load data on mount when storeId is available
-  useEffect(() => {
-    if (storeId) {
-      loadData();
-    }
-  }, [storeId, loadData]);
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = useCallback(() => {
@@ -187,7 +142,11 @@ export function useCatalogState(storeId: string) {
       const addIndex = prev.categories.toAdd.findIndex((_, i) => `temp-${i}` === category.id);
       if (addIndex !== -1) {
         const newToAdd = [...prev.categories.toAdd];
-        newToAdd[addIndex] = { ...newToAdd[addIndex], ...category };
+        newToAdd[addIndex] = {
+          ...newToAdd[addIndex],
+          ...category,
+          description: category.description ?? undefined
+        };
         return {
           ...prev,
           categories: { ...prev.categories, toAdd: newToAdd }
@@ -321,7 +280,7 @@ export function useCatalogState(storeId: string) {
 
   // Save all changes to database
   const saveAll = useCallback(async () => {
-    setLoading(true);
+    setIsSaving(true);
     try {
       // Delete categories first
       if (pendingChanges.categories.toDelete.length > 0) {
@@ -386,17 +345,14 @@ export function useCatalogState(storeId: string) {
       setPendingChanges(initialPendingChanges);
       localStorage.removeItem(STORAGE_KEY);
 
-      // Reload data
-      await loadData();
-
       return true;
     } catch (error) {
       console.error('Failed to save changes:', error);
       throw error;
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
-  }, [storeId, pendingChanges, loadData]);
+  }, [storeId, pendingChanges]);
 
   // Discard all changes
   const discardAll = useCallback(() => {
@@ -424,7 +380,7 @@ export function useCatalogState(storeId: string) {
     categories: getMergedCategories(),
     items: getMergedItems(),
     itemCounts: getItemCounts(),
-    loading,
+    loading: isSaving,
 
     // State
     hasUnsavedChanges: hasUnsavedChanges(),
@@ -441,7 +397,6 @@ export function useCatalogState(storeId: string) {
     bulkAddItems,
 
     // Actions
-    loadData,
     saveAll,
     discardAll
   };
