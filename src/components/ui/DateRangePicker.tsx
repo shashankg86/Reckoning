@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { CalendarIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from './Button';
 import { Input } from './Input';
 
@@ -20,6 +20,10 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Local state for custom date inputs (only applied on "Apply" click)
+  const [tempStartDate, setTempStartDate] = useState(value.startDate);
+  const [tempEndDate, setTempEndDate] = useState(value.endDate);
 
   const presets = [
     { key: 'today', label: t('reports.dateRanges.today') },
@@ -70,7 +74,14 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
 
   const handlePresetSelect = (preset: string) => {
     if (preset === 'custom') {
-      onChange({ ...value, preset });
+      // Pre-select current date when opening custom range
+      const today = new Date().toISOString().split('T')[0];
+      const startDate = value.startDate || today;
+      const endDate = value.endDate || today;
+
+      setTempStartDate(startDate);
+      setTempEndDate(endDate);
+      onChange({ startDate, endDate, preset });
     } else {
       onChange(getDateRange(preset));
       setIsOpen(false);
@@ -116,18 +127,17 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
             <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
               {t('reports.selectDateRange')}
             </h3>
-            
+
             {/* Preset Options */}
             <div className="space-y-1 mb-4">
               {presets.map((preset) => (
                 <button
                   key={preset.key}
                   onClick={() => handlePresetSelect(preset.key)}
-                  className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                    value.preset === preset.key
-                      ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                  }`}
+                  className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${value.preset === preset.key
+                    ? 'bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}
                 >
                   {preset.label}
                 </button>
@@ -140,27 +150,36 @@ export function DateRangePicker({ value, onChange, className }: DateRangePickerP
                 <Input
                   label={t('reports.startDate')}
                   type="date"
-                  value={value.startDate}
-                  onChange={(e) => onChange({ ...value, startDate: e.target.value })}
+                  value={tempStartDate}
+                  onChange={(e) => setTempStartDate(e.target.value)}
                 />
                 <Input
                   label={t('reports.endDate')}
                   type="date"
-                  value={value.endDate}
-                  onChange={(e) => onChange({ ...value, endDate: e.target.value })}
+                  value={tempEndDate}
+                  onChange={(e) => setTempEndDate(e.target.value)}
                 />
                 <div className="flex gap-2 pt-2">
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => setIsOpen(false)}
+                    onClick={() => {
+                      // Reset temp values and close
+                      setTempStartDate(value.startDate);
+                      setTempEndDate(value.endDate);
+                      setIsOpen(false);
+                    }}
                     className="flex-1"
                   >
                     {t('common.cancel')}
                   </Button>
                   <Button
                     size="sm"
-                    onClick={() => setIsOpen(false)}
+                    onClick={() => {
+                      // Apply custom dates - clear preset and trigger API call
+                      onChange({ startDate: tempStartDate, endDate: tempEndDate });
+                      setIsOpen(false);
+                    }}
                     className="flex-1"
                   >
                     {t('common.apply')}

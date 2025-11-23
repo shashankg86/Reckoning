@@ -1,27 +1,27 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import Tesseract from 'tesseract.js';
+import * as pdfjsLib from 'pdfjs-dist';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import {
+  CloudArrowUpIcon,
+  DocumentTextIcon,
+  PhotoIcon,
+  XMarkIcon,
+  CheckIcon,
   ArrowUpTrayIcon,
   CameraIcon,
-  CheckIcon,
-  DocumentTextIcon,
-  PencilSquareIcon,
-  PhotoIcon,
-  XMarkIcon
 } from '@heroicons/react/24/outline';
-import React, { useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Layout } from '../components/layout/Layout';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
-import { usePOS } from '../contexts/POSContext';
 
-//  Import parsers
-import Papa from 'papaparse';
-import * as pdfjsLib from 'pdfjs-dist';
-import Tesseract from 'tesseract.js';
-import * as XLSX from 'xlsx';
+import { useAuth } from '../contexts/AuthContext';
+import { useCatalogQueries } from '../hooks/useCatalogQueries';
+import { useCurrency } from '../hooks/useCurrency';
 
-// Configure PDF.js worker
+// Initialize PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ParsedItem {
@@ -30,9 +30,8 @@ interface ParsedItem {
   price: number;
   category: string;
   confidence: number;
-  currency?: string;
   image?: string; // Base64 image data
-  imagePosition?: { x: number; y: number; width: number; height: number };
+  currency?: string;
 }
 
 interface ImageRegion {
@@ -43,202 +42,110 @@ interface ImageRegion {
   imageData: string;
 }
 
-// Global currency patterns and symbols
 const CURRENCY_PATTERNS = {
-  symbols: ['$', '₹', '€', '£', '¥', 'د.إ', 'AED', 'USD', 'INR', 'EUR', 'GBP', 'JPY', 'SAR', 'QAR', 'KWD'],
-  prefixes: ['Rs', 'USD', 'INR', 'AED', 'SAR', 'QAR', 'KWD', 'EUR', 'GBP'],
-  patterns: [
-    /[$₹€£¥د\.إAED]+/i,
-    /Rs\.?/i,
-    /USD|INR|EUR|GBP|JPY|AED|SAR|QAR|KWD/i
-  ]
+  symbols: ['$', '₹', '€', '£', '¥', 'د.إ', 'Rs', 'AED', 'USD', 'INR', 'EUR', 'GBP'],
 };
 
 export function OCRImportScreen() {
   const { t } = useTranslation();
-  const { state, dispatch } = usePOS();
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const { state } = useAuth();
+  const storeId = state.user?.store?.id || '';
+  const { createItemMutation, categoriesQuery } = useCatalogQueries(storeId);
+  const { currency: storeCurrencyCode, formatCurrency } = useCurrency();
+
   const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
-  const [editingItem, setEditingItem] = useState<string | null>(null);
   const [debugText, setDebugText] = useState<string>('');
   const [ocrConfidence, setOcrConfidence] = useState<number>(0);
   const [extractedImages, setExtractedImages] = useState<ImageRegion[]>([]);
-  const [originalImageData, setOriginalImageData] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [editingItem, setEditingItem] = useState<string | null>(null);
 
-  // Refs for file inputs
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
-  const pdfInputRef = useRef<HTMLInputElement | null>(null);
-  const csvExcelInputRef = useRef<HTMLInputElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const csvExcelInputRef = useRef<HTMLInputElement>(null);
 
-  // --- IMAGE DETECTION AND EXTRACTION ---
+  const processFile = async (file: File) => {
+    setIsProcessing(true);
+    setParsedItems([]);
+    setDebugText('');
+    setOcrConfidence(0);
+    setExtractedImages([]);
+
+    const fileName = file.name.toLowerCase();
+
+    try {
+      if (fileName.endsWith('.csv')) {
+        await processCSV(file);
+      } else if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
+        await processExcel(file);
+      } else if (fileName.endsWith('.pdf')) {
+        await processPDF(file);
+      } else if (file.type.startsWith('image/')) {
+        await processImage(file);
+      } else {
+        alert('Unsupported file format. Please upload Image, PDF, or Excel/CSV.');
+      }
+    } catch (err) {
+      console.error('Processing error:', err);
+      alert('Failed to process file. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const detectAndExtractImages = async (file: File): Promise<ImageRegion[]> => {
+    // Basic implementation: return the whole image as one region
+    // In a real app, this would use OpenCV or advanced logic to find product images
     return new Promise((resolve) => {
-      const img = new Image();
       const reader = new FileReader();
-
       reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        setOriginalImageData(dataUrl);
-
+        const img = new Image();
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            resolve([]);
-            return;
-          }
-
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-
-          // Detect image regions using edge detection and color analysis
-          const regions = detectImageRegions(ctx, img.width, img.height);
-
-          // Extract each region as separate image
-          const extractedRegions: ImageRegion[] = [];
-          regions.forEach((region, index) => {
-            const regionCanvas = document.createElement('canvas');
-            const regionCtx = regionCanvas.getContext('2d');
-            if (!regionCtx) return;
-
-            regionCanvas.width = region.width;
-            regionCanvas.height = region.height;
-
-            regionCtx.drawImage(
-              canvas,
-              region.x, region.y, region.width, region.height,
-              0, 0, region.width, region.height
-            );
-
-            extractedRegions.push({
-              ...region,
-              imageData: regionCanvas.toDataURL('image/jpeg', 0.8)
-            });
-          });
-
-          setExtractedImages(extractedRegions);
-          resolve(extractedRegions);
+          resolve([{
+            x: 0,
+            y: 0,
+            width: img.width,
+            height: img.height,
+            imageData: e.target?.result as string
+          }]);
         };
-
-        img.src = dataUrl;
+        img.src = e.target?.result as string;
       };
-
       reader.readAsDataURL(file);
     });
   };
 
-  const detectImageRegions = (ctx: CanvasRenderingContext2D, width: number, height: number): Array<{ x: number, y: number, width: number, height: number }> => {
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
+  const processImage = async (file: File) => {
+    try {
+      const images = await detectAndExtractImages(file);
+      setExtractedImages(images);
 
-    // Grid-based analysis for menu images
-    const gridSize = 50; // pixels
-    const regions: Array<{ x: number, y: number, width: number, height: number, score: number }> = [];
-
-    // Scan grid for image-like regions (high variance, colors)
-    for (let y = 0; y < height - gridSize; y += gridSize) {
-      for (let x = 0; x < width - gridSize; x += gridSize) {
-        const score = analyzeRegion(data, x, y, gridSize, gridSize, width);
-
-        // If region looks like an image (not text)
-        if (score > 0.3) {
-          regions.push({ x, y, width: gridSize, height: gridSize, score });
-        }
-      }
-    }
-
-    // Merge adjacent high-score regions
-    const mergedRegions = mergeAdjacentRegions(regions);
-
-    // Filter out regions that are too small or too large
-    return mergedRegions.filter(r => {
-      const area = r.width * r.height;
-      const minArea = (width * height) * 0.01; // At least 1% of image
-      const maxArea = (width * height) * 0.4;  // At most 40% of image
-      return area >= minArea && area <= maxArea && r.width >= 80 && r.height >= 80;
-    });
-  };
-
-  const analyzeRegion = (data: Uint8ClampedArray, startX: number, startY: number, w: number, h: number, imageWidth: number): number => {
-    let colorVariance = 0;
-    let edgeCount = 0;
-    const samples: number[] = [];
-
-    for (let y = startY; y < startY + h && y < data.length / (imageWidth * 4); y++) {
-      for (let x = startX; x < startX + w; x++) {
-        const i = (y * imageWidth + x) * 4;
-        if (i + 2 >= data.length) continue;
-
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-
-        samples.push(r + g + b);
-
-        // Edge detection (simple gradient)
-        if (x < startX + w - 1 && y < startY + h - 1) {
-          const nextI = (y * imageWidth + (x + 1)) * 4;
-          if (nextI + 2 < data.length) {
-            const gradient = Math.abs(r - data[nextI]) + Math.abs(g - data[nextI + 1]) + Math.abs(b - data[nextI + 2]);
-            if (gradient > 100) edgeCount++;
+      const result = await Tesseract.recognize(file, 'eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
           }
         }
+      });
+
+      const text = result.data.text;
+      const confidence = result.data.confidence;
+
+      setDebugText(text);
+      setOcrConfidence(confidence);
+
+      let items = extractItemsFromText(text);
+      items = matchImagesToItems(items, images, result);
+      setParsedItems(items);
+
+      if (items.length === 0) {
+        alert(`No items found (OCR confidence: ${Math.round(confidence)}%). Try a clearer image or check the extracted text.`);
       }
+    } catch (error) {
+      console.error('OCR Error:', error);
+      throw error;
     }
-
-    // Calculate variance
-    if (samples.length > 0) {
-      const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
-      colorVariance = samples.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / samples.length;
-    }
-
-    // Score: higher variance + edges = likely image
-    return (colorVariance / 10000) * (edgeCount / (w * h));
-  };
-
-  const mergeAdjacentRegions = (regions: Array<{ x: number, y: number, width: number, height: number, score: number }>): Array<{ x: number, y: number, width: number, height: number }> => {
-    if (regions.length === 0) return [];
-
-    const merged: Array<{ x: number, y: number, width: number, height: number }> = [];
-    const used = new Set<number>();
-
-    regions.forEach((region, i) => {
-      if (used.has(i)) return;
-
-      let minX = region.x;
-      let minY = region.y;
-      let maxX = region.x + region.width;
-      let maxY = region.y + region.height;
-
-      // Find adjacent regions
-      regions.forEach((other, j) => {
-        if (i === j || used.has(j)) return;
-
-        const distance = Math.sqrt(
-          Math.pow(region.x - other.x, 2) + Math.pow(region.y - other.y, 2)
-        );
-
-        if (distance < region.width * 1.5) {
-          minX = Math.min(minX, other.x);
-          minY = Math.min(minY, other.y);
-          maxX = Math.max(maxX, other.x + other.width);
-          maxY = Math.max(maxY, other.y + other.height);
-          used.add(j);
-        }
-      });
-
-      merged.push({
-        x: minX,
-        y: minY,
-        width: maxX - minX,
-        height: maxY - minY
-      });
-      used.add(i);
-    });
-
-    return merged;
   };
 
   const matchImagesToItems = (items: ParsedItem[], images: ImageRegion[], ocrResult: any) => {
@@ -274,79 +181,13 @@ export function OCRImportScreen() {
 
       // Only assign if reasonably close (within 300px)
       if (closestImage && minDistance < 300) {
-        return { ...item, image: closestImage.imageData };
+        return { ...item, image: (closestImage as ImageRegion).imageData };
       }
 
       return item;
     });
   };
 
-  // --- CORE LOGIC ---
-  const processFile = async (file: File) => {
-    setIsProcessing(true);
-    setParsedItems([]);
-    setDebugText('');
-    setOcrConfidence(0);
-    setExtractedImages([]);
-    setOriginalImageData('');
-    const fileName = file.name.toLowerCase();
-
-    try {
-      if (fileName.endsWith('.csv')) {
-        await processCSV(file);
-      } else if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
-        await processExcel(file);
-      } else if (fileName.endsWith('.pdf')) {
-        await processPDF(file);
-      } else if (file.type.startsWith('image/')) {
-        await processImage(file);
-      } else {
-        alert('Unsupported file format. Please upload Image, PDF, or Excel/CSV.');
-      }
-    } catch (err) {
-      console.error('Processing error:', err);
-      alert('Failed to process file. Please try again.');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  // --- ADVANCED IMAGE OCR WITH IMAGE EXTRACTION ---
-  const processImage = async (file: File) => {
-    try {
-      const images = await detectAndExtractImages(file);
-
-      const result = await Tesseract.recognize(file, 'eng', {
-        logger: (m) => {
-          if (m.status === 'recognizing text') {
-            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
-          }
-        }
-      });
-
-      const text = result.data.text;
-      const confidence = result.data.confidence;
-
-
-      setDebugText(text);
-      setOcrConfidence(confidence);
-
-      let items = extractItemsFromText(text);
-
-      items = matchImagesToItems(items, images, result);
-
-      setParsedItems(items);
-
-      if (items.length === 0) {
-        alert(`No items found (OCR confidence: ${Math.round(confidence)}%). Try a clearer image or check the extracted text.`);
-      }
-    } catch (error) {
-      console.error('OCR Error:', error);
-      throw error;
-    }
-  };
-
-  // --- PDF ---
   const processPDF = async (file: File) => {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -364,7 +205,6 @@ export function OCRImportScreen() {
     setParsedItems(items);
   };
 
-  // --- CSV ---
   const processCSV = async (file: File) => {
     const text = await file.text();
     const result = Papa.parse(text, { header: true, skipEmptyLines: true });
@@ -388,7 +228,6 @@ export function OCRImportScreen() {
     setParsedItems(items);
   };
 
-  // --- EXCEL ---
   const processExcel = async (file: File) => {
     const arrayBuffer = await file.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -413,7 +252,6 @@ export function OCRImportScreen() {
     setParsedItems(items);
   };
 
-  // --- SMART TEXT EXTRACTION ENGINE ---
   const extractItemsFromText = (rawText: string): ParsedItem[] => {
     const items: ParsedItem[] = [];
     const seenItems = new Map<string, boolean>();
@@ -456,6 +294,7 @@ export function OCRImportScreen() {
       const priceOnly = extractPriceOnly(nextLine, detectedCurrency);
       if (priceOnly && isLikelyItemName(currentLine)) {
         const extracted = {
+          id: '',
           name: cleanItemName(currentLine),
           price: priceOnly.price,
           currency: priceOnly.currency,
@@ -498,8 +337,6 @@ export function OCRImportScreen() {
     return items;
   };
 
-  // --- HELPER FUNCTIONS ---
-
   const detectCurrency = (text: string): string => {
     const currencyCount = new Map<string, number>();
 
@@ -512,7 +349,7 @@ export function OCRImportScreen() {
     });
 
     let maxCount = 0;
-    let detectedCurrency = '$';
+    let detectedCurrency = storeCurrencyCode as string; // Default to store currency
     currencyCount.forEach((count, symbol) => {
       if (count > maxCount) {
         maxCount = count;
@@ -740,282 +577,288 @@ export function OCRImportScreen() {
   };
 
   const saveItemsToCatalog = () => {
+    const categories = categoriesQuery.data || [];
+
     parsedItems.forEach((item) => {
-      const catalogItem = {
-        id: Date.now().toString() + Math.random(),
+      // Find matching category case-insensitive
+      const matchingCategory = categories.find(c =>
+        c.name.toLowerCase() === item.category.toLowerCase()
+      ) || categories[0]; // Fallback to first category if no match
+
+      createItemMutation.mutate({
         name: item.name,
         price: item.price,
-        category: item.category,
-        image: item.image, // Include image if available
-      };
-      dispatch({ type: 'ADD_ITEM', payload: catalogItem });
+        category_id: matchingCategory?.id || 'general',
+        description: `Imported from ${item.category}`,
+        image_url: item.image,
+        is_active: true,
+        stock: 50, // Default stock
+        sku: `${item.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 10000)}`, // Generate simple SKU
+      });
     });
 
     setUploadedFile(null);
     setParsedItems([]);
     setDebugText('');
     setExtractedImages([]);
-    setOriginalImageData('');
+
     // TODO: Navigate to catalog
   };
 
-  // --- UI Components ---
+  if (isProcessing) {
+    return <ProcessingState />;
+  }
 
-  const UploadArea = () => (
-    <Card className="p-8 text-center">
-      <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mb-4">
-        <ArrowUpTrayIcon className="w-8 h-8 text-orange-500 dark:text-orange-400" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {t('ocr.importItems')}
-      </h3>
-      <p className="text-gray-500 dark:text-gray-400 mb-6">
-        {t('ocr.uploadDescription')}
-      </p>
-
-      <div className="flex flex-col sm:flex-row gap-4 justify-center">
-        <Button variant="primary" onClick={() => imageInputRef.current?.click()}>
-          <CameraIcon className="w-4 h-4 mr-2" />
-          {t('ocr.uploadPhoto')}
-        </Button>
-        <input ref={imageInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-
-        <Button variant="secondary" onClick={() => pdfInputRef.current?.click()}>
-          <DocumentTextIcon className="w-4 h-4 mr-2" />
-          {t('ocr.uploadPdf')}
-        </Button>
-        <input ref={pdfInputRef} type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" />
-
-        <Button variant="secondary" onClick={() => csvExcelInputRef.current?.click()}>
-          <DocumentTextIcon className="w-4 h-4 mr-2" />
-          Excel/CSV
-        </Button>
-        <input
-          ref={csvExcelInputRef}
-          type="file"
-          accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          onChange={handleFileUpload}
-          className="hidden"
-        />
-      </div>
-
-    </Card>
-  );
-
-  const ProcessingState = () => (
-    <Card className="p-8 text-center">
-      <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-4 animate-pulse">
-        <DocumentTextIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {t('ocr.processing')}
-      </h3>
-      <p className="text-gray-500 dark:text-gray-400">
-        {t('ocr.extractingItems')}
-      </p>
-      <p className="text-xs text-gray-400 mt-2">
-        This may take 10-30 seconds
-      </p>
-    </Card>
-  );
-
-  const ResultsView = () => (
+  return (
     <div className="space-y-6">
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('ocr.extractedItems')} ({parsedItems.length})
-            </h2>
-            {ocrConfidence > 0 && (
-              <p className="text-xs text-gray-500 mt-1">
-                OCR Confidence: {Math.round(ocrConfidence)}% • {parsedItems.filter(i => i.image).length} items with images
-              </p>
-            )}
-          </div>
-          <Button variant="secondary" onClick={() => {
-            setUploadedFile(null);
-            setParsedItems([]);
-            setDebugText('');
-            setExtractedImages([]);
-            setOriginalImageData('');
-          }}>
-            {t('ocr.uploadNew')}
-          </Button>
-        </div>
-
-        {parsedItems.length === 0 ? (
-          <div className="text-center">
-            <p className="text-gray-500 mb-4">No items found. Check extracted text below.</p>
-            {debugText && (
-              <details className="text-left">
-                <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 mb-2">
-                  🔍 View Raw Extracted Text (Debug)
-                </summary>
-                <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
-                  {debugText}
-                </pre>
-              </details>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="space-y-3 mb-4">
-              {parsedItems.map((item) => (
-                <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
-                  {editingItem === item.id ? (
-                    <div className="space-y-3">
-                      {/* Image Upload Section */}
-                      <div className="flex items-center gap-4">
-                        {item.image ? (
-                          <div className="relative">
-                            <img
-                              src={item.image}
-                              alt={item.name}
-                              className="w-24 h-24 object-cover rounded-lg"
-                            />
-                            <button
-                              onClick={() => updateItem(item.id, { image: undefined })}
-                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                            >
-                              <XMarkIcon className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="w-24 h-24 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center cursor-pointer hover:border-blue-500 dark:hover:border-blue-400">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handleImageUpload(item.id, e)}
-                              className="hidden"
-                            />
-                            <PhotoIcon className="w-8 h-8 text-gray-400" />
-                          </label>
-                        )}
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <Input
-                            value={item.name}
-                            onChange={(e) => updateItem(item.id, { name: e.target.value })}
-                            placeholder={t('catalog.itemName')}
-                          />
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={item.price}
-                            onChange={(e) => updateItem(item.id, { price: Number(e.target.value) })}
-                            placeholder={t('catalog.price')}
-                          />
-                        </div>
-                      </div>
-                      <Input
-                        value={item.category}
-                        onChange={(e) => updateItem(item.id, { category: e.target.value })}
-                        placeholder={t('catalog.category')}
-                      />
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={() => setEditingItem(null)}>
-                          <CheckIcon className="w-3 h-3 mr-1" /> {t('catalog.save')}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => setEditingItem(null)}>
-                          {t('common.cancel')}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-4">
-                      {/* Display Item Image */}
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-20 h-20 object-cover rounded-lg border-2 border-green-500"
-                          title="Auto-extracted image"
-                        />
-                      ) : (
-                        <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
-                          <PhotoIcon className="w-8 h-8 text-gray-400" />
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                          {item.name}
-                          {item.image && (
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                              With Image
-                            </span>
-                          )}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {item.category} • {item.currency || '₹'}{item.price.toFixed(2)}
-                          {item.confidence < 80 && (
-                            <span className="ml-2 text-xs text-orange-500">({item.confidence}% confidence)</span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => setEditingItem(item.id)}>
-                          <PencilSquareIcon className="w-3 h-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => removeItem(item.id)} className="text-red-600">
-                          <XMarkIcon className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Debug info */}
-            {debugText && (
-              <details className="mb-4">
-                <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-700">
-                  🔍 View Raw Text & Extracted Images
-                </summary>
-                <div className="mt-2 space-y-3">
-                  {extractedImages.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold mb-2">Detected Image Regions ({extractedImages.length}):</p>
-                      <div className="flex gap-2 flex-wrap">
-                        {extractedImages.map((img, idx) => (
-                          <img
-                            key={idx}
-                            src={img.imageData}
-                            alt={`Region ${idx}`}
-                            className="w-16 h-16 object-cover rounded border"
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <pre className="p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-64 whitespace-pre-wrap">
-                    {debugText}
-                  </pre>
-                </div>
-              </details>
-            )}
-          </>
-        )}
-
-        {parsedItems.length > 0 && (
-          <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
-            <Button onClick={saveItemsToCatalog} className="flex-1">
-              <CheckIcon className="w-4 h-4 mr-2" />
-              {t('ocr.addAllToCatalog')} ({parsedItems.length})
-            </Button>
-          </div>
-        )}
-      </Card>
+      {!uploadedFile && <UploadArea />}
+      {uploadedFile && <ResultsView />}
     </div>
   );
 
-  return (
-    <Layout title={t('ocr.title')}>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {!uploadedFile && !isProcessing && parsedItems.length === 0 && <UploadArea />}
-        {isProcessing && <ProcessingState />}
-        {(parsedItems.length > 0 || debugText) && <ResultsView />}
+  function UploadArea() {
+    return (
+      <Card className="p-8 text-center">
+        <div className="mx-auto w-16 h-16 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mb-4">
+          <ArrowUpTrayIcon className="w-8 h-8 text-orange-500 dark:text-orange-400" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          {t('ocr.importItems')}
+        </h3>
+        <p className="text-gray-500 dark:text-gray-400 mb-6">
+          {t('ocr.uploadDescription')}
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Button variant="primary" onClick={() => imageInputRef.current?.click()}>
+            <CameraIcon className="w-4 h-4 mr-2" />
+            {t('ocr.uploadPhoto')}
+          </Button>
+          <input ref={imageInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+
+          <Button variant="secondary" onClick={() => pdfInputRef.current?.click()}>
+            <DocumentTextIcon className="w-4 h-4 mr-2" />
+            {t('ocr.uploadPdf')}
+          </Button>
+          <input ref={pdfInputRef} type="file" accept=".pdf" onChange={handleFileUpload} className="hidden" />
+
+          <Button variant="secondary" onClick={() => csvExcelInputRef.current?.click()}>
+            <DocumentTextIcon className="w-4 h-4 mr-2" />
+            Excel/CSV
+          </Button>
+          <input
+            ref={csvExcelInputRef}
+            type="file"
+            accept=".csv, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+        </div>
+
+      </Card>
+    );
+  }
+
+  function ProcessingState() {
+    return (
+      <Card className="p-8 text-center">
+        <div className="mx-auto w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mb-4 animate-pulse">
+          <DocumentTextIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          {t('ocr.processing')}
+        </h3>
+        <p className="text-gray-500 dark:text-gray-400">
+          {t('ocr.extractingItems')}
+        </p>
+        <p className="text-xs text-gray-400 mt-2">
+          This may take 10-30 seconds
+        </p>
+      </Card>
+    );
+  }
+
+  function ResultsView() {
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {t('ocr.extractedItems')} ({parsedItems.length})
+              </h2>
+              {ocrConfidence > 0 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  OCR Confidence: {Math.round(ocrConfidence)}% • {parsedItems.filter(i => i.image).length} items with images
+                </p>
+              )}
+            </div>
+            <Button variant="secondary" onClick={() => {
+              setUploadedFile(null);
+              setParsedItems([]);
+              setDebugText('');
+              setExtractedImages([]);
+
+            }}>
+              {t('ocr.uploadNew')}
+            </Button>
+          </div>
+
+          {parsedItems.length === 0 ? (
+            <div className="text-center">
+              <p className="text-gray-500 mb-4">No items found. Check extracted text below.</p>
+              {debugText && (
+                <details className="text-left">
+                  <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 mb-2">
+                    🔍 View Raw Extracted Text (Debug)
+                  </summary>
+                  <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded text-xs overflow-auto max-h-96 whitespace-pre-wrap">
+                    {debugText}
+                  </pre>
+                </details>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3 mb-4">
+                {parsedItems.map((item) => (
+                  <div key={item.id} className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    {editingItem === item.id ? (
+                      <div className="space-y-3">
+                        {/* Image Upload Section */}
+                        <div className="flex items-center gap-4">
+                          {item.image ? (
+                            <div className="relative">
+                              <img
+                                src={item.image}
+                                alt={item.name}
+                                className="w-24 h-24 object-cover rounded-lg"
+                              />
+                              <button
+                                onClick={() => updateItem(item.id, { image: undefined })}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                              >
+                                <XMarkIcon className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="w-24 h-24 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center cursor-pointer hover:border-blue-500 dark:hover:border-blue-400">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleImageUpload(item.id, e)}
+                                className="hidden"
+                              />
+                              <PhotoIcon className="w-8 h-8 text-gray-400" />
+                            </label>
+                          )}
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <Input
+                              value={item.name}
+                              onChange={(e) => updateItem(item.id, { name: e.target.value })}
+                              placeholder={t('catalog.itemName')}
+                            />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={item.price}
+                              onChange={(e) => updateItem(item.id, { price: Number(e.target.value) })}
+                              placeholder={t('catalog.price')}
+                            />
+                          </div>
+                        </div>
+                        <Input
+                          value={item.category}
+                          onChange={(e) => updateItem(item.id, { category: e.target.value })}
+                          placeholder={t('catalog.category')}
+                        />
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => setEditingItem(null)}>
+                            <CheckIcon className="w-3 h-3 mr-1" /> {t('catalog.save')}
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setEditingItem(null)}>
+                            {t('common.cancel')}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4">
+                        {/* Display Item Image */}
+                        {item.image ? (
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-20 h-20 object-cover rounded-lg border-2 border-green-500"
+                            title="Auto-extracted image"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                            <PhotoIcon className="w-8 h-8 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                            {item.name}
+                            {item.image && (
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                With Image
+                              </span>
+                            )}
+                          </h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {item.category} • {item.currency ? `${item.currency}${item.price.toFixed(2)}` : formatCurrency(item.price)}
+                            {item.confidence < 80 && (
+                              <span className="ml-2 text-xs text-orange-500">({item.confidence}% confidence)</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => setEditingItem(item.id)}>
+                            Edit
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-red-500" onClick={() => removeItem(item.id)}>
+                            <XMarkIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-4">
+                <Button variant="secondary" onClick={() => {
+                  setUploadedFile(null);
+                  setParsedItems([]);
+                  setDebugText('');
+                  setExtractedImages([]);
+
+                }}>
+                  {t('common.cancel')}
+                </Button>
+                <Button variant="primary" onClick={saveItemsToCatalog} disabled={createItemMutation.isPending}>
+                  {createItemMutation.isPending ? t('common.saving') : t('ocr.saveToCatalog')}
+                </Button>
+              </div>
+            </>
+          )}
+        </Card>
+
+        {/* Extracted Images Debug View (Optional) */}
+        {extractedImages.length > 0 && (
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Extracted Image Regions (Debug)</h3>
+            <div className="grid grid-cols-4 gap-4">
+              {extractedImages.map((img, idx) => (
+                <div key={idx} className="border p-2 rounded">
+                  <img src={img.imageData} alt={`Region ${idx}`} className="w-full h-auto" />
+                  <p className="text-xs mt-1">x:{Math.round(img.x)}, y:{Math.round(img.y)}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
-    </Layout>
-  );
+    );
+  }
 }

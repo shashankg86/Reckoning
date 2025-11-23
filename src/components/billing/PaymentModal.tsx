@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface PaymentModalProps {
   total: number;
@@ -19,6 +20,7 @@ type PaymentMethod = 'cash' | 'upi' | 'card' | 'razorpay';
 
 export function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
   const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>(null);
   const [amountPaid, setAmountPaid] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -95,7 +97,7 @@ export function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
               {t('billing.totalAmount')}
             </p>
             <p className="text-3xl font-bold text-orange-500">
-              ₹{total.toLocaleString('en-IN')}
+              {formatCurrency(total)}
             </p>
           </div>
 
@@ -108,17 +110,15 @@ export function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
             {/* Cash */}
             <button
               onClick={() => setSelectedMethod('cash')}
-              className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
-                selectedMethod === 'cash'
+              className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${selectedMethod === 'cash'
                   ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
                   : 'border-gray-200 dark:border-gray-700 hover:border-orange-300'
-              }`}
+                }`}
             >
-              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                selectedMethod === 'cash'
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${selectedMethod === 'cash'
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}>
+                }`}>
                 <BanknotesIcon className="h-5 w-5" />
               </div>
               <div className="flex-1 text-left">
@@ -135,17 +135,15 @@ export function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
             {/* UPI */}
             <button
               onClick={() => setSelectedMethod('upi')}
-              className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
-                selectedMethod === 'upi'
+              className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${selectedMethod === 'upi'
                   ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
                   : 'border-gray-200 dark:border-gray-700 hover:border-orange-300'
-              }`}
+                }`}
             >
-              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                selectedMethod === 'upi'
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${selectedMethod === 'upi'
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}>
+                }`}>
                 <QrCodeIcon className="h-5 w-5" />
               </div>
               <div className="flex-1 text-left">
@@ -162,17 +160,15 @@ export function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
             {/* Card/Razorpay */}
             <button
               onClick={() => setSelectedMethod('card')}
-              className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
-                selectedMethod === 'card'
+              className={`w-full flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${selectedMethod === 'card'
                   ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
                   : 'border-gray-200 dark:border-gray-700 hover:border-orange-300'
-              }`}
+                }`}
             >
-              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                selectedMethod === 'card'
+              <div className={`flex items-center justify-center w-10 h-10 rounded-full ${selectedMethod === 'card'
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-              }`}>
+                }`}>
                 <CreditCardIcon className="h-5 w-5" />
               </div>
               <div className="flex-1 text-left">
@@ -214,7 +210,7 @@ export function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
                     onClick={() => setAmountPaid(amount.toString())}
                     className="text-xs"
                   >
-                    ₹{amount}
+                    {formatCurrency(amount)}
                   </Button>
                 ))}
               </div>
@@ -226,7 +222,7 @@ export function PaymentModal({ total, onClose, onPayment }: PaymentModalProps) {
                     {t('billing.change')}
                   </p>
                   <p className="text-xl font-bold text-green-600 dark:text-green-400">
-                    ₹{change.toLocaleString('en-IN')}
+                    {formatCurrency(change)}
                   </p>
                 </div>
               )}

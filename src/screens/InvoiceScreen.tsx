@@ -14,15 +14,24 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { usePOS } from '../contexts/POSContext';
-import type { Invoice, PaymentMethod } from '../contexts/POSContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useCatalogQueries } from '../hooks/useCatalogQueries';
+import { useCurrency } from '../hooks/useCurrency';
+import type { Invoice, PaymentMethod } from '../types';
 
 export function InvoiceScreen() {
   const { t } = useTranslation();
   const { state, dispatch } = usePOS();
+  const { state: authState } = useAuth();
+  const storeId = authState.user?.store?.id;
+  const { useItems } = useCatalogQueries(storeId || '');
+  const { data: itemsData } = useItems();
+  const items = itemsData?.data || [];
+  const { formatCurrency } = useCurrency();
   const [searchTerm, setSearchTerm] = useState('');
   const [discount, setDiscount] = useState(0);
 
-  const filteredItems = state.items.filter((item) =>
+  const filteredItems = items.filter((item: any) =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -87,7 +96,7 @@ export function InvoiceScreen() {
               </div>
 
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {filteredItems.map((item) => (
+                {filteredItems.map((item: any) => (
                   <div
                     key={item.id}
                     className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
@@ -98,12 +107,12 @@ export function InvoiceScreen() {
                         {item.name}
                       </h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        {item.category}
+                        {item.category?.name || item.category}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-orange-500 dark:text-orange-400">
-                        ₹{item.price}
+                        {formatCurrency(item.price)}
                       </p>
                       <Button size="sm" className="mt-1">
                         <PlusIcon className="h-3 w-3" />
@@ -144,7 +153,7 @@ export function InvoiceScreen() {
                             {item.name}
                           </h3>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            ₹{item.price} × {item.quantity}
+                            {formatCurrency(item.price)} × {item.quantity}
                           </p>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -182,7 +191,7 @@ export function InvoiceScreen() {
                         </div>
                         <div className="ml-4 text-right">
                           <p className="font-semibold text-gray-900 dark:text-white">
-                            ₹{(item.price * item.quantity).toFixed(2)}
+                            {formatCurrency(item.price * item.quantity)}
                           </p>
                         </div>
                       </div>
@@ -209,7 +218,7 @@ export function InvoiceScreen() {
                         {t('invoice.subtotal')}:
                       </span>
                       <span className="text-gray-900 dark:text-white">
-                        ₹{subtotal.toFixed(2)}
+                        {formatCurrency(subtotal)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
@@ -217,7 +226,7 @@ export function InvoiceScreen() {
                         {t('invoice.tax')}:
                       </span>
                       <span className="text-gray-900 dark:text-white">
-                        ₹{tax.toFixed(2)}
+                        {formatCurrency(tax)}
                       </span>
                     </div>
                     {discount > 0 && (
@@ -226,7 +235,7 @@ export function InvoiceScreen() {
                           {t('invoice.discount')}:
                         </span>
                         <span className="text-green-600 dark:text-green-400">
-                          -₹{discount.toFixed(2)}
+                          -{formatCurrency(discount)}
                         </span>
                       </div>
                     )}
@@ -235,7 +244,7 @@ export function InvoiceScreen() {
                         {t('invoice.total')}:
                       </span>
                       <span className="text-orange-500 dark:text-orange-400">
-                        ₹{total.toFixed(2)}
+                        {formatCurrency(total)}
                       </span>
                     </div>
                   </div>

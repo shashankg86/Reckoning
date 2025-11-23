@@ -6,6 +6,8 @@ interface DashboardAnalytics {
     activeItems: number;
     recentTransactions: RecentTransaction[];
     totalInvoices: number;
+    topSellingItems: { name: string; quantity: number; revenue: number }[];
+    lowStockItems: { id: string; name: string; stock: number; category: string }[];
     loading: boolean;
     error: string | null;
     refresh: () => void;
@@ -16,6 +18,8 @@ export function useDashboardAnalytics(storeId: string | undefined): DashboardAna
     const [activeItems, setActiveItems] = useState(0);
     const [recentTransactions, setRecentTransactions] = useState<RecentTransaction[]>([]);
     const [totalInvoices, setTotalInvoices] = useState(0);
+    const [topSellingItems, setTopSellingItems] = useState<{ name: string; quantity: number; revenue: number }[]>([]);
+    const [lowStockItems, setLowStockItems] = useState<{ id: string; name: string; stock: number; category: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -30,17 +34,21 @@ export function useDashboardAnalytics(storeId: string | undefined): DashboardAna
             setError(null);
 
             // Fetch all dashboard data in parallel
-            const [statsData, itemsCount, transactions, invoiceCount] = await Promise.all([
+            const [statsData, itemsCount, transactions, invoiceCount, topItems, lowStock] = await Promise.all([
                 analyticsAPI.getTodayStats(storeId),
                 analyticsAPI.getActiveItemsCount(storeId),
-                analyticsAPI.getRecentTransactions(storeId, 3),
-                analyticsAPI.getTotalInvoicesCount(storeId)
+                analyticsAPI.getRecentTransactions(storeId, 5),
+                analyticsAPI.getTotalInvoicesCount(storeId),
+                analyticsAPI.getTopSellingItems(storeId),
+                analyticsAPI.getLowStockItems(storeId)
             ]);
 
             setStats(statsData);
             setActiveItems(itemsCount);
             setRecentTransactions(transactions);
             setTotalInvoices(invoiceCount);
+            setTopSellingItems(topItems);
+            setLowStockItems(lowStock);
         } catch (err) {
             console.error('Dashboard analytics error:', err);
             setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
@@ -58,6 +66,8 @@ export function useDashboardAnalytics(storeId: string | undefined): DashboardAna
         activeItems,
         recentTransactions,
         totalInvoices,
+        topSellingItems,
+        lowStockItems,
         loading,
         error,
         refresh: loadDashboardData

@@ -21,6 +21,7 @@ import * as XLSX from 'xlsx';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import type { CreateCategoryData, CreateItemData, CompleteMenuImport } from '../../../types/menu';
+import { useCurrency } from '../../../hooks/useCurrency';
 
 interface ParsedMenuItem {
   category: string;
@@ -51,6 +52,7 @@ export function CompleteMenuExcelImportModal({
   onSubmit,
 }: CompleteMenuExcelImportModalProps) {
   const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsedData, setParsedData] = useState<ParsedMenuItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -434,7 +436,7 @@ Beverages,Thai Iced Tea,3.99,Sweet Thai milk tea,,Drinks and refreshments,#3B82F
                               )}
                             </div>
                             <span className="font-semibold text-gray-900 dark:text-white ml-4">
-                              ₹{item.price.toFixed(2)}
+                              {formatCurrency(item.price)}
                             </span>
                           </div>
                         ))}

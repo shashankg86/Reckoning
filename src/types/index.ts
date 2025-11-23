@@ -1,89 +1,131 @@
+
+
 export interface User {
-  uid: string;
-  email: string | null;
-  name: string | null;
-  phone?: string;
-  photoURL?: string;
-  isOnboarded: boolean;
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'manager' | 'cashier';
   store?: Store;
-  createdAt: Date;
-  lastLoginAt: Date;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  color?: string;
+  store_id: string;
+  created_at: string;
 }
 
 export interface Store {
   id: string;
   name: string;
+  address: string;
+  phone: string;
+  currency: string;
+  tax_rate: number;
   type: StoreType;
-  language: Language;
-  currency: Currency;
-  theme: Theme;
-  logoURL?: string;
-  store_phone?: string;
-  store_email?: string;
-  store_address?: string;
+  settings?: {
+    print_header?: string;
+    print_footer?: string;
+    logo_url?: string;
+  };
 }
 
 export interface Item {
   id: string;
   name: string;
+  description?: string;
   price: number;
-  category: {
-    id: string;
-    name: string;
-    color: string;
-  };
-  image_url?: string;
-  stock?: number;
+  category: string | Category;
+  stock: number;
   sku?: string;
+  barcode?: string;
+  image_url?: string;
+  is_active: boolean;
+  store_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CartItem extends Item {
   quantity: number;
 }
 
-export interface CustomerDetails {
-  name: string;
-  phone: string;
-  email: string;
-  countryCode: string;
-}
-
 export interface Invoice {
   id: string;
-  items: CartItem[];
+  store_id: string;
+  invoice_number: string;
   subtotal: number;
-  discount: number;
   tax: number;
-  taxRate?: number;
-  serviceCharge?: number;
-  municipalityFee?: number;
+  discount: number;
   total: number;
-  paymentMethod: PaymentMethod;
-  date: Date;
-  customer?: string;
-  customerDetails?: CustomerDetails;
+  payment_method: PaymentMethod;
   status: InvoiceStatus;
-  notes?: string;
-  roundOff?: number;
+  customer_name?: string;
+  customer_phone?: string;
+  items: CartItem[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SalesData {
   date: string;
-  sales: number;
+  amount: number;
   orders: number;
 }
 
 export interface TopSellingItem {
+  id: string;
   name: string;
-  sales: number;
+  quantity: number;
   revenue: number;
 }
 
-export type Language = 'en' | 'hi' | 'ar' | 'mr' | 'ur' | 'bn' | 'ta' | 'te' | 'gu' | 'kn' | 'ml' | 'pa';
-export type Currency = 'INR' | 'AED' | 'USD' | 'EUR' | 'GBP';
-export type Theme = 'light' | 'dark';
-export type StoreType = 'restaurant' | 'cafe' | 'retail' | 'salon' | 'pharmacy' | 'other';
-export type PaymentMethod = 'cash' | 'card' | 'upi' | 'razorpay';
-export type InvoiceStatus = 'paid' | 'pending' | 'cancelled';
-export type ChartType = 'line' | 'bar' | 'pie' | 'doughnut';
-export type ReportView = 'chart' | 'statistics';
+export type Language = 'en' | 'es' | 'fr' | 'de' | 'hi' | 'zh' | 'ar';
+export type Currency = 'USD' | 'EUR' | 'GBP' | 'INR' | 'JPY' | 'CNY' | 'AED';
+export type Theme = 'light' | 'dark' | 'system';
+export type StoreType = 'retail' | 'restaurant' | 'service' | 'other';
+export type PaymentMethod = 'cash' | 'card' | 'upi' | 'other';
+export type InvoiceStatus = 'completed' | 'pending' | 'cancelled' | 'refunded';
+export type ChartType = 'bar' | 'line' | 'pie' | 'doughnut';
+export type ReportView = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface DashboardStats {
+  totalSales: number;
+  totalOrders: number;
+  averageOrder: number;
+  activeItems: number;
+  totalInvoices: number;
+  totalTax?: number;
+  itemsSold?: number;
+}
+
+export interface Transaction {
+  id: string;
+  invoice_number: string;
+  total: number;
+  payment_method: PaymentMethod;
+  status: InvoiceStatus;
+  created_at: string;
+  items: {
+    id: string;
+    item_name: string;
+    quantity: number;
+    price: number;
+  }[];
+}
+
+export interface ItemData {
+  id: string;
+  name: string;
+  stock: number;
+  price: number;
+  category: any;
+}
+
+export interface DashboardSummary {
+  stats: DashboardStats;
+  recentTransactions: Transaction[];
+  topSellingItems: TopSellingItem[];
+  lowStockItems: ItemData[];
+}
