@@ -1,9 +1,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { CurrencyRupeeIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { BanknotesIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
-import type { Currency } from '../../contexts/POSContext';
+import { Currency } from '../../types';
 
 const currencies = [
   { code: 'INR' as Currency, symbol: '₹' },
@@ -22,7 +22,7 @@ export function CurrencySelector() {
 
   const handleCurrencyChange = async (currencyCode: Currency) => {
     if (!state.user?.store) return;
-    
+
     await updateStoreSettings({ currency: currencyCode });
     setIsOpen(false);
   };
@@ -36,7 +36,7 @@ export function CurrencySelector() {
         className="flex items-center space-x-2 px-3 py-2"
         aria-label="Select currency"
       >
-        <CurrencyRupeeIcon className="h-4 w-4" />
+        <BanknotesIcon className="h-4 w-4" />
         <span className="text-sm font-medium">{currentCurrency.symbol}</span>
         <ChevronDownIcon className="h-3 w-3" />
       </Button>
@@ -52,16 +52,15 @@ export function CurrencySelector() {
             {currencies.map((currency) => {
               const isActive = state.user?.store?.currency === currency.code;
               const currencyName = t(`currencies.${currency.code}`);
-              
+
               return (
                 <button
                   key={currency.code}
                   onClick={() => handleCurrencyChange(currency.code)}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${
-                    isActive
-                      ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
-                      : 'text-gray-700 dark:text-gray-300'
-                  }`}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between ${isActive
+                    ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+                    : 'text-gray-700 dark:text-gray-300'
+                    }`}
                   aria-current={isActive ? 'true' : 'false'}
                 >
                   <div>

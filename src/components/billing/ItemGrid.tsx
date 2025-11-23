@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { PlusIcon, CubeIcon } from '@heroicons/react/24/outline';
 import type { Item, CartItem } from '../../types';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface ItemGridProps {
   items: Item[];
@@ -14,6 +15,7 @@ interface ItemGridProps {
 
 export function ItemGrid({ items, viewMode, onAddToCart, cart, onLoadMore, hasNextPage, isFetchingNextPage }: ItemGridProps) {
   const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
 
   if (items.length === 0) {
     return (
@@ -69,7 +71,7 @@ export function ItemGrid({ items, viewMode, onAddToCart, cart, onLoadMore, hasNe
                   </p>
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-lg font-bold text-orange-500">
-                      ₹{item.price.toLocaleString('en-IN')}
+                      {formatCurrency(item.price)}
                     </span>
                     {!isOutOfStock && (
                       <div className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-500 text-white group-hover:scale-110 transition-transform">
@@ -180,7 +182,7 @@ export function ItemGrid({ items, viewMode, onAddToCart, cart, onLoadMore, hasNe
             {/* Price and Add Button */}
             <div className="flex items-center gap-3">
               <span className="text-xl font-bold text-orange-500">
-                ₹{item.price.toLocaleString('en-IN')}
+                {formatCurrency(item.price)}
               </span>
               {!isOutOfStock && (
                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-orange-500 text-white">

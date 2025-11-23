@@ -9,6 +9,7 @@ import {
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import type { InvoiceTaxOverride } from '../../api/taxConfig';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface InvoiceTaxModalProps {
   currentOverride: InvoiceTaxOverride | null;
@@ -28,6 +29,7 @@ export function InvoiceTaxModal({
   onApply
 }: InvoiceTaxModalProps) {
   const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
 
   // Initialize state from current override or defaults
   const [taxEnabled, setTaxEnabled] = useState(currentOverride?.enabled ?? true);
@@ -380,7 +382,7 @@ export function InvoiceTaxModal({
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400">{t('billing.subtotal')}</span>
                 <span className="font-medium text-gray-900 dark:text-white">
-                  ₹{preview.baseAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  {formatCurrency(preview.baseAmount)}
                 </span>
               </div>
 
@@ -390,7 +392,7 @@ export function InvoiceTaxModal({
                     {t('billing.serviceCharge')} ({serviceChargeRate}%)
                   </span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    ₹{preview.serviceChargeAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {formatCurrency(preview.serviceChargeAmount)}
                   </span>
                 </div>
               )}
@@ -401,7 +403,7 @@ export function InvoiceTaxModal({
                     {isDubai ? t('billing.vat') : t('billing.gst')} ({preview.taxRate}%)
                   </span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    ₹{preview.taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {formatCurrency(preview.taxAmount)}
                   </span>
                 </div>
               )}
@@ -412,7 +414,7 @@ export function InvoiceTaxModal({
                     {t('billing.municipalityFee')} ({municipalityFeeRate}%)
                   </span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    ₹{preview.municipalityFeeAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {formatCurrency(preview.municipalityFeeAmount)}
                   </span>
                 </div>
               )}
@@ -423,7 +425,7 @@ export function InvoiceTaxModal({
                     {comp.name} ({comp.rate}%)
                   </span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    ₹{((preview.baseAmount * comp.rate) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {formatCurrency((preview.baseAmount * comp.rate) / 100)}
                   </span>
                 </div>
               ))}
@@ -431,7 +433,7 @@ export function InvoiceTaxModal({
               <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-200 dark:border-gray-700">
                 <span className="text-gray-900 dark:text-white">{t('billing.total')}</span>
                 <span className="text-orange-500">
-                  ₹{preview.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  {formatCurrency(preview.total)}
                 </span>
               </div>
             </div>

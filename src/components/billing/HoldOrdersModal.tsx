@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   XMarkIcon,
@@ -10,7 +10,8 @@ import {
   ListBulletIcon
 } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
-import type { CartItem } from '../../contexts/POSContext';
+import { useCurrency } from '../../hooks/useCurrency';
+import { CartItem } from '../../types';
 
 interface HeldOrder {
   id: string;
@@ -31,6 +32,7 @@ interface HoldOrdersModalProps {
 
 export function HoldOrdersModal({ heldOrders, onClose, onRecall, onDelete }: HoldOrdersModalProps) {
   const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
   const formatTime = (date: Date) => {
@@ -56,8 +58,8 @@ export function HoldOrdersModal({ heldOrders, onClose, onRecall, onDelete }: Hol
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
@@ -74,21 +76,19 @@ export function HoldOrdersModal({ heldOrders, onClose, onRecall, onDelete }: Hol
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-white dark:bg-gray-600 text-orange-500'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
+                className={`p-1.5 rounded transition-colors ${viewMode === 'grid'
+                  ? 'bg-white dark:bg-gray-600 text-orange-500'
+                  : 'text-gray-600 dark:text-gray-400'
+                  }`}
               >
                 <Squares2X2Icon className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-white dark:bg-gray-600 text-orange-500'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
+                className={`p-1.5 rounded transition-colors ${viewMode === 'list'
+                  ? 'bg-white dark:bg-gray-600 text-orange-500'
+                  : 'text-gray-600 dark:text-gray-400'
+                  }`}
               >
                 <ListBulletIcon className="h-4 w-4" />
               </button>
@@ -155,7 +155,7 @@ export function HoldOrdersModal({ heldOrders, onClose, onRecall, onDelete }: Hol
                       <span>{getTotalItems(order.items)} {t('billing.items')}</span>
                     </div>
                     <div className="text-sm font-bold text-orange-500">
-                      ₹{getTotalAmount(order.items).toLocaleString('en-IN')}
+                      {formatCurrency(getTotalAmount(order.items))}
                     </div>
                   </div>
 
@@ -217,74 +217,35 @@ export function HoldOrdersModal({ heldOrders, onClose, onRecall, onDelete }: Hol
                     </button>
                   </div>
 
-                  {/* Order Items Summary */}
-                  <div className="space-y-2 mb-3">
-                    {order.items.slice(0, 3).map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between text-sm"
-                      >
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="w-6 h-6 flex items-center justify-center bg-gray-100 dark:bg-gray-700 rounded text-xs font-medium text-gray-600 dark:text-gray-300">
-                            {item.quantity}×
-                          </span>
-                          <span className="text-gray-900 dark:text-white truncate">
-                            {item.name}
-                          </span>
-                        </div>
-                        <span className="text-gray-600 dark:text-gray-400 ml-2">
-                          ₹{(item.price * item.quantity).toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                    ))}
-
-                    {order.items.length > 3 && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 pl-8">
-                        +{order.items.length - 3} {t('billing.moreItems')}
-                      </div>
-                    )}
+                  {/* Order Details */}
+                  <div className="bg-gray-50 dark:bg-gray-900/50 rounded p-3 mb-3">
+                    <div className="flex justify-between items-center text-sm mb-1">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        {getTotalItems(order.items)} {t('billing.items')}
+                      </span>
+                      <span className="font-bold text-gray-900 dark:text-white">
+                        {formatCurrency(getTotalAmount(order.items))}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-400 truncate">
+                      {order.items.map(i => i.name).join(', ')}
+                    </div>
                   </div>
 
-                  {/* Order Footer */}
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                        <ShoppingBagIcon className="h-4 w-4" />
-                        <span>{getTotalItems(order.items)} {t('billing.items')}</span>
-                      </div>
-                      <div className="text-lg font-bold text-orange-500">
-                        ₹{getTotalAmount(order.items).toLocaleString('en-IN')}
-                      </div>
-                    </div>
-
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
                     <Button
-                      size="sm"
+                      variant="primary"
+                      className="flex-1 bg-orange-500 hover:bg-orange-600"
                       onClick={() => onRecall(order)}
-                      className="bg-orange-500 hover:bg-orange-600"
                     >
-                      {t('billing.recall')}
+                      {t('billing.recallOrder')}
                     </Button>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <Button
-            variant="secondary"
-            onClick={onClose}
-            className="w-full"
-          >
-            {t('common.close')}
-          </Button>
-        </div>
-
-        {/* Keyboard Hint */}
-        <div className="px-4 pb-4 text-xs text-center text-gray-500 dark:text-gray-400">
-          {t('billing.pressEscToClose')}
         </div>
       </div>
     </div>

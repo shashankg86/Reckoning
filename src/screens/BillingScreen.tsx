@@ -131,8 +131,6 @@ export function BillingScreen() {
   // No client-side filtering needed anymore
   const filteredItems = catalogItems;
 
-
-
   // Calculate totals using hook
   const subtotal = useMemo(() =>
     posState.cart.reduce((sum, item) => sum + item.price * item.quantity, 0),

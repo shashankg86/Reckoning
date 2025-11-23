@@ -15,6 +15,7 @@ import { Input } from '../ui/Input';
 import type { CartItem, CustomerDetails } from '../../types';
 import type { StoreTaxConfig, InvoiceTaxOverride } from '../../api/taxConfig';
 import type { TaxCalculationResult } from '../../hooks/useTaxCalculation';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface CartPanelProps {
   cart: CartItem[];
@@ -70,6 +71,7 @@ export function CartPanel({
   heldOrdersCount
 }: CartPanelProps) {
   const { t } = useTranslation();
+  const { formatCurrency } = useCurrency();
 
   return (
     <Card className="flex flex-col h-full overflow-hidden">
@@ -167,7 +169,7 @@ export function CartPanel({
                       {item.name}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      ₹{item.price.toLocaleString('en-IN')} × {item.quantity}
+                      {formatCurrency(item.price)} × {item.quantity}
                     </p>
                   </div>
                   <button
@@ -198,7 +200,7 @@ export function CartPanel({
                   </div>
 
                   <span className="text-lg font-bold text-gray-900 dark:text-white">
-                    ₹{(item.price * item.quantity).toLocaleString('en-IN')}
+                    {formatCurrency(item.price * item.quantity)}
                   </span>
                 </div>
               </div>
@@ -228,7 +230,7 @@ export function CartPanel({
                 onChange={(e) => onDiscountTypeChange(e.target.value as 'flat' | 'percentage')}
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               >
-                <option value="flat">₹</option>
+                <option value="flat">{formatCurrency(0).charAt(0)}</option>
                 <option value="percentage">%</option>
               </select>
             </div>
@@ -242,7 +244,7 @@ export function CartPanel({
               </span>
               <div className="flex items-center gap-2">
                 <span className="font-medium text-gray-900 dark:text-white">
-                  ₹{calculations.subtotal.toLocaleString('en-IN')}
+                  {formatCurrency(calculations.subtotal)}
                 </span>
                 <button
                   onClick={onInvoiceTaxClick}
@@ -261,7 +263,7 @@ export function CartPanel({
                   {t('billing.serviceCharge')} ({calculations.serviceChargeRate}%)
                 </span>
                 <span className="font-medium text-gray-900 dark:text-white">
-                  ₹{calculations.serviceCharge.toLocaleString('en-IN')}
+                  {formatCurrency(calculations.serviceCharge)}
                 </span>
               </div>
             )}
@@ -281,7 +283,7 @@ export function CartPanel({
                     </button>
                   </span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    ₹{calculations.tax.toLocaleString('en-IN')}
+                    {formatCurrency(calculations.tax)}
                   </span>
                 </div>
                 {taxComponents.map((component, index) => (
@@ -290,7 +292,7 @@ export function CartPanel({
                       {component.name} ({component.rate}%)
                     </span>
                     <span className="text-gray-600 dark:text-gray-400">
-                      ₹{component.amount.toLocaleString('en-IN')}
+                      {formatCurrency(component.amount)}
                     </span>
                   </div>
                 ))}
@@ -308,7 +310,7 @@ export function CartPanel({
                   </button>
                 </span>
                 <span className="font-medium text-gray-900 dark:text-white">
-                  ₹{calculations.tax.toLocaleString('en-IN')}
+                  {formatCurrency(calculations.tax)}
                 </span>
               </div>
             )}
@@ -320,7 +322,7 @@ export function CartPanel({
                   {t('billing.municipalityFee')} ({calculations.municipalityFeeRate}%)
                 </span>
                 <span className="font-medium text-gray-900 dark:text-white">
-                  ₹{calculations.municipalityFee.toLocaleString('en-IN')}
+                  {formatCurrency(calculations.municipalityFee)}
                 </span>
               </div>
             )}
@@ -334,7 +336,7 @@ export function CartPanel({
                       {component.name} ({component.rate}%)
                     </span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      ₹{component.amount.toLocaleString('en-IN')}
+                      {formatCurrency(component.amount)}
                     </span>
                   </div>
                 ))}
@@ -347,7 +349,7 @@ export function CartPanel({
                   {t('billing.discount')}
                 </span>
                 <span className="font-medium text-green-600 dark:text-green-400">
-                  -₹{calculations.discountAmount.toLocaleString('en-IN')}
+                  -{formatCurrency(calculations.discountAmount)}
                 </span>
               </div>
             )}
@@ -357,7 +359,7 @@ export function CartPanel({
                 {t('billing.total')}
               </span>
               <span className="text-orange-500 dark:text-orange-400">
-                ₹{calculations.total.toLocaleString('en-IN')}
+                {formatCurrency(calculations.total)}
               </span>
             </div>
           </div>
