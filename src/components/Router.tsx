@@ -18,6 +18,11 @@ import { BillingScreen } from '../screens/BillingScreen';
 import { OCRImportScreen } from '../screens/OCRImportScreen';
 import { ReportsScreen } from '../screens/ReportsScreen';
 import { MenuSetupScreen } from '../screens/menu-setup/MenuSetupScreen';
+import { SettingsLayout } from '../screens/settings/SettingsLayout';
+import { ProfileSettings } from '../screens/settings/ProfileSettings';
+import { StaffSettings } from '../screens/settings/StaffSettings';
+import { MenuSettings } from '../screens/settings/MenuSettings';
+import TableSettings from '../screens/settings/TableSettings';
 
 export function Router() {
   return (
@@ -54,10 +59,19 @@ export function Router() {
         <Route path="/billing" element={<ProtectedRoute><BillingScreen /></ProtectedRoute>} />
         <Route path="/ocr" element={<ProtectedRoute><OCRImportScreen /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><ReportsScreen /></ProtectedRoute>} />
-        
+
+        {/* Settings routes */}
+        <Route path="/settings" element={<ProtectedRoute><SettingsLayout /></ProtectedRoute>}>
+          <Route index element={<Navigate to="profile" replace />} />
+          <Route path="profile" element={<ProfileSettings />} />
+          <Route path="staff" element={<StaffSettings />} />
+          <Route path="tables" element={<TableSettings />} />
+          <Route path="menu" element={<MenuSettings />} />
+        </Route>
+
         {/* Default redirect */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        
+
         {/* Catch all route */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

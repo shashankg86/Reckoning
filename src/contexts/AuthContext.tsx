@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { authAPI } from '../api/auth';
-import { storesAPI } from '../api/stores';
+import { storesAPI, StoreData } from '../api/stores';
 import { onboardingAPI } from '../api/onboardingProgress';
 import toast from 'react-hot-toast';
 import i18n from '../lib/i18n';
-import type { User, Store } from '../types';
+import type { User } from '../types';
 
 interface AuthState {
   user: User | null;
@@ -82,11 +82,11 @@ interface AuthContextType {
   state: AuthState;
   login: (email: string, password: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<void>;
-  register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
+  register: (email: string, password: string, name: string, phone?: string) => Promise<any>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  completeOnboarding: (storeData: Store) => Promise<void>;
-  updateStoreSettings: (updates: Partial<Store>) => Promise<void>;
+  completeOnboarding: (storeData: StoreData) => Promise<void>;
+  updateStoreSettings: (updates: Partial<StoreData>, options?: { showToast?: boolean }) => Promise<void>;
   refreshUserProfile: () => Promise<void>;
   clearError: () => void;
 }
@@ -506,7 +506,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const completeOnboarding = async (storeData: Store) => {
+  const completeOnboarding = async (storeData: StoreData) => {
     try {
       if (!state.user) throw new Error('No authenticated user');
       const created = await storesAPI.createStore(storeData);
@@ -535,7 +535,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateStoreSettings = async (updates: Partial<Store>, options?: { showToast?: boolean }) => {
+  const updateStoreSettings = async (updates: Partial<StoreData>, options?: { showToast?: boolean }) => {
     try {
       if (!state.user || !state.user.store) throw new Error('No authenticated user or store');
       await storesAPI.updateStore((state.user.store as any).id, updates);

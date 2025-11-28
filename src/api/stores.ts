@@ -3,7 +3,7 @@ import { BRAND } from '../constants/branding';
 
 export interface StoreData {
   name: string;
-  type: 'restaurant' | 'cafe' | 'retail' | 'salon' | 'pharmacy' | 'other';
+  type: 'restaurant' | 'cafe' | 'retail' | 'salon' | 'pharmacy' | 'service' | 'other';
   language?: string;
   currency?: string;
   theme?: 'light' | 'dark';
@@ -15,7 +15,11 @@ export interface StoreData {
   gst_number?: string;
   phone?: string;
   email?: string;
-  logoURL?: string;
+  logo_url?: string;
+  settings?: {
+    print_header?: string;
+    print_footer?: string;
+  };
 }
 
 export const storesAPI = {
@@ -24,7 +28,7 @@ export const storesAPI = {
       const user = await supabase.auth.getUser();
       if (!user.data.user) throw new Error('Not authenticated');
 
-      const logo_url = storeData.logoURL || BRAND.LOGO_URL;
+      const logo_url = storeData.logo_url || BRAND.LOGO_URL;
 
       const { data: store, error: storeError } = await supabase
         .from('stores')

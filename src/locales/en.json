@@ -363,6 +363,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
+    "totalSales": "Total Sales",
     "goodMorning": "Good morning",
     "todaysActivity": "Here's what's happening with your store today",
     "todaysSales": "Today's Sales",
@@ -653,5 +654,35 @@
     "totalInvoices": "Total Invoices",
     "itemsInCart": "Items in Cart",
     "continueToDashboard": "Continue to Dashboard"
+  },
+  "settings": {
+    "profile": "Store Profile",
+    "staff": "Staff Management",
+    "tables": "Tables",
+    "menu": "Menu Configuration",
+    "addStaff": "Add Staff",
+    "branding": "Branding",
+    "storeLogo": "Store Logo",
+    "logoDescription": "This logo will appear on your invoices and receipts.",
+    "basicInfo": "Basic Information",
+    "storeName": "Store Name",
+    "storeType": "Store Type",
+    "storePhone": "Store Phone",
+    "storeEmail": "Store Email",
+    "location": "Location",
+    "storeAddress": "Store Address",
+    "city": "City",
+    "state": "State",
+    "country": "Country",
+    "pincode": "Pincode",
+    "regionalAndTax": "Regional & Tax",
+    "currency": "Currency",
+    "gstin": "GSTIN",
+    "taxRegistrationNumber": "Tax Registration Number (GST/VAT)",
+    "logoUploaded": "Logo uploaded successfully",
+    "logoUploadFailed": "Failed to upload logo",
+    "profileUpdated": "Profile updated successfully",
+    "profileUpdateFailed": "Failed to update profile",
+    "profileDescription": "Manage your store details and branding"
   }
 }

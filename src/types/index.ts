@@ -1,11 +1,24 @@
-
-
 export interface User {
   id: string;
+  uid: string; // AuthContext uses uid
   email: string;
   name: string;
-  role: 'admin' | 'manager' | 'cashier';
+  phone?: string;
+  photoURL?: string;
+  role?: 'owner' | 'admin' | 'manager' | 'cashier'; // Optional, might be derived from store membership
   store?: Store;
+  isOnboarded: boolean;
+  createdAt: Date;
+  lastLoginAt: Date;
+}
+
+export interface StoreMember {
+  id: string;
+  store_id: string;
+  user_id: string;
+  role: 'owner' | 'admin' | 'manager' | 'cashier';
+  permissions?: Record<string, boolean>;
+  created_at: string;
 }
 
 export interface Category {
@@ -21,13 +34,26 @@ export interface Store {
   name: string;
   address: string;
   phone: string;
+  email?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+  gst_number?: string;
   currency: string;
   tax_rate: number;
   type: StoreType;
+  language?: string;
+  theme?: 'light' | 'dark';
+  logo_url?: string;
   settings?: {
     print_header?: string;
     print_footer?: string;
-    logo_url?: string;
+  };
+  membership?: {
+    role: 'owner' | 'admin' | 'manager' | 'cashier';
+    is_active: boolean;
+    permissions?: Record<string, boolean>;
   };
 }
 
@@ -84,7 +110,7 @@ export interface TopSellingItem {
 export type Language = 'en' | 'es' | 'fr' | 'de' | 'hi' | 'zh' | 'ar';
 export type Currency = 'USD' | 'EUR' | 'GBP' | 'INR' | 'JPY' | 'CNY' | 'AED';
 export type Theme = 'light' | 'dark' | 'system';
-export type StoreType = 'retail' | 'restaurant' | 'service' | 'other';
+export type StoreType = 'retail' | 'restaurant' | 'service' | 'cafe' | 'salon' | 'pharmacy' | 'other';
 export type PaymentMethod = 'cash' | 'card' | 'upi' | 'other';
 export type InvoiceStatus = 'completed' | 'pending' | 'cancelled' | 'refunded';
 export type ChartType = 'bar' | 'line' | 'pie' | 'doughnut';
