@@ -240,7 +240,8 @@
     "nameTooLong": "Name is too long (max 50 characters)",
     "descriptionTooLong": "Description is too long (max 500 characters)",
     "descriptionRequired": "Description is required",
-    "pleaseFixImageErrors": "Please fix image errors before submitting"
+    "pleaseFixImageErrors": "Please fix image errors before submitting",
+    "addAnotherItem": "Add Another Item"
   },
   "navigation": {
     "dashboard": "Dashboard",

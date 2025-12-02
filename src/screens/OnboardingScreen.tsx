@@ -21,7 +21,7 @@ const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
 const storeSchema = z.object({
   name: z.string().min(2, 'Store name must be at least 2 characters'),
-  type: z.enum(['restaurant','cafe','retail','salon','pharmacy','other'], {
+  type: z.enum(['restaurant', 'cafe', 'retail', 'salon', 'pharmacy', 'other'], {
     errorMap: () => ({ message: 'Please select a store type' })
   }),
   address: z.string().min(5, 'Address must be at least 5 characters'),
@@ -33,9 +33,9 @@ const storeSchema = z.object({
   secondary_phone: z.string().optional(),
   email: z.string().email('Please enter a valid email').optional(),
   gst_number: z.string().optional(),
-  language: z.enum(['en','hi','ar','mr']).default('en'),
-  currency: z.enum(['INR','USD','EUR','AED','GBP']).default('INR'),
-  theme: z.enum(['light','dark']).default('light'),
+  language: z.enum(['en', 'hi', 'ar', 'mr']).default('en'),
+  currency: z.enum(['INR', 'USD', 'EUR', 'AED', 'GBP']).default('INR'),
+  theme: z.enum(['light', 'dark']).default('light'),
 }).refine((data) => {
   // Conditional GSTIN validation: only validate if country is India and field is not empty
   if (data.country === 'India' && data.gst_number && data.gst_number.trim() !== '') {
@@ -236,15 +236,31 @@ export function OnboardingScreen() {
       // Logo is already uploaded in handleLogoChange, just use the preview URL
       const logoUrl = logoPreview;
 
-      // Complete onboarding with logo URL
+      // Complete onboarding with ALL collected fields
       const storeData: Store = {
+        // Basic info
         name: data.name,
         type: data.type,
         language: data.language,
         currency: data.currency,
         theme: data.theme,
         logoURL: logoUrl ?? undefined,
-      };
+
+        // Address fields
+        address: data.address,
+        city: data.city,
+        state: data.state,
+        country: data.country,
+        pincode: data.pincode,
+
+        // Contact fields
+        phone: data.phone,
+        secondary_phone: data.secondary_phone,
+        email: data.email,
+
+        // Business fields
+        gst_number: data.gst_number,
+      } as Store;
 
       await completeOnboarding(storeData);
 
@@ -299,8 +315,8 @@ export function OnboardingScreen() {
                 {isUploadingLogo
                   ? t('onboarding.uploadingLogo') || 'Uploading logo...'
                   : isSubmitting
-                  ? t('onboarding.submitting')
-                  : t('onboarding.completeSetup')}
+                    ? t('onboarding.submitting')
+                    : t('onboarding.completeSetup')}
               </button>
             </div>
           </form>

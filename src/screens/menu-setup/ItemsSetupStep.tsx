@@ -17,7 +17,7 @@ import { CachedImage } from '../../components/ui/CachedImage';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCatalogQueries } from '../../hooks/useCatalogQueries';
 import { itemsAPI, ItemData, ItemFilter } from '../../api/items';
-import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
+import { storageService, STORAGE_PATHS } from '../../lib/storage';
 import { ItemFormModal } from '../../components/catalog/ItemFormModal';
 import { BulkAddItemsModal } from '../../components/catalog/BulkAddItemsModal';
 import type { Item } from '../../types/menu';
@@ -138,57 +138,70 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
 
 
   const handleCreateItem = async (itemData: ItemData, imageFile?: File | null) => {
-    const newItem: LocalItem = {
-      ...itemData,
-      id: `temp_${Date.now()}_${Math.random()}`,
-      _isNew: true,
-      _imageFile: imageFile || null,
-    };
-
+    // Convert File to data URL for preview and localStorage persistence
     if (imageFile) {
-      await imageCache.set(newItem.id, imageFile);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const newItem: LocalItem = {
+          ...itemData,
+          id: `temp_${Date.now()}_${Math.random()}`,
+          _isNew: true,
+          _imageFile: imageFile, // Store for upload
+          image_url: reader.result as string, // Data URL for preview
+        };
+        setLocalItems((prev) => [...prev, newItem]);
+        toast.success(t('menuSetup.itemAddedLocally'));
+      };
+      reader.readAsDataURL(imageFile);
+    } else {
+      const newItem: LocalItem = {
+        ...itemData,
+        id: `temp_${Date.now()}_${Math.random()}`,
+        _isNew: true,
+        _imageFile: null,
+      };
+      setLocalItems((prev) => [...prev, newItem]);
+      toast.success(t('menuSetup.itemAddedLocally'));
     }
-
-    setLocalItems((prev) => [...prev, newItem]);
-    toast.success(t('menuSetup.itemAddedLocally'));
     setShowItemForm(false);
   };
 
   const handleUpdateItem = async (itemData: ItemData, imageFile?: File | null) => {
     if (!editingItem) return;
 
-    if (imageFile) {
-      await imageCache.set(editingItem.id, imageFile);
-    }
+    const applyUpdate = (imageUrl?: string) => {
+      setLocalItems((prev) => {
+        const exists = prev.find(i => i.id === editingItem.id);
 
-    setLocalItems((prev) => {
-      // Check if item exists in localItems
-      const exists = prev.find(i => i.id === editingItem.id);
-
-      if (exists) {
-        return prev.map((item) => {
-          if (item.id === editingItem.id) {
-            return {
-              ...item,
-              ...itemData,
-              _imageFile: imageFile !== undefined ? imageFile : item._imageFile,
-              _isModified: !item._isNew, // Only mark modified if not new
-            };
-          }
-          return item;
-        });
-      } else {
-        // Item is from DB, add to localItems as modified
-        return [...prev, {
-          ...editingItem,
+        const updated: LocalItem = {
+          ...(exists || editingItem),
           ...itemData,
           _imageFile: imageFile || null,
-          _isModified: true
-        }];
-      }
-    });
+          _isModified: !exists?._isNew,
+          image_url: imageUrl || itemData.image_url,
+        };
 
-    toast.success(t('menuSetup.itemUpdated'));
+        if (exists) {
+          return prev.map(i => i.id === editingItem.id ? updated : i);
+        } else {
+          return [...prev, updated];
+        }
+      });
+    };
+
+    // Convert File to data URL if provided
+    if (imageFile) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        applyUpdate(reader.result as string);
+        toast.success(t('menuSetup.itemUpdated'));
+      };
+      reader.readAsDataURL(imageFile);
+    } else {
+      applyUpdate();
+      toast.success(t('menuSetup.itemUpdated'));
+    }
+
     setEditingItem(null);
     setShowItemForm(false);
   };
@@ -225,16 +238,34 @@ export function ItemsSetupStep({ onBack, onComplete }: ItemsSetupStepProps) {
   };
 
   const handleBulkCreate = (items: ItemData[], imageFiles?: (File | null)[]) => {
-    const newItems: LocalItem[] = items.map((data, index) => ({
-      ...data,
-      id: `temp_${Date.now()}_${index}`,
-      _isNew: true,
-      _imageFile: imageFiles?.[index] || null,
-      is_active: true,
-    }));
+    const convertPromises: Promise<LocalItem>[] = items.map(async (data, index) => {
+      const imageFile = imageFiles?.[index];
+      let image_url: string | undefined = undefined;
 
-    setLocalItems((prev) => [...prev, ...newItems]);
-    toast.success(`${t('menuSetup.added')} ${items.length} ${t('menuSetup.itemsLocally')}`);
+      if (imageFile) {
+        // Convert File to data URL
+        image_url = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(imageFile);
+        });
+      }
+
+      return {
+        ...data,
+        id: `temp_${Date.now()}_${index}`,
+        _isNew: true,
+        _imageFile: imageFile || null,
+        image_url,
+        is_active: true,
+      };
+    });
+
+    Promise.all(convertPromises).then((newItems) => {
+      setLocalItems((prev) => [...prev, ...newItems]);
+      toast.success(`${t('menuSetup.added')} ${items.length} ${t('menuSetup.itemsLocally')}`);
+    });
+
     setShowBulkCreate(false);
   };
 
