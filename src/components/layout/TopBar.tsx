@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { BuildingStorefrontIcon, UserIcon, SunIcon, MoonIcon } from '@heroicons/react/24/outline';
 import { Button } from '../ui/Button';
@@ -12,12 +13,13 @@ interface TopBarProps {
 
 export function TopBar({ title }: TopBarProps) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { state, logout, updateStoreSettings } = useAuth();
   const [showProfile, setShowProfile] = useState(false);
 
   const toggleTheme = async () => {
     if (!state.user?.store) return;
-    
+
     const newTheme = state.user.store.theme === 'dark' ? 'light' : 'dark';
     await updateStoreSettings({ theme: newTheme });
   };
@@ -29,6 +31,11 @@ export function TopBar({ title }: TopBarProps) {
     } catch (error) {
       console.error('Logout error:', error);
     }
+  };
+
+  const handleNavigateToSettings = () => {
+    setShowProfile(false);
+    navigate('/settings');
   };
 
   return (
@@ -59,7 +66,7 @@ export function TopBar({ title }: TopBarProps) {
                 <MoonIcon className="h-5 w-5" />
               )}
             </Button>
-            
+
             <CurrencySelector />
             <LanguageSelector />
 
@@ -94,16 +101,13 @@ export function TopBar({ title }: TopBarProps) {
                         {state.user?.store?.type || 'User'}
                       </div>
                     </div>
-                    <button 
-                      onClick={() => {
-                        setShowProfile(false);
-                        // TODO: Navigate to settings
-                      }}
+                    <button
+                      onClick={handleNavigateToSettings}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       {t('navigation.settings')}
                     </button>
-                    <button 
+                    <button
                       onClick={handleLogout}
                       className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >

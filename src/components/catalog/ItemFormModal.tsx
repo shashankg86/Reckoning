@@ -85,7 +85,7 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
         sku: data.sku.trim() || undefined,
         stock: data.stock ? parseInt(data.stock, 10) : undefined,
         image_url: data.image_url.trim() || undefined,
-        description: data.description?.trim() || undefined,
+        description: data.description.trim(), // Now required
       };
 
       if (editingItem) {
@@ -233,14 +233,19 @@ export function ItemFormModal({ isOpen, onClose, onSave, editingItem, categories
           {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('common.description')}
+              {t('common.description')} *
             </label>
             <textarea
-              {...register('description')}
+              {...register('description', {
+                required: t('menuSetup.descriptionRequired'),
+              })}
               rows={3}
               placeholder={t('catalog.enterDescription')}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
             />
+            {errors.description && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.description.message}</p>
+            )}
           </div>
 
           {/* Image Upload */}

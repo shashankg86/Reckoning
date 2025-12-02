@@ -14,7 +14,8 @@ import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../contexts/AuthContext';
-import { useCatalogQueries } from '../../hooks/useCatalogQueries';
+import { useCatalogQueries, catalogKeys } from '../../hooks/useCatalogQueries';
+import { useQueryClient } from '@tanstack/react-query';
 import { categoriesAPI } from '../../api/categories';
 import { storageService, STORAGE_PATHS, imageCache } from '../../lib/storage';
 import { CategoryCard } from './components/CategoryCard';
@@ -43,6 +44,7 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
   const { t } = useTranslation();
   const { state: authState } = useAuth();
   const storeId = authState.user?.store?.id || '';
+  const queryClient = useQueryClient();
 
   const { categoriesQuery } = useCatalogQueries(storeId);
   const existingCategories = useMemo(() => categoriesQuery.data || [], [categoriesQuery.data]);
@@ -370,6 +372,16 @@ export function CategorySetupStep({ onNext }: CategorySetupStepProps) {
       toast.success(
         `${t('menuSetup.saved')} ${operationCount} ${operationCount === 1 ? t('menuSetup.change') : t('menuSetup.changes')}`
       );
+
+      // Invalidate categories cache to ensure fresh data in ItemsSetupStep
+      try {
+        await queryClient.invalidateQueries({
+          queryKey: catalogKeys.categories(storeId)
+        });
+      } catch (invalidationError) {
+        // Log but don't block - query will refetch when staleTime expires
+        console.warn('[CategorySetup] Cache invalidation failed:', invalidationError);
+      }
 
       localStorage.removeItem(LOCAL_CATEGORIES_KEY);
       onNext();

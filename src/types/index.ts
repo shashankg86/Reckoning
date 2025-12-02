@@ -2,6 +2,7 @@
 
 export interface User {
   id: string;
+  uid: string;
   email: string;
   name: string;
   role: 'admin' | 'manager' | 'cashier';
@@ -19,11 +20,35 @@ export interface Category {
 export interface Store {
   id: string;
   name: string;
-  address: string;
-  phone: string;
-  currency: string;
-  tax_rate: number;
   type: StoreType;
+
+  // Address fields
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+
+  // Contact fields
+  phone?: string;
+  secondary_phone?: string;
+  email?: string;
+
+  // Business fields
+  gst_number?: string;
+
+  // Settings
+  language?: string;
+  currency: string;
+  theme?: string;
+  tax_rate?: number;
+  logo_url?: string;
+  logoURL?: string; // Alias for compatibility
+
+  // Store metadata
+  menu_setup_completed?: boolean;
+  is_active?: boolean;
+
   settings?: {
     print_header?: string;
     print_footer?: string;

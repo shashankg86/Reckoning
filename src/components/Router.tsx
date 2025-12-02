@@ -18,6 +18,7 @@ import { BillingScreen } from '../screens/BillingScreen';
 import { OCRImportScreen } from '../screens/OCRImportScreen';
 import { ReportsScreen } from '../screens/ReportsScreen';
 import { MenuSetupScreen } from '../screens/menu-setup/MenuSetupScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
 
 export function Router() {
   return (
@@ -54,10 +55,11 @@ export function Router() {
         <Route path="/billing" element={<ProtectedRoute><BillingScreen /></ProtectedRoute>} />
         <Route path="/ocr" element={<ProtectedRoute><OCRImportScreen /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><ReportsScreen /></ProtectedRoute>} />
-        
+        <Route path="/settings" element={<ProtectedRoute><SettingsScreen /></ProtectedRoute>} />
+
         {/* Default redirect */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        
+
         {/* Catch all route */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

@@ -318,5 +318,30 @@
     "itemDeleted": "आयटम यशस्वीरित्या हटवला",
     "allChangesDiscarded": "सर्व बदल रद्द केले",
     "image": "प्रतिमा"
+  },
+  "settings": {
+    "title": "सेटिंग्ज",
+    "subtitle": "तुमच्या स्टोअर सेटिंग्ज आणि प्राधान्ये व्यवस्थापित करा",
+    "storeProfile": "स्टोअर प्रोफाइल",
+    "storeProfileSubtitle": "तुमची स्टोअर माहिती अपडेट करा",
+    "storeName": "स्टोअरचे नाव",
+    "storeLogo": "स्टोअर लोगो",
+    "uploadNewLogo": "नवीन लोगो अपलोड करा",
+    "logoHint": "PNG, JPG 5MB पर्यंत",
+    "storeType": "स्टोअरचा प्रकार",
+    "addressDetails": "पत्त्याचे तपशील",
+    "contactInfo": "संपर्क माहिती",
+    "taxInfo": "कर माहिती",
+    "saveChanges": "बदल जतन करा",
+    "saving": "जतन करत आहे...",
+    "changesSaved": "बदल यशस्वीरित्या जतन झाले",
+    "saveFailed": "बदल जतन करण्यात अयशस्वी",
+    "unsavedChanges": "तुमच्याकडे न जतन केलेले बदल आहेत",
+    "allChangesSaved": "सर्व बदल जतन झाले",
+    "noStoreData": "स्टोअर डेटा उपलब्ध नाही",
+    "account": "खाते",
+    "billing": "बिलिंग",
+    "notifications": "सूचना",
+    "security": "सुरक्षा"
   }
 }

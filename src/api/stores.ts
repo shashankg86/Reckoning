@@ -7,14 +7,23 @@ export interface StoreData {
   language?: string;
   currency?: string;
   theme?: 'light' | 'dark';
+
+  // Address fields
   address?: string;
   city?: string;
   state?: string;
   country?: string;
   pincode?: string;
-  gst_number?: string;
+
+  // Contact fields
   phone?: string;
+  secondary_phone?: string;
   email?: string;
+
+  // Business fields
+  gst_number?: string;
+
+  // Logo
   logoURL?: string;
 }
 
@@ -29,19 +38,29 @@ export const storesAPI = {
       const { data: store, error: storeError } = await supabase
         .from('stores')
         .insert({
+          // Basic info
           name: storeData.name,
           type: storeData.type,
           language: storeData.language ?? 'en',
           currency: storeData.currency ?? 'INR',
           theme: storeData.theme ?? 'light',
+
+          // Address fields
           address: storeData.address,
           city: storeData.city,
           state: storeData.state,
           country: storeData.country,
           pincode: storeData.pincode,
-          gst_number: storeData.gst_number,
+
+          // Contact fields
           phone: storeData.phone,
+          secondary_phone: storeData.secondary_phone,
           email: storeData.email,
+
+          // Business fields
+          gst_number: storeData.gst_number,
+
+          // Logo and owner
           logo_url,
           owner_id: user.data.user.id,
         })
