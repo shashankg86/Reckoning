@@ -17,7 +17,9 @@ import {
   TrashIcon,
   ArrowPathIcon,
   XMarkIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
+import { useAuth } from '@/contexts/AuthContext';
 import { useStoreContext } from '@/contexts/StoreContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useStoreMembers, usePendingInvites } from '@/hooks/useStaffMembers';
@@ -288,7 +290,7 @@ export function StaffSection() {
   const [resendingId, setResendingId] = useState<string | null>(null);
 
   // Get current user ID (for highlighting)
-  const { state: authState } = require('@/contexts/AuthContext').useAuth();
+  const { state: authState } = useAuth();
   const currentUserId = authState.user?.uid;
 
   const handleResendInvite = async (inviteId: string) => {
@@ -494,8 +496,5 @@ export function StaffSection() {
     </div>
   );
 }
-
-// Import UsersIcon for the empty state
-import { UsersIcon as UsersIconForEmpty } from '@heroicons/react/24/outline';
 
 export default StaffSection;
