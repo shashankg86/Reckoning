@@ -40,7 +40,7 @@ export function EditMemberModal({
   // Form state
   const [selectedRole, setSelectedRole] = useState<StoreRole>(member.role);
 
-  const displayName = member.user?.name || member.user?.email || t('staff.unknownUser');
+  const displayName = member.profile?.name || member.profile?.email || t('staff.unknownUser');
   const hasChanged = selectedRole !== member.role;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,9 +91,9 @@ export function EditMemberModal({
             <div className="px-6 py-4 space-y-4">
               {/* Member Info */}
               <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-                {member.user?.avatar_url ? (
+                {member.profile?.photo_url ? (
                   <img
-                    src={member.user.avatar_url}
+                    src={member.profile.photo_url}
                     alt={displayName}
                     className="h-10 w-10 rounded-full object-cover"
                   />
@@ -107,7 +107,7 @@ export function EditMemberModal({
                     {displayName}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {member.user?.email}
+                    {member.profile?.email}
                   </p>
                 </div>
               </div>

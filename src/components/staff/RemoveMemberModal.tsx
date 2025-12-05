@@ -31,7 +31,7 @@ export function RemoveMemberModal({
 
   const [confirmText, setConfirmText] = useState('');
 
-  const displayName = member.user?.name || member.user?.email || t('staff.unknownUser');
+  const displayName = member.profile?.name || member.profile?.email || t('staff.unknownUser');
   const confirmationWord = 'REMOVE';
   const isConfirmed = confirmText.toUpperCase() === confirmationWord;
 
@@ -84,9 +84,9 @@ export function RemoveMemberModal({
 
             {/* Member Info */}
             <div className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-              {member.user?.avatar_url ? (
+              {member.profile?.photo_url ? (
                 <img
-                  src={member.user.avatar_url}
+                  src={member.profile.photo_url}
                   alt={displayName}
                   className="h-10 w-10 rounded-full object-cover"
                 />
@@ -100,7 +100,7 @@ export function RemoveMemberModal({
                   {displayName}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {member.user?.email} • {t(`roles.${member.role}`)}
+                  {member.profile?.email} • {t(`roles.${member.role}`)}
                 </p>
               </div>
             </div>

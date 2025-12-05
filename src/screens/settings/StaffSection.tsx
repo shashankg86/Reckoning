@@ -65,16 +65,16 @@ function MemberCard({
   const { t } = useTranslation();
   const [showMenu, setShowMenu] = useState(false);
 
-  const displayName = member.user?.name || member.user?.email || t('staff.unknownUser');
+  const displayName = member.profile?.name || member.profile?.email || t('staff.unknownUser');
   const isOwner = member.role === 'owner';
 
   return (
     <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-sm transition-shadow">
       <div className="flex items-center gap-3">
         {/* Avatar */}
-        {member.user?.avatar_url ? (
+        {member.profile?.photo_url ? (
           <img
-            src={member.user.avatar_url}
+            src={member.profile.photo_url}
             alt={displayName}
             className="h-10 w-10 rounded-full object-cover"
           />
@@ -98,7 +98,7 @@ function MemberCard({
           </div>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              {member.user?.email}
+              {member.profile?.email}
             </span>
             <RoleBadge role={member.role} />
           </div>
