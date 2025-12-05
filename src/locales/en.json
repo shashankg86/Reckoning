@@ -292,6 +292,7 @@
     "createNewStore": "Create New Store"
   },
   "staff": {
+    "yourStores": "Your Stores",
     "sectionSubtitle": "Manage your team members and invitations",
     "inviteStaff": "Invite Staff",
     "inviteTeamMember": "Invite Team Member",

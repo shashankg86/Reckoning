@@ -91,16 +91,27 @@ export const storesAPI = {
       if (!user.data.user) throw new Error('Not authenticated');
 
       // Step 1: fetch memberships for current user only
+      // Order by join date so oldest membership comes first (usually owned store)
       const { data: memberships, error: memErr } = await supabase
         .from('store_members')
-        .select('store_id, role, is_active')
+        .select('store_id, role, is_active, joined_at')
         .eq('user_id', user.data.user.id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .order('joined_at', { ascending: true });
 
       if (memErr) throw memErr;
       if (!memberships || memberships.length === 0) return [];
 
-      const activeStoreIds = memberships.map((m) => m.store_id);
+      // Sort memberships: owners first, then by join date
+      const sortedMemberships = [...memberships].sort((a, b) => {
+        // Owner role takes priority
+        if (a.role === 'owner' && b.role !== 'owner') return -1;
+        if (b.role === 'owner' && a.role !== 'owner') return 1;
+        // Then by join date
+        return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
+      });
+
+      const activeStoreIds = sortedMemberships.map((m) => m.store_id);
 
       // Step 2: fetch stores by id list (no join)
       const { data: stores, error: storesErr } = await supabase
@@ -113,9 +124,13 @@ export const storesAPI = {
 
       // Merge membership role into stores result
       const roleByStore: Record<string, any> = {};
-      memberships.forEach((m: any) => (roleByStore[m.store_id] = { role: m.role, is_active: m.is_active }));
+      sortedMemberships.forEach((m: any) => (roleByStore[m.store_id] = { role: m.role, is_active: m.is_active }));
 
-      return (stores || []).map((s: any) => ({ ...s, membership: roleByStore[s.id] }));
+      // Return stores in the sorted order (owned stores first)
+      const storeMap = new Map((stores || []).map((s: any) => [s.id, s]));
+      return activeStoreIds
+        .filter((id) => storeMap.has(id))
+        .map((id) => ({ ...storeMap.get(id), membership: roleByStore[id] }));
     } catch (error: any) {
       console.error('Get user stores error:', error);
       // Return empty rather than throw to avoid blocking auth flow

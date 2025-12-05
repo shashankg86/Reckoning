@@ -21,7 +21,6 @@ import {
   CameraIcon,
   ChartBarIcon,
   BuildingStorefrontIcon,
-  TableCellsIcon,
 } from '@heroicons/react/24/outline';
 import {
   HomeIcon as HomeIconSolid,
@@ -29,7 +28,6 @@ import {
   DocumentTextIcon as DocumentTextIconSolid,
   CameraIcon as CameraIconSolid,
   ChartBarIcon as ChartBarIconSolid,
-  TableCellsIcon as TableCellsIconSolid,
 } from '@heroicons/react/24/solid';
 import { usePermissions } from '@/hooks/usePermissions';
 import { PERMISSIONS, type Permission } from '@/types/staff';

@@ -100,25 +100,35 @@ export function StoreProvider({ children }: StoreProviderProps) {
       const userMemberships = await staffAPI.getUserMemberships();
       setMemberships(userMemberships);
 
-      // Set current store if not already set
-      if (!currentStoreId && userMemberships.length > 0) {
+      // Set current store if not already set (using functional update to avoid dependency)
+      setCurrentStoreId((prevStoreId) => {
+        // If already set, keep current selection
+        if (prevStoreId && userMemberships.some((m) => m.store_id === prevStoreId)) {
+          return prevStoreId;
+        }
+
+        // No memberships
+        if (userMemberships.length === 0) {
+          return null;
+        }
+
         // Prefer the store from AuthContext if available
         const authStoreId = (user.store as any)?.id;
         if (authStoreId && userMemberships.some((m) => m.store_id === authStoreId)) {
-          setCurrentStoreId(authStoreId);
-        } else {
-          // Default to first owned store, or first membership
-          const ownedStore = userMemberships.find((m) => m.role === 'owner');
-          setCurrentStoreId(ownedStore?.store_id ?? userMemberships[0]?.store_id ?? null);
+          return authStoreId;
         }
-      }
+
+        // Default to first owned store, or first membership
+        const ownedStore = userMemberships.find((m) => m.role === 'owner');
+        return ownedStore?.store_id ?? userMemberships[0]?.store_id ?? null;
+      });
     } catch (error) {
       console.error('[StoreContext] Failed to load memberships:', error);
       setMemberships([]);
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, user, currentStoreId]);
+  }, [isAuthenticated, user]); // Removed currentStoreId - using functional update instead
 
   // Load memberships when auth state changes
   useEffect(() => {
@@ -143,14 +153,16 @@ export function StoreProvider({ children }: StoreProviderProps) {
   const currentStore = useMemo((): Store | null => {
     if (!currentMembership?.store) return null;
     // Convert StoreMemberStore to Store type
+    // Use currency from AuthContext's user.store if available (for the user's primary store)
+    const authStoreCurrency = (user?.store as any)?.currency;
     return {
       id: currentMembership.store.id,
       name: currentMembership.store.name,
       logo_url: currentMembership.store.logo_url ?? undefined,
       type: currentMembership.store.type as any,
-      currency: 'INR', // Default, should come from actual store data
+      currency: authStoreCurrency || 'INR', // Fallback to INR if not available
     } as Store;
-  }, [currentMembership]);
+  }, [currentMembership, user?.store]);
 
   const currentRole = useMemo((): StoreRole | null => {
     return currentMembership?.role ?? null;
