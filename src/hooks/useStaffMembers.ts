@@ -23,10 +23,11 @@ export const staffKeys = {
 
 /**
  * Hook to fetch all team members for the current store
+ * @param overrideStoreId - Optional store ID to override the current store
  */
-export function useStaffMembers() {
+export function useStoreMembers(overrideStoreId?: string) {
   const { currentStore } = useStoreContext();
-  const storeId = currentStore?.id;
+  const storeId = overrideStoreId ?? currentStore?.id;
 
   return useQuery({
     queryKey: staffKeys.members(storeId ?? ''),
@@ -37,12 +38,16 @@ export function useStaffMembers() {
   });
 }
 
+// Alias for backwards compatibility
+export const useStaffMembers = useStoreMembers;
+
 /**
  * Hook to fetch pending invitations for the current store
+ * @param overrideStoreId - Optional store ID to override the current store
  */
-export function usePendingInvites() {
+export function usePendingInvites(overrideStoreId?: string) {
   const { currentStore } = useStoreContext();
-  const storeId = currentStore?.id;
+  const storeId = overrideStoreId ?? currentStore?.id;
 
   return useQuery({
     queryKey: staffKeys.invites(storeId ?? ''),

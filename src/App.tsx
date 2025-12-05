@@ -6,6 +6,7 @@ import { Router } from './components/Router';
 import { AuthProvider } from './contexts/AuthContext';
 import { POSProvider } from './contexts/POSContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { StoreProvider } from './contexts/StoreContext';
 import './lib/i18n';
 
 const queryClient = new QueryClient({
@@ -159,9 +160,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <POSProvider>
-          <ThemeProvider>
-            <Router />
+        <StoreProvider>
+          <POSProvider>
+            <ThemeProvider>
+              <Router />
             <Toaster
               position="top-right"
               toastOptions={{
@@ -195,8 +197,9 @@ function App() {
                 },
               }}
             />
-          </ThemeProvider>
-        </POSProvider>
+            </ThemeProvider>
+          </POSProvider>
+        </StoreProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
