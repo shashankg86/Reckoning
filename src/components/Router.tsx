@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingScreen } from './ui/Loader';
+import { getPendingInvite } from '../screens/AcceptInviteScreen';
 
 // Auth screens
 import { LoginScreen } from '../screens/LoginScreen';
@@ -10,6 +11,7 @@ import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { PhoneVerificationScreen } from '../screens/PhoneVerificationScreen';
 import { EmailVerificationPendingScreen } from '../screens/EmailVerificationPendingScreen';
 import { OnboardingScreen } from '../screens/OnboardingScreen';
+import { AcceptInviteScreen } from '../screens/AcceptInviteScreen';
 
 // App screens
 import { DashboardScreen } from '../screens/DashboardScreen';
@@ -37,6 +39,9 @@ export function Router() {
 
         {/* Email verification pending route */}
         <Route path="/verify-email" element={<EmailVerificationPendingScreen />} />
+
+        {/* Staff invitation route (public) */}
+        <Route path="/invite/:token" element={<AcceptInviteScreen />} />
 
         {/* Phone verification route */}
         <Route path="/phone-verification" element={<VerificationRoute><PhoneVerificationScreen /></VerificationRoute>} />
@@ -99,6 +104,12 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (state.isAuthenticated) {
+    // Check for pending staff invitation
+    const pendingInvite = getPendingInvite();
+    if (pendingInvite) {
+      return <Navigate to={`/invite/${pendingInvite}`} replace />;
+    }
+
     if (state.isOnboarded) {
       return <Navigate to="/dashboard" replace />;
     }
@@ -151,6 +162,12 @@ function OAuthCallbackRoute() {
 
   // After OAuth processed, redirect based on state
   if (state.isAuthenticated) {
+    // Check for pending staff invitation first
+    const pendingInvite = getPendingInvite();
+    if (pendingInvite) {
+      return <Navigate to={`/invite/${pendingInvite}`} replace />;
+    }
+
     if (state.isOnboarded) {
       // Check if menu setup is completed
       const menuSetupCompleted = (state.user as any)?.store?.menu_setup_completed;
@@ -176,6 +193,12 @@ function EmailConfirmCallbackRoute() {
 
   // After email confirmed, redirect based on state
   if (state.isAuthenticated) {
+    // Check for pending staff invitation first
+    const pendingInvite = getPendingInvite();
+    if (pendingInvite) {
+      return <Navigate to={`/invite/${pendingInvite}`} replace />;
+    }
+
     if (state.isOnboarded) {
       // Check if menu setup is completed
       const menuSetupCompleted = (state.user as any)?.store?.menu_setup_completed;
