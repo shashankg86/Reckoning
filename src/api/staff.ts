@@ -17,7 +17,8 @@ export const staffAPI = {
    * Includes profile information for each member
    */
   async getStoreMembers(storeId: string): Promise<StoreMember[]> {
-    const { data, error } = await supabase
+    // Fetch members without FK join (profiles FK may not exist)
+    const { data: members, error } = await supabase
       .from('store_members')
       .select(
         `
@@ -29,14 +30,7 @@ export const staffAPI = {
         invited_by,
         joined_at,
         created_at,
-        updated_at,
-        profile:profiles!user_id (
-          id,
-          name,
-          email,
-          phone,
-          photo_url
-        )
+        updated_at
       `
       )
       .eq('store_id', storeId)
@@ -48,10 +42,27 @@ export const staffAPI = {
       throw new Error(error.message);
     }
 
+    if (!members || members.length === 0) {
+      return [];
+    }
+
+    // Fetch profiles separately
+    const userIds = [...new Set(members.map((m) => m.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, name, email, phone, photo_url')
+      .in('id', userIds);
+
+    if (profilesError) {
+      console.error('[staffAPI.getStoreMembers] Profiles fetch error:', profilesError);
+    }
+
+    const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
     // Transform the data to match our StoreMember interface
-    return (data || []).map((member) => ({
+    return members.map((member) => ({
       ...member,
-      profile: Array.isArray(member.profile) ? member.profile[0] : member.profile,
+      profile: profileMap.get(member.user_id) || null,
     })) as StoreMember[];
   },
 
@@ -68,7 +79,8 @@ export const staffAPI = {
       throw new Error('Not authenticated');
     }
 
-    const { data, error } = await supabase
+    // Fetch memberships without FK join (stores FK may not exist)
+    const { data: memberships, error } = await supabase
       .from('store_members')
       .select(
         `
@@ -76,13 +88,7 @@ export const staffAPI = {
         store_id,
         role,
         is_active,
-        joined_at,
-        store:stores!store_id (
-          id,
-          name,
-          logo_url,
-          type
-        )
+        joined_at
       `
       )
       .eq('user_id', user.id)
@@ -94,18 +100,39 @@ export const staffAPI = {
       throw new Error(error.message);
     }
 
+    if (!memberships || memberships.length === 0) {
+      return [];
+    }
+
+    // Fetch stores separately
+    const storeIds = [...new Set(memberships.map((m) => m.store_id))];
+    const { data: stores, error: storesError } = await supabase
+      .from('stores')
+      .select('id, name, logo_url, type')
+      .in('id', storeIds);
+
+    if (storesError) {
+      console.error('[staffAPI.getUserMemberships] Stores fetch error:', storesError);
+    }
+
+    const storeMap = new Map((stores || []).map((s) => [s.id, s]));
+
     // Transform the data to match our StoreMembership interface
-    return (data || []).map((membership) => ({
-      ...membership,
-      store: Array.isArray(membership.store) ? membership.store[0] : membership.store,
-    })) as StoreMembership[];
+    // Filter out any memberships where store couldn't be found (should never happen)
+    return memberships
+      .filter((membership) => storeMap.has(membership.store_id))
+      .map((membership) => ({
+        ...membership,
+        store: storeMap.get(membership.store_id)!,
+      })) as StoreMembership[];
   },
 
   /**
    * Get a specific member's details
    */
   async getMemberById(memberId: string): Promise<StoreMember | null> {
-    const { data, error } = await supabase
+    // Fetch member without FK join (profiles FK may not exist)
+    const { data: member, error } = await supabase
       .from('store_members')
       .select(
         `
@@ -117,14 +144,7 @@ export const staffAPI = {
         invited_by,
         joined_at,
         created_at,
-        updated_at,
-        profile:profiles!user_id (
-          id,
-          name,
-          email,
-          phone,
-          photo_url
-        )
+        updated_at
       `
       )
       .eq('id', memberId)
@@ -136,9 +156,20 @@ export const staffAPI = {
       throw new Error(error.message);
     }
 
+    // Fetch profile separately
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, name, email, phone, photo_url')
+      .eq('id', member.user_id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('[staffAPI.getMemberById] Profile fetch error:', profileError);
+    }
+
     return {
-      ...data,
-      profile: Array.isArray(data.profile) ? data.profile[0] : data.profile,
+      ...member,
+      profile: profile || null,
     } as StoreMember;
   },
 
@@ -283,7 +314,8 @@ export const staffAPI = {
    * Useful for showing removed members that can be reactivated
    */
   async getInactiveMembers(storeId: string): Promise<StoreMember[]> {
-    const { data, error } = await supabase
+    // Fetch members without FK join (profiles FK may not exist)
+    const { data: members, error } = await supabase
       .from('store_members')
       .select(
         `
@@ -295,14 +327,7 @@ export const staffAPI = {
         invited_by,
         joined_at,
         created_at,
-        updated_at,
-        profile:profiles!user_id (
-          id,
-          name,
-          email,
-          phone,
-          photo_url
-        )
+        updated_at
       `
       )
       .eq('store_id', storeId)
@@ -314,9 +339,26 @@ export const staffAPI = {
       throw new Error(error.message);
     }
 
-    return (data || []).map((member) => ({
+    if (!members || members.length === 0) {
+      return [];
+    }
+
+    // Fetch profiles separately
+    const userIds = [...new Set(members.map((m) => m.user_id))];
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, name, email, phone, photo_url')
+      .in('id', userIds);
+
+    if (profilesError) {
+      console.error('[staffAPI.getInactiveMembers] Profiles fetch error:', profilesError);
+    }
+
+    const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+    return members.map((member) => ({
       ...member,
-      profile: Array.isArray(member.profile) ? member.profile[0] : member.profile,
+      profile: profileMap.get(member.user_id) || null,
     })) as StoreMember[];
   },
 };

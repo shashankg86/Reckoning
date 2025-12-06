@@ -105,6 +105,7 @@ export const invitationsAPI = {
    * Only accessible by owners and managers
    */
   async getPendingInvites(storeId: string): Promise<StoreInvite[]> {
+    // Fetch invites without FK join (profiles FK may not exist)
     const { data, error } = await supabase
       .from('store_invites')
       .select(
@@ -120,11 +121,7 @@ export const invitationsAPI = {
         expires_at,
         created_by,
         created_at,
-        updated_at,
-        inviter:profiles!created_by (
-          name,
-          email
-        )
+        updated_at
       `
       )
       .eq('store_id', storeId)
@@ -137,9 +134,10 @@ export const invitationsAPI = {
       throw new Error(error.message);
     }
 
+    // Return invites without inviter profile (can be fetched separately if needed)
     return (data || []).map((invite) => ({
       ...invite,
-      inviter: Array.isArray(invite.inviter) ? invite.inviter[0] : invite.inviter,
+      inviter: null, // Profile fetch not available without FK
     })) as StoreInvite[];
   },
 
@@ -148,6 +146,7 @@ export const invitationsAPI = {
    * Useful for audit/history purposes
    */
   async getAllInvites(storeId: string): Promise<StoreInvite[]> {
+    // Fetch invites without FK join (profiles FK may not exist)
     const { data, error } = await supabase
       .from('store_invites')
       .select(
@@ -165,11 +164,7 @@ export const invitationsAPI = {
         created_at,
         updated_at,
         accepted_at,
-        accepted_by,
-        inviter:profiles!created_by (
-          name,
-          email
-        )
+        accepted_by
       `
       )
       .eq('store_id', storeId)
@@ -180,9 +175,10 @@ export const invitationsAPI = {
       throw new Error(error.message);
     }
 
+    // Return invites without inviter profile (can be fetched separately if needed)
     return (data || []).map((invite) => ({
       ...invite,
-      inviter: Array.isArray(invite.inviter) ? invite.inviter[0] : invite.inviter,
+      inviter: null,
     })) as StoreInvite[];
   },
 
@@ -363,7 +359,8 @@ export const invitationsAPI = {
    * Used during login to detect and prompt for invitation acceptance
    */
   async checkUserPendingInvites(email: string): Promise<InviteDetails[]> {
-    const { data, error } = await supabase
+    // First fetch invites without FK join
+    const { data: invites, error } = await supabase
       .from('store_invites')
       .select(
         `
@@ -372,13 +369,7 @@ export const invitationsAPI = {
         email,
         role,
         token,
-        expires_at,
-        store:stores!store_id (
-          id,
-          name,
-          logo_url,
-          type
-        )
+        expires_at
       `
       )
       .ilike('email', email)
@@ -390,7 +381,24 @@ export const invitationsAPI = {
       return [];
     }
 
-    return (data || []).map((invite) => ({
+    if (!invites || invites.length === 0) {
+      return [];
+    }
+
+    // Fetch store details separately
+    const storeIds = [...new Set(invites.map((inv) => inv.store_id))];
+    const { data: stores, error: storesError } = await supabase
+      .from('stores')
+      .select('id, name, logo_url, type')
+      .in('id', storeIds);
+
+    if (storesError) {
+      console.error('[invitationsAPI.checkUserPendingInvites] Stores fetch error:', storesError);
+    }
+
+    const storeMap = new Map((stores || []).map((s) => [s.id, s]));
+
+    return invites.map((invite) => ({
       valid: true,
       invite: {
         id: invite.id,
@@ -400,7 +408,7 @@ export const invitationsAPI = {
         last_name: null,
         expires_at: invite.expires_at,
       },
-      store: Array.isArray(invite.store) ? invite.store[0] : invite.store,
+      store: storeMap.get(invite.store_id) || null,
     })) as InviteDetails[];
   },
 };
