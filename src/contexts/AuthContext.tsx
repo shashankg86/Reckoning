@@ -125,21 +125,23 @@ async function validateGoogleOAuth(uid: string, email: string | null | undefined
   if (!email) return { isValid: true };
 
   try {
-    const emailExists = await authAPI.checkEmailExists(email);
-    if (!emailExists) return { isValid: true };
-
-    // Check if existing profile belongs to different user
-    const { data: existingProfile } = await supabase
+    // Check if profile with this email exists and belongs to a different user
+    const { data: existingProfile, error } = await supabase
       .from('profiles')
-      .select('id, auth_provider')
+      .select('id')
       .eq('email', email.toLowerCase())
       .maybeSingle();
 
+    if (error) {
+      console.error('[AuthContext] Error checking existing profile:', error);
+      return { isValid: true }; // Allow on error to not block auth
+    }
+
+    // If profile exists with different user ID, it's a duplicate account
     if (existingProfile && existingProfile.id !== uid) {
-      const providerName = existingProfile.auth_provider === 'email' ? 'email/password' : existingProfile.auth_provider;
       return {
         isValid: false,
-        errorMsg: `This email is already registered with ${providerName}. Please sign in using ${providerName} instead.`
+        errorMsg: 'This email is already registered with another account. Please sign in using email/password instead.'
       };
     }
 
@@ -510,6 +512,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (!state.user) throw new Error('No authenticated user');
       const created = await storesAPI.createStore(storeData);
+
+      // Update profile onboarding_completed flag for data consistency
+      await supabase
+        .from('profiles')
+        .update({ onboarding_completed: true })
+        .eq('id', state.user.uid);
 
       // Clear onboarding progress
       await onboardingAPI.clear(state.user.uid);
